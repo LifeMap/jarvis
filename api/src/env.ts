@@ -12,5 +12,7 @@ export interface Env {
   GOOGLE_CLIENT_SECRET?: string;
   SEARCH_PROVIDER?: string;
   SEARCH_API_KEY?: string;
+  SEARCH_FALLBACK_PROVIDER?: string;
+  SERP_API_KEY?: string;
   SYSTEM_TIMEZONE?: string;
 }

@@ -1,6 +1,24 @@
-# Copy this file to .dev.vars for local development. Never commit the real key.
-OPENAI_API_KEY=replace-me
-JARVIS_API_TOKEN=replace-me
+# Copy this file to `.dev.vars` for local development.
+# Never commit `.dev.vars` or paste its values into chat, logs, or source code.
+
+# Required: server-to-server bearer token used by Web/Admin proxies.
+# This is a private random string you choose yourself. Use the same value in
+# `admin/.env.local` and `web/.env.local` (or their server launch environment).
+JARVIS_API_TOKEN=choose-a-long-random-local-token
+
+# Required for real Agent responses. Create this in the OpenAI API dashboard.
+# It normally starts with `sk-`. This is not a ChatGPT login/password.
+OPENAI_API_KEY=sk-replace-with-your-openai-api-key
+
+# Optional: required only for Gmail and Google Calendar testing.
+# Create an OAuth 2.0 Web application in Google Cloud Console.
 GOOGLE_CLIENT_ID=replace-me.apps.googleusercontent.com
-GOOGLE_CLIENT_SECRET=replace-me
-SEARCH_API_KEY=replace-me
+GOOGLE_CLIENT_SECRET=replace-with-google-oauth-client-secret
+
+# Optional: required only for Web Search testing.
+# Create a Brave Search API subscription key in the Brave Search dashboard.
+SEARCH_API_KEY=replace-with-brave-search-api-key
+
+# Optional: used only when Brave returns 429 twice (one retry after 1 second).
+# If the SerpApi free allowance is exhausted, search fails without charging a card.
+SERP_API_KEY=replace-with-serpapi-key

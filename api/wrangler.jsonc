@@ -23,6 +23,7 @@
     "LLM_MODEL": "gpt-5-mini",
     "OPENAI_BASE_URL": "https://api.openai.com/v1",
     "SEARCH_PROVIDER": "brave",
+    "SEARCH_FALLBACK_PROVIDER": "serpapi",
     "SYSTEM_TIMEZONE": "Asia/Seoul"
   }
 }

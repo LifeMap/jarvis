@@ -146,9 +146,11 @@ async function handleAgentMessage(request: Request, agent: AgentStub): Promise<R
     }
     const sessionId = typeof body.sessionId === "string" && body.sessionId.trim() ? body.sessionId.trim() : "default";
     if (!isValidId(sessionId)) return json({ error: "sessionId must contain 1 to 128 safe characters" }, 400);
+    const location = parseRequestLocation(body.location);
+    if (body.location !== undefined && !location) return json({ error: "Invalid location payload" }, 400);
 
     try {
-      return json(await agent.message(message, sessionId));
+      return json(await agent.message(message, sessionId, location));
     } catch (error) {
       console.error("Agent request failed", error);
       return json(
@@ -218,6 +220,17 @@ function isApprovalStatus(value: string): value is ApprovalStatus {
 function isValidId(value: string): boolean { return value.length <= 128 && /^[A-Za-z0-9._:-]+$/.test(value); }
 function isText(value: unknown): value is string { return typeof value === "string" && value.trim().length > 0 && value.length <= 10_000; }
 function isMemorySource(value: unknown): value is MemorySource { return value === "user" || value === "agent" || value === "system"; }
+function parseRequestLocation(value:unknown):import("./contracts").RequestLocation|undefined{
+  if(value===undefined)return undefined;
+  if(!value||typeof value!=="object")return undefined;
+  const x=value as Record<string,unknown>;
+  if(typeof x.latitude!=="number"||!Number.isFinite(x.latitude)||x.latitude < -90||x.latitude > 90)return undefined;
+  if(typeof x.longitude!=="number"||!Number.isFinite(x.longitude)||x.longitude < -180||x.longitude > 180)return undefined;
+  if(x.accuracyMeters!==undefined&&(typeof x.accuracyMeters!=="number"||!Number.isFinite(x.accuracyMeters)||x.accuracyMeters<0))return undefined;
+  if(typeof x.capturedAt!=="string"||!Number.isFinite(Date.parse(x.capturedAt)))return undefined;
+  if(x.source!=="browser"&&x.source!=="ios"&&x.source!=="watchos")return undefined;
+  return{latitude:x.latitude,longitude:x.longitude,...(typeof x.accuracyMeters==="number"?{accuracyMeters:x.accuracyMeters}:{}),capturedAt:x.capturedAt,source:x.source};
+}
 
 function isAuthorized(request: Request, env: Env): boolean {
   if (!env.JARVIS_API_TOKEN) {

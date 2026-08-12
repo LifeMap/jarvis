@@ -6,7 +6,7 @@ import { CalendarCreateTool, CalendarDeleteTool, CalendarUpdateTool } from "./ca
 import { GoogleGmailClient } from "./gmail/gmail-client";
 import { GmailSearchTool } from "./gmail/gmail-tool";
 import { GmailReplyTool, GmailSendTool } from "./gmail/gmail-write-tools";
-import { BraveSearchProvider, UnavailableSearchProvider } from "./search/search-provider";
+import { BraveSearchProvider, RateLimitFallbackSearchProvider, SerpApiSearchProvider, UnavailableSearchProvider } from "./search/search-provider";
 import { WebSearchTool } from "./search/search-tool";
 import type { ToolContext, ToolDefinition, ToolExecutionAuthorization } from "./types";
 import { ToolPolicyError } from "./types";
@@ -17,9 +17,12 @@ export class ToolRegistry {
   readonly tools: ToolDefinition[];
   constructor(env: Env, oauth: GoogleOAuthService, scheduler?: SchedulerService) {
     const accessToken = () => oauth.getAccessToken();
-    const searchProvider = env.SEARCH_PROVIDER === "brave" && env.SEARCH_API_KEY
+    const primarySearchProvider = env.SEARCH_PROVIDER === "brave" && env.SEARCH_API_KEY
       ? new BraveSearchProvider(env.SEARCH_API_KEY)
       : new UnavailableSearchProvider("SEARCH_PROVIDER 또는 SEARCH_API_KEY가 설정되지 않았습니다.");
+    const searchProvider=env.SEARCH_FALLBACK_PROVIDER==="serpapi"&&env.SERP_API_KEY
+      ?new RateLimitFallbackSearchProvider(primarySearchProvider,new SerpApiSearchProvider(env.SERP_API_KEY))
+      :primarySearchProvider;
     const gmail = new GoogleGmailClient(accessToken);
     const calendar = new GoogleCalendarClient(accessToken);
     this.tools = [

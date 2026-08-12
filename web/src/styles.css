@@ -93,7 +93,7 @@ textarea { width: 100%; resize: vertical; padding: 15px 16px; color: #eaf2ee; ba
 textarea:focus { border-color: rgba(156,248,199,.55); box-shadow: 0 0 0 3px rgba(156,248,199,.07); }
 .send-button { min-width: 170px; padding: 0 18px; display: flex; align-items: center; justify-content: space-between; gap: 20px; color: #07100c; background: var(--accent); border: 0; border-radius: 12px; font-weight: 700; }
 .send-button span { font-size: 20px; }
-.voice-controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--border); }
+.voice-controls { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--border); }
 .voice-controls > div { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 5px 12px; }
 .voice-controls .control-label { margin: 0; }
 .voice-controls small { grid-column: 1 / -1; color: var(--muted); font-size: 10px; }

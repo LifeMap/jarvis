@@ -7,6 +7,7 @@ export interface Approval {
 }
 export interface ToolCallDebug { id: string; name: string; input: Record<string, unknown>; requiresApproval: boolean; approvalId?: string }
 export interface ToolResultDebug { toolCallId: string; name: string; success: boolean; durationMs: number; summary: string; error?: string }
+export interface RequestLocation { latitude:number; longitude:number; accuracyMeters?:number; capturedAt:string; source:"browser"|"ios"|"watchos" }
 
 export interface AgentMessageResponse {
   message: string;
@@ -19,6 +20,7 @@ export interface AgentMessageResponse {
   executionTimeMs: number;
   requestId: string;
   sessionId: string;
+  context?: { location?: RequestLocation };
   memory?: {
     savedMemoryId?: string;
     profileCount: number;

@@ -3,7 +3,7 @@ import { CalendarSearchTool } from "../src/tools/calendar/calendar-tool";
 import type { CalendarClient } from "../src/tools/calendar/calendar-client";
 import { GmailSearchTool } from "../src/tools/gmail/gmail-tool";
 import type { GmailClient } from "../src/tools/gmail/gmail-client";
-import { BraveSearchProvider } from "../src/tools/search/search-provider";
+import { BraveSearchProvider, RateLimitFallbackSearchProvider, SearchProviderError, SerpApiSearchProvider } from "../src/tools/search/search-provider";
 import { GmailReplyTool, GmailSendTool } from "../src/tools/gmail/gmail-write-tools";
 import { CalendarCreateTool, CalendarDeleteTool, CalendarUpdateTool } from "../src/tools/calendar/calendar-write-tools";
 import type { CalendarMutationClient } from "../src/tools/calendar/calendar-client";
@@ -95,8 +95,29 @@ describe("External tools", () => {
     const results = await new BraveSearchProvider("secret", fetcher).search("Cloudflare Agents", 5);
     expect(results).toEqual([{
       title: "Cloudflare Agents", url: "https://developers.cloudflare.com/agents/",
-      snippet: "Build agents", source: "developers.cloudflare.com",
+      snippet: "Build agents", source: "developers.cloudflare.com", provider: "brave",
     }]);
+    expect(fetcher).toHaveBeenCalledOnce();
+  });
+
+  it("falls back to SerpApi only after Brave returns 429 twice",async()=>{
+    const primary={search:vi.fn().mockRejectedValue(new SearchProviderError("brave",429,"limited"))};
+    const fallback={search:vi.fn().mockResolvedValue([{title:"Fallback",url:"https://example.com",snippet:"ok",source:"example.com",provider:"serpapi" as const}])};
+    const wait=vi.fn().mockResolvedValue(undefined);
+    const results=await new RateLimitFallbackSearchProvider(primary,fallback,wait).search("query",3);
+    expect(primary.search).toHaveBeenCalledTimes(2);expect(wait).toHaveBeenCalledWith(1000);expect(fallback.search).toHaveBeenCalledOnce();expect(results[0]?.provider).toBe("serpapi");
+  });
+
+  it("does not use SerpApi for Brave authentication or other non-rate-limit failures",async()=>{
+    const primary={search:vi.fn().mockRejectedValue(new SearchProviderError("brave",401,"invalid key"))};
+    const fallback={search:vi.fn()};
+    await expect(new RateLimitFallbackSearchProvider(primary,fallback).search("query",3)).rejects.toMatchObject({status:401});
+    expect(fallback.search).not.toHaveBeenCalled();
+  });
+
+  it("normalizes SerpApi organic results",async()=>{
+    const fetcher=vi.fn<typeof fetch>().mockResolvedValue(Response.json({organic_results:[{title:"Result",link:"https://example.com/a",snippet:"Text",source:"Example"}]}));
+    await expect(new SerpApiSearchProvider("secret",fetcher).search("query",5)).resolves.toEqual([{title:"Result",url:"https://example.com/a",snippet:"Text",source:"Example",provider:"serpapi"}]);
     expect(fetcher).toHaveBeenCalledOnce();
   });
 });

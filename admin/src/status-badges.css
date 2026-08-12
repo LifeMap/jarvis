@@ -1,0 +1,20 @@
+.activity {
+  align-items: center;
+  gap: 12px;
+}
+
+.activity > span:first-child {
+  min-width: 0;
+}
+
+.badge {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  min-height: 20px;
+  padding: 3px 8px;
+  line-height: 1;
+  white-space: nowrap;
+  text-align: center;
+}

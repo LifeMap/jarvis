@@ -16,6 +16,27 @@ npm run dev
 For local development, put both `JARVIS_API_TOKEN` and `OPENAI_API_KEY` in the untracked
 `.dev.vars` file. For deployment, register both values with `wrangler secret put`.
 
+### Local secret reference
+
+| Variable | Required | Meaning / source |
+| --- | --- | --- |
+| `JARVIS_API_TOKEN` | Yes | A long random token you choose. Web/Admin proxies must use the same value. |
+| `OPENAI_API_KEY` | Real LLM only | OpenAI API dashboard key used for Agent responses. A ChatGPT subscription alone is not an API key. |
+| `GOOGLE_CLIENT_ID` | Gmail/Calendar only | OAuth 2.0 Web application client ID from Google Cloud Console. |
+| `GOOGLE_CLIENT_SECRET` | Gmail/Calendar only | Secret belonging to the Google OAuth client above. |
+| `SEARCH_API_KEY` | Web Search only | Brave Search API subscription key. |
+| `SERP_API_KEY` | Optional fallback | SerpApi key used only after Brave returns HTTP 429 twice. |
+
+`LLM_PROVIDER`, `LLM_MODEL`, `OPENAI_BASE_URL`, `SEARCH_PROVIDER`, `SEARCH_FALLBACK_PROVIDER`, and `SYSTEM_TIMEZONE` are
+non-secret defaults declared in `wrangler.jsonc`; they normally do not need to be duplicated in
+`.dev.vars`. Start with only `JARVIS_API_TOKEN` and `OPENAI_API_KEY`, then add Google and Search
+credentials when testing those tools.
+
+Web Search uses Brave first. On HTTP 429 it waits one second and retries Brave once; only a second
+429 activates SerpApi. Authentication, validation, and server failures do not trigger paid-provider
+fallback. If SerpApi also returns 429 because its free allowance is exhausted, Jarvis reports the
+search failure and does not retry indefinitely.
+
 Phase 4 external tools additionally require:
 
 ```text

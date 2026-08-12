@@ -19,7 +19,7 @@ interface GoogleEvent {
 }
 
 export class GoogleCalendarClient implements CalendarClient {
-  constructor(private readonly getAccessToken: () => Promise<string>, private readonly fetcher: typeof fetch = fetch) {}
+  constructor(private readonly getAccessToken: () => Promise<string>, private readonly fetcher: typeof fetch = (input, init) => fetch(input, init)) {}
   async listEvents(input: { timeMin: string; timeMax: string; timezone: string }): Promise<CalendarEvent[]> {
     const url = new URL("https://www.googleapis.com/calendar/v3/calendars/primary/events");
     url.search = new URLSearchParams({

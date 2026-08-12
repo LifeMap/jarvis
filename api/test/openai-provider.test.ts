@@ -24,7 +24,7 @@ describe("OpenAiProvider", () => {
   it("maps Responses API function calls into the common Tool contract", async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(Response.json({
       model: "gpt-test",
-      output: [{ type: "function_call", call_id: "call-1", name: "web_search.search", arguments: "{\"query\":\"Cloudflare Agents\"}" }],
+      output: [{ type: "function_call", call_id: "call-1", name: "web_search_search", arguments: "{\"query\":\"Cloudflare Agents\"}" }],
     }));
     const provider = new OpenAiProvider({ apiKey: "secret", model: "gpt-test", fetch: fetchMock });
     const selected = await provider.selectTool(
@@ -32,12 +32,15 @@ describe("OpenAiProvider", () => {
       [{ name: "web_search.search", description: "search", inputSchema: { type: "object" } }],
     );
     expect(selected).toMatchObject({ id: "call-1", name: "web_search.search", arguments: { query: "Cloudflare Agents" } });
+    const sent=JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body)) as {tools:Array<{name:string}>};
+    expect(sent.tools[0]?.name).toBe("web_search_search");
   });
 
   it("continues a Responses API function call with its call_id and structured output", async () => {
     const fetchMock = vi.fn<typeof fetch>()
       .mockResolvedValueOnce(Response.json({
-        output: [{ type: "function_call", call_id: "call-2", name: "web_search.search", arguments: "{\"query\":\"Cloudflare\"}" }],
+        id: "resp-1",
+        output: [{ type: "function_call", call_id: "call-2", name: "web_search_search", arguments: "{\"query\":\"Cloudflare\"}" }],
       }))
       .mockResolvedValueOnce(Response.json({ model: "gpt-test", output_text: "검색 결과 요약" }));
     const provider = new OpenAiProvider({ apiKey: "secret", model: "gpt-test", fetch: fetchMock });
@@ -51,11 +54,13 @@ describe("OpenAiProvider", () => {
       .resolves.toEqual({ text: "검색 결과 요약", model: "gpt-test" });
 
     const secondBody = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body)) as {
+      previous_response_id?:string;
       input: Array<{ type?: string; call_id?: string; name?: string }>;
     };
+    expect(secondBody.previous_response_id).toBe("resp-1");
     expect(secondBody.input).toEqual(expect.arrayContaining([
-      expect.objectContaining({ type: "function_call", call_id: "call-2", name: "web_search.search" }),
       expect.objectContaining({ type: "function_call_output", call_id: "call-2" }),
     ]));
+    expect(secondBody.input).toHaveLength(1);
   });
 });

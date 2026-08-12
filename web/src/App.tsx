@@ -4,6 +4,7 @@ import { DebugPanel } from "./components/DebugPanel";
 import { VoiceControls } from "./components/VoiceControls";
 import { useSpeechRecognition } from "./hooks/useSpeechRecognition";
 import { useTextToSpeech } from "./hooks/useTextToSpeech";
+import { useLocationContext } from "./hooks/useLocationContext";
 import { AgentApiError, getConversation, resolveApproval, sendAgentMessage } from "./services/agent";
 import type { ConversationMessage, DebugSnapshot } from "./types/agent";
 import "./styles.css";
@@ -22,6 +23,7 @@ export default function App() {
   const [resolvingApproval, setResolvingApproval] = useState(false);
   const speechRecognition = useSpeechRecognition(setInput);
   const textToSpeech = useTextToSpeech();
+  const locationContext = useLocationContext();
   const latestAssistantMessage = useMemo(
     () => [...messages].reverse().find((message) => message.role === "assistant")?.content,
     [messages],
@@ -80,10 +82,10 @@ export default function App() {
     const startedAt = performance.now();
 
     try {
-      const response = await sendAgentMessage(message, session.id);
+      const response = await sendAgentMessage(message, session.id, locationContext.location ? { location: locationContext.location } : undefined);
       setMessages((current) => [
         ...current,
-        { id: crypto.randomUUID(), role: "assistant", content: response.message },
+        { id: crypto.randomUUID(), role: "assistant", content: formatAssistantMessage(response) },
       ]);
       setDebug({ response, roundTripTimeMs: Math.round(performance.now() - startedAt) });
     } catch (error) {
@@ -165,8 +167,18 @@ export default function App() {
           canSpeak={Boolean(latestAssistantMessage)}
           onSpeak={() => latestAssistantMessage && textToSpeech.speak(latestAssistantMessage)}
           onStopSpeaking={textToSpeech.stop}
+          locationStatus={locationContext.status}
+          {...(locationContext.location?.accuracyMeters!==undefined?{locationAccuracy:locationContext.location.accuracyMeters}:{})}
+          onRefreshLocation={locationContext.refresh}
         />
       </section>
     </main>
   );
+}
+
+function formatAssistantMessage(response:import("./types/agent").AgentMessageResponse){
+  const location=response.context?.location;
+  if(!location)return response.message;
+  const accuracy=location.accuracyMeters!==undefined?` · 정확도 약 ${Math.round(location.accuracyMeters)}m`:"";
+  return `${response.message}\n\n📍 현재 위치: ${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}${accuracy}\n수집 시각: ${new Date(location.capturedAt).toLocaleString()}`;
 }

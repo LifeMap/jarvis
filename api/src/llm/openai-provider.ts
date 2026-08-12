@@ -2,6 +2,7 @@ import type { LlmProvider, LlmRequest, LlmResponse, LlmToolCall, LlmToolDefiniti
 import { LlmProviderError } from "./types";
 
 interface OpenAiResponse {
+  id?: string;
   model?: string;
   output_text?: string;
   output?: Array<{
@@ -17,6 +18,7 @@ interface OpenAiResponse {
 interface OpenAiToolContinuation {
   outputItem: NonNullable<OpenAiResponse["output"]>[number];
   tools: Array<Record<string, unknown>>;
+  responseId?: string;
 }
 
 export interface OpenAiProviderOptions {
@@ -36,7 +38,7 @@ export class OpenAiProvider implements LlmProvider {
     this.#apiKey = options.apiKey;
     this.#model = options.model;
     this.#baseUrl = (options.baseUrl ?? "https://api.openai.com/v1").replace(/\/$/, "");
-    this.#fetch = options.fetch ?? globalThis.fetch;
+    this.#fetch = options.fetch ?? ((input, init) => fetch(input, init));
   }
 
   async generate(request: LlmRequest): Promise<LlmResponse> {
@@ -48,9 +50,11 @@ export class OpenAiProvider implements LlmProvider {
 
   async selectTool(request: LlmRequest, tools: LlmToolDefinition[]): Promise<LlmToolCall | null> {
     if (tools.length === 0) return null;
+    const names = new Map(tools.map((tool) => [toProviderToolName(tool.name), tool.name]));
+    if (names.size !== tools.length) throw new LlmProviderError("OpenAI Tool 이름 변환 결과가 중복됩니다.");
     const providerTools = tools.map((tool) => ({
       type: "function",
-      name: tool.name,
+      name: toProviderToolName(tool.name),
       description: tool.description,
       parameters: tool.inputSchema,
       strict: false,
@@ -61,12 +65,14 @@ export class OpenAiProvider implements LlmProvider {
     });
     const call = payload.output?.find((item) => item.type === "function_call" && item.name);
     if (!call?.name) return null;
+    const originalName=names.get(call.name);
+    if(!originalName)throw new LlmProviderError(`등록되지 않은 Tool이 선택되었습니다: ${call.name}`);
     try {
       return {
         id: call.call_id ?? crypto.randomUUID(),
-        name: call.name,
+        name: originalName,
         arguments: JSON.parse(call.arguments ?? "{}") as Record<string, unknown>,
-        continuation: { outputItem: call, tools: providerTools } satisfies OpenAiToolContinuation,
+        continuation: { outputItem: call, tools: providerTools, ...(payload.id?{responseId:payload.id}:{}) } satisfies OpenAiToolContinuation,
       };
     } catch (error) {
       throw new LlmProviderError("LLM Tool arguments가 올바른 JSON이 아닙니다.", { cause: error });
@@ -78,12 +84,11 @@ export class OpenAiProvider implements LlmProvider {
     if (!continuation?.outputItem) {
       throw new LlmProviderError("Tool 호출을 이어갈 provider 정보가 없습니다.");
     }
-    const input = [
-      ...request.messages.map((message) => ({ role: message.role, content: message.content })),
-      continuation.outputItem,
-      { type: "function_call_output", call_id: call.id, output: JSON.stringify(result) },
-    ];
-    const payload = await this.request(request, { input, tools: continuation.tools });
+    const toolOutput={ type: "function_call_output", call_id: call.id, output: JSON.stringify(result) };
+    const extra=continuation.responseId
+      ?{input:[toolOutput],tools:continuation.tools,previous_response_id:continuation.responseId}
+      :{input:[...request.messages.map((message)=>({role:message.role,content:message.content})),continuation.outputItem,toolOutput],tools:continuation.tools};
+    const payload = await this.request(request, extra);
     const text = extractText(payload);
     if (!text) throw new LlmProviderError("LLM 응답에 텍스트가 없습니다.");
     return { text, model: payload.model ?? this.#model };
@@ -119,6 +124,8 @@ export class OpenAiProvider implements LlmProvider {
     return payload;
   }
 }
+
+function toProviderToolName(name:string):string{return name.replace(/[^a-zA-Z0-9_-]/g,"_")}
 
 async function parseJson(response: Response): Promise<OpenAiResponse> {
   try {

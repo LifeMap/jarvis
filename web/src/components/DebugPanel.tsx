@@ -46,6 +46,7 @@ export function DebugPanel({ debug, onResolveApproval, resolvingApproval = false
           </div>}
           <DebugRow label="Request ID" value={response.requestId} mono />
           <DebugRow label="Session ID" value={response.sessionId} mono />
+          {response.context?.location&&<DebugRow label="Request location" value={`${response.context.location.latitude.toFixed(5)}, ${response.context.location.longitude.toFixed(5)} · ±${Math.round(response.context.location.accuracyMeters??0)}m`} mono />}
           {response.memory && (
             <>
               <DebugRow label="Profile memory" value={`${response.memory.profileCount}`} />

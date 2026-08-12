@@ -583,9 +583,22 @@ POST /api/agent/message
 
 ```json
 {
-  "message": "내일 오후 일정 알려줘"
+  "message": "내일 오후 일정 알려줘",
+  "sessionId": "client-session-id",
+  "location": {
+    "latitude": 37.5665,
+    "longitude": 126.978,
+    "accuracyMeters": 25,
+    "capturedAt": "2026-08-13T00:00:00.000Z",
+    "source": "browser"
+  }
 }
 ```
+
+`location`은 선택 항목이다. Playground는 브라우저 위치 권한이 허용된 경우 각 Agent 요청에
+현재 좌표를 전달하며, iPhone/Apple Watch Thin Client는 향후 동일 계약에서 `source`를
+`ios`/`watchos`로 전달한다. 위치는 요청 시점의 임시 Context로만 사용하고 Profile/Long-term
+Memory에 자동 저장하지 않는다. 권한 거부나 위치 조회 실패는 기본 Chat 실행을 막지 않는다.
 
 응답:
 

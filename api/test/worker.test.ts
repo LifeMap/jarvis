@@ -61,6 +61,15 @@ describe("Jarvis Phase 1 Worker", () => {
     });
   });
 
+  it("accepts a validated transient location and rejects invalid coordinates", async()=>{
+    const valid=await api("/api/agent/message",{method:"POST",body:JSON.stringify({message:"내 주변 날씨",sessionId:"location-session",location:{latitude:37.5665,longitude:126.978,accuracyMeters:25,capturedAt:"2026-08-13T00:00:00.000Z",source:"browser"}})});
+    expect(valid.status).toBe(200);
+    await expect(valid.json()).resolves.toMatchObject({context:{location:{latitude:37.5665,longitude:126.978,accuracyMeters:25,source:"browser"}}});
+    const invalid=await api("/api/agent/message",{method:"POST",body:JSON.stringify({message:"내 위치",location:{latitude:999,longitude:126.978,capturedAt:"2026-08-13T00:00:00.000Z",source:"browser"}})});
+    expect(invalid.status).toBe(400);
+    await expect(invalid.json()).resolves.toMatchObject({error:"Invalid location payload"});
+  });
+
   it("persists conversations and isolates sessions", async () => {
     await sendMessage("session-a", "A의 첫 메시지");
     await sendMessage("session-b", "B의 첫 메시지");

@@ -1,6 +1,15 @@
 export interface AgentMessageRequest {
   message: string;
   sessionId?: string;
+  location?: RequestLocation;
+}
+
+export interface RequestLocation {
+  latitude: number;
+  longitude: number;
+  accuracyMeters?: number;
+  capturedAt: string;
+  source: "browser" | "ios" | "watchos";
 }
 
 export interface AgentMessageResponse {
@@ -14,6 +23,7 @@ export interface AgentMessageResponse {
   executionTimeMs: number;
   requestId: string;
   sessionId: string;
+  context?: { location?: RequestLocation };
   memory: {
     savedMemoryId?: string;
     profileCount: number;

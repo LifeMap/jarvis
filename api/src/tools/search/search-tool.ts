@@ -16,5 +16,5 @@ export class WebSearchTool implements ToolDefinition<SearchResult[]> {
     try { return await this.provider.search(input.query.trim(), input.count ?? 5); }
     catch (error) { throw new ToolError("Web search failed", "웹 검색 서비스에 연결할 수 없습니다.", { cause: error }); }
   }
-  summarize(result: SearchResult[]): string { return `Web search results: ${result.length}`; }
+  summarize(result: SearchResult[]): string { const providers=[...new Set(result.map(item=>item.provider).filter(Boolean))];return `Web search results: ${result.length}${providers.length?` via ${providers.join(", ")}`:""}`; }
 }

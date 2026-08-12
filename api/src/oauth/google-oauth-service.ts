@@ -21,7 +21,7 @@ export class GoogleOAuthService {
   constructor(
     private readonly repository: GoogleOAuthStore,
     private readonly env: Env,
-    private readonly fetcher: typeof fetch = fetch,
+    private readonly fetcher: typeof fetch = (input, init) => fetch(input, init),
   ) {}
 
   createAuthorizationUrl(redirectUri: string): string {

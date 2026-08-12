@@ -1,4 +1,4 @@
-import type { AgentMessageResponse, Approval, StoredConversationMessage } from "../types/agent";
+import type { AgentMessageResponse, Approval, RequestLocation, StoredConversationMessage } from "../types/agent";
 
 const DEFAULT_AGENT_API_URL = "/api/agent/message";
 
@@ -34,7 +34,7 @@ export class AgentApiError extends Error {
 export async function sendAgentMessage(
   message: string,
   sessionId: string,
-  options?: { signal?: AbortSignal },
+  options?: { signal?: AbortSignal; location?: RequestLocation },
 ): Promise<AgentMessageResponse> {
   const apiUrl = import.meta.env.VITE_AGENT_API_URL || DEFAULT_AGENT_API_URL;
   let response: Response;
@@ -43,7 +43,7 @@ export async function sendAgentMessage(
     response = await fetch(apiUrl, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ message, sessionId }),
+      body: JSON.stringify({ message, sessionId, ...(options?.location ? { location: options.location } : {}) }),
       ...(options?.signal ? { signal: options.signal } : {}),
     });
   } catch (error) {

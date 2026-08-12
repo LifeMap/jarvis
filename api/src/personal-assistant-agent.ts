@@ -40,7 +40,7 @@ export class PersonalAssistantAgent extends Agent<Env> {
     ensureApplicationSchema(this);
   }
 
-  async message(message: string, sessionId = "default"): Promise<AgentMessageResponse> {
+  async message(message: string, sessionId = "default", location?: import("./contracts").RequestLocation): Promise<AgentMessageResponse> {
     const requestId = crypto.randomUUID();
     const createdAt = new Date().toISOString();
     const startedAt = Date.now();
@@ -88,6 +88,7 @@ export class PersonalAssistantAgent extends Agent<Env> {
           this.env.SYSTEM_TIMEZONE,
         );
         request.systemPrompt += `\n\nCurrent date/time: ${formatLocalDateTime(new Date(), timezone)} (${timezone}). Use this when interpreting relative dates and times.`;
+        if(location)request.systemPrompt+=`\n\nCurrent request location (user-authorized, transient): latitude ${location.latitude}, longitude ${location.longitude}${location.accuracyMeters!==undefined?`, accuracy approximately ${location.accuracyMeters} meters`:""}, captured at ${location.capturedAt}. Use it only when relevant to this request. Do not claim a street address unless a tool provides one.`;
         const provider = createLlmProvider(this.env);
         const oauth = new GoogleOAuthService(new GoogleOAuthRepository(this), this.env);
         const scheduleRepository = new ScheduleRepository(this);
@@ -186,6 +187,7 @@ export class PersonalAssistantAgent extends Agent<Env> {
         executionTimeMs,
         requestId,
         sessionId,
+        ...(location?{context:{location}}:{}),
         memory: {
           ...(savedMemoryId ? { savedMemoryId } : {}),
           profileCount: memories.listProfile().length,
@@ -247,7 +249,7 @@ export class PersonalAssistantAgent extends Agent<Env> {
   adminSettings(){const profile=new MemoryRepository(this).listProfile();return{language:profile.find(x=>x.key==="language")?.value??"ko",timezone:resolveTimezone(profile.find(x=>x.key==="timezone")?.value,this.env.SYSTEM_TIMEZONE),llmProvider:this.env.LLM_PROVIDER,llmModel:this.env.LLM_MODEL,systemTimezone:this.env.SYSTEM_TIMEZONE??"UTC",secretsManagedBy:"Cloudflare Secrets"}}
   updateAdminSettings(input:{language?:string;timezone?:string}){const repo=new MemoryRepository(this);if(input.language)repo.create({type:"profile",key:"language",value:input.language,source:"user"});if(input.timezone){const timezone=resolveTimezone(input.timezone);if(timezone!==input.timezone)throw new Error("Invalid timezone");repo.create({type:"profile",key:"timezone",value:timezone,source:"user"})}return this.adminSettings()}
 
-  adminDashboard(){const runs=this.listAgentRuns(10);const tools=new ToolExecutionRepository(this).list(10);const approvals=new ApprovalRepository(this).list();const schedules=new ScheduleRepository(this).list();const scheduleExecutions=new ScheduleRepository(this).executions();return{counts:{pendingApprovals:approvals.filter(x=>x.status==="PENDING").length,activeSchedules:schedules.filter(x=>x.enabled&&(x.status==="scheduled"||x.status==="running"||x.status==="failed")).length,recentErrors:runs.filter(x=>x.status==="failed").length+tools.filter(x=>!x.success).length+(scheduleExecutions as Array<{success?:number}>).filter(x=>x.success===0).length},recentRuns:runs,recentTools:tools,recentScheduleExecutions:scheduleExecutions.slice(0,10)}}
+  adminDashboard(){const runs=this.listAgentRuns(10);const tools=new ToolExecutionRepository(this).list(10);const approvals=new ApprovalRepository(this).list();const schedules=new ScheduleRepository(this).list();const scheduleExecutions=new ScheduleRepository(this).executions();const scheduleTitles=new Map(schedules.map(schedule=>[schedule.id,schedule.title]));return{counts:{pendingApprovals:approvals.filter(x=>x.status==="PENDING").length,activeSchedules:schedules.filter(x=>x.enabled&&(x.status==="scheduled"||x.status==="running"||x.status==="failed")).length,recentErrors:runs.filter(x=>x.status==="failed").length+tools.filter(x=>!x.success).length+(scheduleExecutions as Array<{success?:number}>).filter(x=>x.success===0).length},recentRuns:runs,recentTools:tools,recentScheduleExecutions:scheduleExecutions.slice(0,10).map(execution=>({...execution,scheduleTitle:scheduleTitles.get(String(execution.schedule_id))??null}))}}
 
   listConversations() {
     return new ConversationRepository(this).listSessions();

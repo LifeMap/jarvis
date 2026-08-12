@@ -18,6 +18,7 @@ export interface GmailMutationClient {
 
 export interface GmailSendRequest { to: string; subject: string; body: string; threadId?: string; inReplyTo?: string }
 export interface GmailMutationResult { id: string; threadId: string }
+export class GmailApiError extends Error{constructor(readonly status:number,readonly reason:string){super(`Gmail API 요청 실패 (${status}): ${reason}`);this.name="GmailApiError"}}
 
 interface GmailApiMessage {
   id: string;
@@ -29,7 +30,7 @@ interface GmailApiMessage {
 interface GmailPart { mimeType?: string; headers?: Array<{ name: string; value: string }>; body?: { data?: string }; parts?: GmailPart[] }
 
 export class GoogleGmailClient implements GmailClient {
-  constructor(private readonly getAccessToken: () => Promise<string>, private readonly fetcher: typeof fetch = fetch) {}
+  constructor(private readonly getAccessToken: () => Promise<string>, private readonly fetcher: typeof fetch = (input, init) => fetch(input, init)) {}
 
   async search(input: { query?: string; maxResults: number }): Promise<GmailMessage[]> {
     const token = await this.getAccessToken();
@@ -51,7 +52,7 @@ export class GoogleGmailClient implements GmailClient {
       headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
       body: JSON.stringify({ raw: encodeMime(input), ...(input.threadId ? { threadId: input.threadId } : {}) }),
     });
-    if (!response.ok) throw new Error(`Gmail API 발송 실패 (${response.status})`);
+    if (!response.ok) throw await gmailApiError(response);
     const payload = await response.json() as { id?: string; threadId?: string };
     if (!payload.id || !payload.threadId) throw new Error("Gmail API 발송 응답이 올바르지 않습니다.");
     return { id: payload.id, threadId: payload.threadId };
@@ -59,9 +60,15 @@ export class GoogleGmailClient implements GmailClient {
 
   private async request<T>(url: URL, token: string): Promise<T> {
     const response = await this.fetcher(url, { headers: { authorization: `Bearer ${token}` } });
-    if (!response.ok) throw new Error(`Gmail API 요청 실패 (${response.status})`);
+    if (!response.ok) throw await gmailApiError(response);
     return response.json() as Promise<T>;
   }
+}
+
+async function gmailApiError(response:Response):Promise<GmailApiError>{
+  let reason="Google API error";
+  try{const payload=await response.json() as {error?:{message?:string;errors?:Array<{reason?:string}>}};reason=payload.error?.errors?.[0]?.reason??payload.error?.message??reason}catch{}
+  return new GmailApiError(response.status,reason);
 }
 
 function encodeMime(input: GmailSendRequest): string {
