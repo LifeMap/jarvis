@@ -34,6 +34,17 @@ export default {
 
     const agent = env.PERSONAL_ASSISTANT_AGENT.getByName(AGENT_NAME);
 
+    if(url.pathname==="/api/admin/dashboard"&&request.method==="GET")return json(await agent.adminDashboard());
+    if(url.pathname==="/api/tools"&&request.method==="GET")return json({tools:await agent.adminToolStatus()});
+    if(url.pathname==="/api/settings"){
+      if(request.method==="GET")return json(await agent.adminSettings());
+      if(request.method==="PATCH"){const body=await readJson(request);if(!body||typeof body!=="object")return json({error:"Invalid settings payload"},400);try{return json(await agent.updateAdminSettings(body as {language?:string;timezone?:string}))}catch(error){return json({error:"Invalid settings",detail:safeMessage(error)},400)}}
+      return json({error:"Method not allowed"},405);
+    }
+    if(url.pathname==="/api/history"&&request.method==="GET")return json({runs:await agent.listAgentRuns(),scheduleExecutions:await agent.listScheduleExecutions()});
+    const historyId=matchPath(url.pathname,"/api/history/");
+    if(historyId&&request.method==="GET"){const run=await agent.getAgentRun(historyId);return run?json(run):json({error:"History not found"},404)}
+
     if (url.pathname === "/api/oauth/google/authorize" && request.method === "GET") {
       const redirectUri = `${url.origin}/api/oauth/google/callback`;
       try { return json({ authorizationUrl: await agent.googleAuthorizationUrl(redirectUri) }); }

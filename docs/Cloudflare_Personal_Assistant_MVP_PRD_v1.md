@@ -803,6 +803,32 @@ SDK의 `schedule(Date, callback, payload)`가 제공하는 Durable Object Alarm�
 - Settings
 - Playground 통합
 
+### Phase 7 구현 아키텍처
+
+`admin/`은 React, TypeScript, Vite 기반의 단일 사용자 Control Center다. Dashboard, Memory,
+Tools, Approvals, Schedules, History, Settings 및 기존 Playground 링크를 제공한다. API 호출은
+공통 service 계층을 통하며 production URL이나 Secret을 브라우저 코드에 하드코딩하지 않는다.
+
+Backend에는 기존 기능을 중복하지 않고 다음 관리 조회 계약만 추가한다.
+
+```text
+GET /api/admin/dashboard
+GET /api/tools
+GET /api/history
+GET /api/history/:id
+GET/PATCH /api/settings
+```
+
+Tool enable/disable 저장 모델은 현재 Backend에 없으므로 Admin Tools 화면은 실제 연결·정책·최근
+실행 상태만 조회한다. LLM Provider와 Model은 Cloudflare 환경변수 관리 항목으로 읽기 전용이며,
+Admin에서는 Profile Memory 기반 language와 timezone만 수정한다. Token Usage는 현재 LLM 계약이
+저장하지 않으므로 History에 `Unavailable`로 표시하며 값을 생성하지 않는다.
+
+로컬에서는 Vite server proxy, Cloudflare Pages 배포에서는 `functions/api/[[path]].ts`가 서버 측
+Bearer Token을 주입한다. 브라우저 번들에는 API Token이 포함되지 않는다. 배포된 Admin 전체는
+Cloudflare Access의 Single User 정책으로 보호한다. 기존 `web/` Playground는 복사하지 않고
+설정된 URL로 이동한다.
+
 ---
 
 ## Phase 8. iPhone / Apple Watch

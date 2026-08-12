@@ -232,6 +232,23 @@ export class PersonalAssistantAgent extends Agent<Env> {
     return run ?? null;
   }
 
+  listAgentRuns(limit=100){return this.sql<RunRow>`SELECT id,request,response,model,status,error_message,execution_time_ms,created_at,completed_at FROM agent_runs ORDER BY created_at DESC LIMIT ${limit}`.map(mapRun)}
+  getAgentRun(id:string){const [run]=this.sql<RunRow>`SELECT id,request,response,model,status,error_message,execution_time_ms,created_at,completed_at FROM agent_runs WHERE id=${id}`;return run?{...mapRun(run),toolExecutions:new ToolExecutionRepository(this).listByRequestId(id),tokenUsage:null}:null}
+
+  adminToolStatus(){
+    const oauth=new GoogleOAuthService(new GoogleOAuthRepository(this),this.env).status();
+    const latest=new ToolExecutionRepository(this).list(100);
+    const registry=new ToolRegistry(this.env,new GoogleOAuthService(new GoogleOAuthRepository(this),this.env),new SchedulerService(new ScheduleRepository(this),this,this.env.SYSTEM_TIMEZONE??"UTC"));
+    return registry.tools.map(tool=>({name:tool.name,description:tool.description,enabled:true,policy:tool.policy,requiresApproval:tool.requiresApproval,
+      connection:tool.name.startsWith("gmail.")||tool.name.startsWith("calendar.")||tool.name.startsWith("google_calendar.")?(oauth.connected?"connected":"disconnected"):tool.name==="web_search.search"?(this.env.SEARCH_PROVIDER&&this.env.SEARCH_API_KEY?"available":"unavailable"):"available",
+      permission:tool.policy==="APPROVAL_REQUIRED"?"Write with approval":"Read / safe",latestExecution:latest.find(item=>item.toolName===tool.name)??null}));
+  }
+
+  adminSettings(){const profile=new MemoryRepository(this).listProfile();return{language:profile.find(x=>x.key==="language")?.value??"ko",timezone:resolveTimezone(profile.find(x=>x.key==="timezone")?.value,this.env.SYSTEM_TIMEZONE),llmProvider:this.env.LLM_PROVIDER,llmModel:this.env.LLM_MODEL,systemTimezone:this.env.SYSTEM_TIMEZONE??"UTC",secretsManagedBy:"Cloudflare Secrets"}}
+  updateAdminSettings(input:{language?:string;timezone?:string}){const repo=new MemoryRepository(this);if(input.language)repo.create({type:"profile",key:"language",value:input.language,source:"user"});if(input.timezone){const timezone=resolveTimezone(input.timezone);if(timezone!==input.timezone)throw new Error("Invalid timezone");repo.create({type:"profile",key:"timezone",value:timezone,source:"user"})}return this.adminSettings()}
+
+  adminDashboard(){const runs=this.listAgentRuns(10);const tools=new ToolExecutionRepository(this).list(10);const approvals=new ApprovalRepository(this).list();const schedules=new ScheduleRepository(this).list();const scheduleExecutions=new ScheduleRepository(this).executions();return{counts:{pendingApprovals:approvals.filter(x=>x.status==="PENDING").length,activeSchedules:schedules.filter(x=>x.enabled&&(x.status==="scheduled"||x.status==="running"||x.status==="failed")).length,recentErrors:runs.filter(x=>x.status==="failed").length+tools.filter(x=>!x.success).length+(scheduleExecutions as Array<{success?:number}>).filter(x=>x.success===0).length},recentRuns:runs,recentTools:tools,recentScheduleExecutions:scheduleExecutions.slice(0,10)}}
+
   listConversations() {
     return new ConversationRepository(this).listSessions();
   }
@@ -363,6 +380,8 @@ export class PersonalAssistantAgent extends Agent<Env> {
 export type ApprovalActionResult =
   | { ok: true; approval: Approval; result?: { summary: string; durationMs: number } }
   | { ok: false; code: "NOT_FOUND" | "ALREADY_RESOLVED" | "EXPIRED" | "TOOL_NOT_FOUND" | "POLICY_MISMATCH"; message: string; approval?: Approval };
+
+function mapRun(row:RunRow){return{id:row.id,request:row.request,response:row.response,model:row.model,status:row.status,error:row.error_message,executionTimeMs:row.execution_time_ms,createdAt:row.created_at,completedAt:row.completed_at,triggerType:"manual" as const}}
 
 function resolveTimezone(profileTimezone?: string, systemTimezone?: string): string {
   for (const candidate of [profileTimezone, systemTimezone, "UTC"]) {

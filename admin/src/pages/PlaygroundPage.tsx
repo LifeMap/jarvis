@@ -1,0 +1,1 @@
+export function PlaygroundPage(){const url=import.meta.env.VITE_PLAYGROUND_URL||"http://127.0.0.1:5173";return <section className="card playground"><p>기존 Web Playground를 그대로 유지합니다. Agent Chat, Tool Debug, Approval, Scheduler, STT/TTS 검증은 전용 Playground에서 수행합니다.</p><a href={url}>Playground 열기 ↗</a></section>}

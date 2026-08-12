@@ -45,6 +45,7 @@ export class ToolExecutionRepository {
       createdAt: row.created_at,
     }));
   }
+  listByRequestId(requestId:string){return this.list(500).filter(item=>item.requestId===requestId)}
 }
 
 function sanitizeInput(input: Record<string, unknown>): Record<string, unknown> {

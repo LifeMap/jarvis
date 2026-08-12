@@ -1,0 +1,8 @@
+import{api}from"./api-client";import type{Approval,DashboardData,Memory,Run,Schedule,ScheduleExecution,Settings,ToolStatus}from"../types";
+export const dashboard=()=>api<DashboardData>("/admin/dashboard");
+export const memories={list:()=>api<{profile:Memory[];longTerm:Memory[]}>("/memories"),create:(body:unknown)=>api<Memory>("/memories",{method:"POST",body:JSON.stringify(body)}),update:(id:string,body:unknown)=>api<Memory>(`/memories/${encodeURIComponent(id)}`,{method:"PATCH",body:JSON.stringify(body)}),remove:(id:string)=>api<{deleted:boolean}>(`/memories/${encodeURIComponent(id)}`,{method:"DELETE"})};
+export const approvals={list:(status?:string)=>api<{approvals:Approval[]}>(`/approvals${status?`?status=${status}`:""}`),resolve:(id:string,action:"approve"|"reject")=>api<{approval:Approval}>(`/approvals/${id}/${action}`,{method:"POST"})};
+export const schedules={list:()=>api<{schedules:Schedule[]}>("/schedules"),create:(body:unknown)=>api<Schedule>("/schedules",{method:"POST",body:JSON.stringify(body)}),update:(id:string,body:unknown)=>api<Schedule>(`/schedules/${id}`,{method:"PATCH",body:JSON.stringify(body)}),remove:(id:string)=>api<{deleted:boolean}>(`/schedules/${id}`,{method:"DELETE"}),run:(id:string)=>api<unknown>(`/schedules/${id}/run`,{method:"POST"})};
+export const history={list:()=>api<{runs:Run[];scheduleExecutions:ScheduleExecution[]}>("/history"),detail:(id:string)=>api<Run>(`/history/${id}`)};
+export const tools=()=>api<{tools:ToolStatus[]}>("/tools");
+export const settings={get:()=>api<Settings>("/settings"),update:(body:Partial<Settings>)=>api<Settings>("/settings",{method:"PATCH",body:JSON.stringify(body)})};

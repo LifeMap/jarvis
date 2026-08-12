@@ -232,6 +232,15 @@ describe("Jarvis Phase 1 Worker", () => {
     expect(responses.map(r=>r.status).sort()).toEqual([200,409]);
   });
 
+  it("provides authenticated Admin dashboard, tools, settings and history APIs",async()=>{
+    const dashboard=await api("/api/admin/dashboard");expect(dashboard.status).toBe(200);expect(await dashboard.json()).toMatchObject({counts:{pendingApprovals:expect.any(Number),activeSchedules:expect.any(Number),recentErrors:expect.any(Number)}});
+    const toolList=await (await api("/api/tools")).json<{tools:Array<{name:string;requiresApproval:boolean}>}>();expect(toolList.tools).toEqual(expect.arrayContaining([expect.objectContaining({name:"gmail.send",requiresApproval:true}),expect.objectContaining({name:"scheduler.create",requiresApproval:false})]));
+    const updated=await api("/api/settings",{method:"PATCH",body:JSON.stringify({language:"ko",timezone:"Asia/Seoul"})});expect(await updated.json()).toMatchObject({language:"ko",timezone:"Asia/Seoul",llmProvider:"test",secretsManagedBy:"Cloudflare Secrets"});
+    const sent=await sendMessage("admin-history","안녕 Admin");const run=await sent.json<{requestId:string}>();
+    const historyList=await (await api("/api/history")).json<{runs:Array<{id:string}>}>();expect(historyList.runs).toContainEqual(expect.objectContaining({id:run.requestId}));
+    expect(await (await api(`/api/history/${run.requestId}`)).json()).toMatchObject({id:run.requestId,request:"안녕 Admin",triggerType:"manual",tokenUsage:null,toolExecutions:[]});
+  });
+
 });
 
 function api(path: string, init: RequestInit = {}): Promise<Response> {
