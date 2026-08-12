@@ -9,6 +9,8 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react()],
     server: {
+      allowedHosts: ["playground.twms.ai"],
+      hmr: { protocol: "wss", clientPort: 443 },
       proxy: {
         "/api": {
           target: apiOrigin,
