@@ -81,6 +81,9 @@ pre { max-height: 140px; margin: 0; padding: 10px; overflow: auto; background: #
 .approval-actions { display: flex; gap: .5rem; }
 .approval-actions button { border: 1px solid var(--border); border-radius: .55rem; padding: .5rem .75rem; background: var(--surface); color: #eaf2ee; }
 .approval-actions button:first-child { background: var(--accent); color: #07100c; }
+.schedule-card dd { display: grid; gap: .5rem; }
+.schedule-card strong { color: var(--accent); }
+.schedule-card p { margin: 0; color: var(--muted); font-size: 11px; }
 .error-card { margin: 24px; padding: 16px; color: #ffd0cd; background: rgba(120, 30, 30, .18); border: 1px solid rgba(255,156,150,.3); border-radius: 12px; }
 .error-card p { color: #d8aaa7; font-size: 12px; line-height: 1.5; }.error-card code { font-size: 10px; }
 .composer-panel { margin-top: 16px; padding: 24px; }

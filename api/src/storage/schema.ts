@@ -108,4 +108,23 @@ export function ensureApplicationSchema(database: SqlExecutor): void {
     )
   `;
   database.sql`CREATE INDEX IF NOT EXISTS approvals_status_requested_idx ON approvals (status, requested_at)`;
+  database.sql`
+    CREATE TABLE IF NOT EXISTS schedules (
+      id TEXT PRIMARY KEY, title TEXT NOT NULL, instruction TEXT NOT NULL,
+      schedule_type TEXT NOT NULL CHECK (schedule_type IN ('one_time', 'recurring')),
+      schedule_rule_json TEXT NOT NULL, timezone TEXT NOT NULL, enabled INTEGER NOT NULL,
+      status TEXT NOT NULL CHECK (status IN ('scheduled', 'running', 'completed', 'failed', 'disabled')),
+      native_schedule_id TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+      last_run_at TEXT, next_run_at TEXT, last_result TEXT
+    )
+  `;
+  database.sql`CREATE INDEX IF NOT EXISTS schedules_next_run_idx ON schedules (enabled, next_run_at)`;
+  database.sql`
+    CREATE TABLE IF NOT EXISTS schedule_executions (
+      id TEXT PRIMARY KEY, schedule_id TEXT NOT NULL, trigger_type TEXT NOT NULL CHECK (trigger_type IN ('manual', 'scheduled')),
+      started_at TEXT NOT NULL, completed_at TEXT, success INTEGER, tool_calls_json TEXT,
+      response TEXT, error_message TEXT
+    )
+  `;
+  database.sql`CREATE INDEX IF NOT EXISTS schedule_executions_schedule_idx ON schedule_executions (schedule_id, started_at)`;
 }

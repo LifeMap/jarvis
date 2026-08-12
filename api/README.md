@@ -69,3 +69,25 @@ npm run check
 npm test
 npx wrangler deploy --dry-run
 ```
+
+## Scheduler API
+
+Jarvis uses the Agents SDK `schedule(Date, callback, payload)` API, which is persisted in the
+Durable Object and backed by its native alarm. Application metadata and execution history remain
+in the Jarvis `schedules` and `schedule_executions` SQLite tables.
+
+```text
+GET    /api/schedules
+GET    /api/schedules/:id
+POST   /api/schedules
+PATCH  /api/schedules/:id
+DELETE /api/schedules/:id
+POST   /api/schedules/:id/run
+GET    /api/schedule-executions?scheduleId=:id
+```
+
+One-time rules use `{ "runAt": "RFC3339" }`. Recurring rules use daily or weekly wall-clock
+time, for example `{ "frequency":"weekly", "weekday":1, "hour":8, "minute":0 }`.
+Jarvis calculates each next occurrence in the schedule timezone and registers it as a one-time
+Agent schedule. This preserves Profile timezone and daylight-saving behavior rather than treating
+a cron expression as implicitly UTC.

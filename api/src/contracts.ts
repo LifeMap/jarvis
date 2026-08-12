@@ -9,6 +9,7 @@ export interface AgentMessageResponse {
   toolResults: import("./tools/types").ToolResultDebug[];
   approvalRequired: boolean;
   approval?: import("./approval/approval-repository").Approval;
+  schedule?: import("./scheduler/types").JarvisSchedule;
   model: string;
   executionTimeMs: number;
   requestId: string;

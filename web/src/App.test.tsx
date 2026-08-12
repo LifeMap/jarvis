@@ -86,6 +86,12 @@ describe("Jarvis Playground", () => {
     expect(fetchMock.mock.calls[1]?.[0]).toBe("/api/approvals/a1/approve");
   });
 
+  it("shows Scheduler debug information returned by the Agent",async()=>{
+    vi.spyOn(globalThis,"fetch").mockResolvedValue(Response.json({message:"등록했습니다.",toolCalls:[],toolResults:[],approvalRequired:false,model:"test",executionTimeMs:2,requestId:"r",sessionId:"s",schedule:{id:"sch-1",title:"Daily digest",scheduleType:"recurring",timezone:"Asia/Seoul",status:"scheduled",nextRunAt:"2026-08-12T23:00:00.000Z"}}));
+    render(<App/>);fireEvent.change(screen.getByRole("textbox",{name:"Agent command"}),{target:{value:"매일 알려줘"}});fireEvent.click(screen.getByRole("button",{name:/명령 보내기/}));
+    expect(await screen.findByText("Daily digest")).toBeInTheDocument();expect(screen.getByText("recurring · scheduled")).toBeInTheDocument();expect(screen.getByText(/Asia\/Seoul/)).toBeInTheDocument();
+  });
+
   it("displays network errors in the debug panel", async () => {
     vi.spyOn(globalThis, "fetch").mockRejectedValue(new TypeError("Failed to fetch"));
     render(<App />);

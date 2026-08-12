@@ -10,10 +10,12 @@ import { BraveSearchProvider, UnavailableSearchProvider } from "./search/search-
 import { WebSearchTool } from "./search/search-tool";
 import type { ToolContext, ToolDefinition, ToolExecutionAuthorization } from "./types";
 import { ToolPolicyError } from "./types";
+import type { SchedulerService } from "../scheduler/scheduler-service";
+import { SchedulerCreateTool } from "../scheduler/scheduler-tool";
 
 export class ToolRegistry {
   readonly tools: ToolDefinition[];
-  constructor(env: Env, oauth: GoogleOAuthService) {
+  constructor(env: Env, oauth: GoogleOAuthService, scheduler?: SchedulerService) {
     const accessToken = () => oauth.getAccessToken();
     const searchProvider = env.SEARCH_PROVIDER === "brave" && env.SEARCH_API_KEY
       ? new BraveSearchProvider(env.SEARCH_API_KEY)
@@ -24,6 +26,7 @@ export class ToolRegistry {
       new GmailSearchTool(gmail), new GmailSendTool(gmail), new GmailReplyTool(gmail),
       new CalendarSearchTool(calendar), new CalendarCreateTool(calendar), new CalendarUpdateTool(calendar), new CalendarDeleteTool(calendar),
       new WebSearchTool(searchProvider),
+      ...(scheduler ? [new SchedulerCreateTool(scheduler)] : []),
     ];
   }
   definitions() { return this.tools.map((tool) => ({ name: tool.name, description: tool.description, inputSchema: tool.inputSchema })); }

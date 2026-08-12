@@ -14,6 +14,9 @@ import { MemoryRepository } from "./memory/memory-repository";
 import { GoogleOAuthRepository } from "./oauth/google-oauth-repository";
 import { GoogleOAuthService } from "./oauth/google-oauth-service";
 import { ensureApplicationSchema } from "./storage/schema";
+import { ScheduleRepository } from "./scheduler/schedule-repository";
+import { SchedulerService } from "./scheduler/scheduler-service";
+import type { CreateScheduleInput, UpdateScheduleInput } from "./scheduler/types";
 import { ToolExecutionRepository } from "./tools/tool-execution-repository";
 import { ToolRegistry } from "./tools/tool-registry";
 import type { ToolCallDebug, ToolResultDebug } from "./tools/types";
@@ -62,6 +65,7 @@ export class PersonalAssistantAgent extends Agent<Env> {
       let toolCalls: ToolCallDebug[] = [];
       let toolResults: ToolResultDebug[] = [];
       let approval: Approval | undefined;
+      let createdSchedule: import("./scheduler/types").JarvisSchedule | undefined;
       if (explicitMemory) {
         const saved = memories.create({
           type: "long_term",
@@ -86,7 +90,9 @@ export class PersonalAssistantAgent extends Agent<Env> {
         request.systemPrompt += `\n\nCurrent date/time: ${formatLocalDateTime(new Date(), timezone)} (${timezone}). Use this when interpreting relative dates and times.`;
         const provider = createLlmProvider(this.env);
         const oauth = new GoogleOAuthService(new GoogleOAuthRepository(this), this.env);
-        const registry = new ToolRegistry(this.env, oauth);
+        const scheduleRepository = new ScheduleRepository(this);
+        const scheduler = new SchedulerService(scheduleRepository, this, timezone);
+        const registry = new ToolRegistry(this.env, oauth, scheduler);
         const selected = await provider.selectTool(request, registry.definitions());
         if (selected) {
           const tool = registry.get(selected.name);
@@ -114,6 +120,7 @@ export class PersonalAssistantAgent extends Agent<Env> {
             let summary: string;
             try {
               toolPayload = (await registry.execute(selected.name, selected.arguments, { timezone })).result;
+              if (selected.name === "scheduler.create") createdSchedule = toolPayload as import("./scheduler/types").JarvisSchedule;
               success = true;
               summary = tool.summarize(toolPayload);
             } catch (toolError) {
@@ -174,6 +181,7 @@ export class PersonalAssistantAgent extends Agent<Env> {
         toolResults,
         approvalRequired: Boolean(approval),
         ...(approval ? { approval } : {}),
+        ...(createdSchedule ? { schedule: createdSchedule } : {}),
         model: responseModel,
         executionTimeMs,
         requestId,
@@ -271,6 +279,30 @@ export class PersonalAssistantAgent extends Agent<Env> {
 
   listToolExecutions() {
     return new ToolExecutionRepository(this).list();
+  }
+
+  listJarvisSchedules(){return new ScheduleRepository(this).list()}
+  getJarvisSchedule(id:string){return new ScheduleRepository(this).get(id)}
+  listScheduleExecutions(id?:string){return new ScheduleRepository(this).executions(id)}
+  async createJarvisSchedule(input:CreateScheduleInput){const timezone=resolveTimezone(input.timezone??new MemoryRepository(this).listProfile().find(x=>x.key==="timezone")?.value,this.env.SYSTEM_TIMEZONE);return new SchedulerService(new ScheduleRepository(this),this,timezone).create({...input,timezone})}
+  async updateJarvisSchedule(id:string,input:UpdateScheduleInput){const timezone=resolveTimezone(input.timezone??new MemoryRepository(this).listProfile().find(x=>x.key==="timezone")?.value,this.env.SYSTEM_TIMEZONE);return new SchedulerService(new ScheduleRepository(this),this,timezone).update(id,input)}
+  async deleteJarvisSchedule(id:string){return new SchedulerService(new ScheduleRepository(this),this,this.env.SYSTEM_TIMEZONE??"UTC").delete(id)}
+  async runJarvisSchedule(id:string){const schedule=new ScheduleRepository(this).get(id);if(!schedule)return{ok:false,code:"NOT_FOUND"};if(schedule.nativeScheduleId)await this.cancelSchedule(schedule.nativeScheduleId);return this.executeSchedule({scheduleId:id},"manual")}
+
+  async executeScheduledTask(payload:{scheduleId:string}){return this.executeSchedule(payload,"scheduled")}
+
+  private async executeSchedule(payload:{scheduleId:string},trigger:"manual"|"scheduled"){
+    const repository=new ScheduleRepository(this);const schedule=repository.claim(payload.scheduleId);
+    if(!schedule)return{ok:false,code:"NOT_RUNNABLE"};
+    const executionId=crypto.randomUUID();repository.startExecution(executionId,schedule.id,trigger);
+    try{
+      const response=await this.message(schedule.instruction,`schedule:${schedule.id}`);
+      const success=!response.toolResults.some(result=>!result.success);
+      let next:string|null=null;let status:import("./scheduler/types").ScheduleStatus;
+      if(schedule.scheduleType==="recurring"&&schedule.enabled){const at=await new SchedulerService(repository,this,schedule.timezone).rescheduleRecurring(schedule);next=at.toISOString();status=success?"scheduled":"failed"}else status=success?"completed":"failed";
+      repository.finish(schedule.id,status,next,response.message);repository.finishExecution(executionId,success,response.message,success?null:"Scheduled Tool execution failed",response.toolCalls);
+      return{ok:true,schedule:repository.get(schedule.id),response};
+    }catch(error){const message=error instanceof Error?error.message:"Scheduled task failed";if(schedule.scheduleType==="recurring"&&schedule.enabled){try{const at=await new SchedulerService(repository,this,schedule.timezone).rescheduleRecurring(schedule);repository.finish(schedule.id,"failed",at.toISOString(),message)}catch{repository.finish(schedule.id,"failed",null,message)}}else repository.finish(schedule.id,"failed",null,message);repository.finishExecution(executionId,false,null,message,[]);return{ok:false,code:"EXECUTION_FAILED",error:message,schedule:repository.get(schedule.id)}}
   }
 
   listApprovals(status?: ApprovalStatus) { return new ApprovalRepository(this).list(status); }

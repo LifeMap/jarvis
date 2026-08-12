@@ -14,6 +14,7 @@ export interface AgentMessageResponse {
   toolResults?: ToolResultDebug[];
   approvalRequired: boolean;
   approval?: Approval;
+  schedule?: { id:string; title:string; scheduleType:"one_time"|"recurring"; timezone:string; status:string; nextRunAt:string|null };
   model: string;
   executionTimeMs: number;
   requestId: string;

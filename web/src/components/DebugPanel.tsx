@@ -36,6 +36,14 @@ export function DebugPanel({ debug, onResolveApproval, resolvingApproval = false
           )}
           <DebugRow label="Approval" value={response.approvalRequired ? "Required" : "Not required"} />
           {response.approval && <ApprovalCard approval={response.approval} onResolve={onResolveApproval} disabled={resolvingApproval} />}
+          {response.schedule && <div className="debug-row debug-json schedule-card">
+            <dt>Schedule</dt><dd>
+              <strong>{response.schedule.title}</strong>
+              <code>{response.schedule.id}</code>
+              <p>{response.schedule.scheduleType} · {response.schedule.status}</p>
+              <p>{response.schedule.nextRunAt ?? "No next run"} · {response.schedule.timezone}</p>
+            </dd>
+          </div>}
           <DebugRow label="Request ID" value={response.requestId} mono />
           <DebugRow label="Session ID" value={response.sessionId} mono />
           {response.memory && (

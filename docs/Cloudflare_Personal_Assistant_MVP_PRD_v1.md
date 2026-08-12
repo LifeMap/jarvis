@@ -773,6 +773,23 @@ Voice -> STT -> Agent -> TTS
 
 - 등록된 시간에 Agent 작업 실행
 
+### Phase 6 구현 아키텍처
+
+Scheduler는 `ScheduleRepository`, `SchedulerService`, 시간 계산 모듈 및 Agent의
+`executeScheduledTask` callback으로 분리한다. Jarvis 일정 메타데이터와 실행 기록은 Durable
+Object SQLite의 `schedules`, `schedule_executions`에 저장한다. 실제 wake-up은 Cloudflare Agents
+SDK의 `schedule(Date, callback, payload)`가 제공하는 Durable Object Alarm을 사용한다.
+
+반복 작업은 timezone이 없는 SDK cron 문자열에 직접 의존하지 않는다. `daily` 또는 `weekly`
+규칙과 IANA timezone을 저장하고, 실행 완료 후 Scheduler 레이어가 다음 로컬 wall-clock 시각을
+계산해 다음 one-time Alarm을 등록한다. Profile Memory timezone을 기본값으로 사용하며 요청에
+명시된 timezone이 우선한다.
+
+실행은 조건부 `scheduled/failed -> running` 전이로 claim하여 중복 실행을 막는다. 단발 작업은
+`completed`, 반복 작업은 다음 실행 시각과 함께 `scheduled`로 돌아간다. 실패한 반복 작업도
+삭제하지 않고 다음 Alarm을 유지한다. 예약 실행은 기존 Agent message/Tool Registry를 그대로
+통과하므로 write Tool은 실행 시점에 Pending Approval만 만들고 승인 전 외부 상태를 변경하지 않는다.
+
 ---
 
 ## Phase 7. Admin Web

@@ -1,6 +1,7 @@
 import type { AgentMessageRequest, CreateMemoryInput, MemorySource, UpdateMemoryInput } from "./contracts";
 import type { Env } from "./env";
 import type { ApprovalStatus } from "./approval/approval-repository";
+import type { CreateScheduleInput, UpdateScheduleInput } from "./scheduler/types";
 
 export { PersonalAssistantAgent } from "./personal-assistant-agent";
 
@@ -46,6 +47,20 @@ export default {
     }
     if (url.pathname === "/api/tool-executions" && request.method === "GET") {
       return json({ executions: await agent.listToolExecutions() });
+    }
+    if(url.pathname==="/api/schedule-executions"&&request.method==="GET")return json({executions:await agent.listScheduleExecutions(url.searchParams.get("scheduleId")??undefined)});
+    if(url.pathname==="/api/schedules"){
+      if(request.method==="GET")return json({schedules:await agent.listJarvisSchedules()});
+      if(request.method==="POST"){const body=await readJson(request);if(!isCreateSchedule(body))return json({error:"Invalid schedule payload"},400);try{return json(await agent.createJarvisSchedule(body),201)}catch(error){return json({error:"Invalid schedule",detail:safeMessage(error)},400)}}
+      return json({error:"Method not allowed"},405);
+    }
+    const schedulePath=matchSchedulePath(url.pathname);
+    if(schedulePath){
+      if(!schedulePath.action&&request.method==="GET"){const value=await agent.getJarvisSchedule(schedulePath.id);return value?json(value):json({error:"Schedule not found"},404)}
+      if(!schedulePath.action&&request.method==="PATCH"){const body=await readJson(request);if(!body||typeof body!=="object")return json({error:"Invalid schedule payload"},400);try{const value=await agent.updateJarvisSchedule(schedulePath.id,body as UpdateScheduleInput);return value?json(value):json({error:"Schedule not found"},404)}catch(error){return json({error:"Invalid schedule",detail:safeMessage(error)},400)}}
+      if(!schedulePath.action&&request.method==="DELETE")return await agent.deleteJarvisSchedule(schedulePath.id)?json({deleted:true}):json({error:"Schedule not found"},404);
+      if(schedulePath.action==="run"&&request.method==="POST"){const result=await agent.runJarvisSchedule(schedulePath.id) as unknown as {ok:boolean;code?:string};return result.ok?json(result):json(result,result.code==="NOT_FOUND"?404:409)}
+      return json({error:"Method not allowed"},405);
     }
     if (url.pathname === "/api/approvals" && request.method === "GET") {
       const status = url.searchParams.get("status");
@@ -181,6 +196,9 @@ function matchApprovalPath(pathname: string): { id: string; action?: "approve" |
     return match[2] ? { id, action: match[2] as "approve" | "reject" } : { id };
   } catch { return null; }
 }
+function matchSchedulePath(pathname:string):{id:string;action?:"run"}|null{const m=pathname.match(/^\/api\/schedules\/([^/]+)(?:\/(run))?$/);if(!m?.[1])return null;try{return m[2]?{id:decodeURIComponent(m[1]),action:"run"}:{id:decodeURIComponent(m[1])}}catch{return null}}
+function isCreateSchedule(v:unknown):v is CreateScheduleInput{if(!v||typeof v!=="object")return false;const x=v as Record<string,unknown>;return typeof x.title==="string"&&typeof x.instruction==="string"&&(x.scheduleType==="one_time"||x.scheduleType==="recurring")&&Boolean(x.scheduleRule)&&typeof x.scheduleRule==="object"}
+function safeMessage(error:unknown){return error instanceof Error?error.message:"Unknown error"}
 
 function isApprovalStatus(value: string): value is ApprovalStatus {
   return ["PENDING", "APPROVED", "REJECTED", "EXECUTED", "FAILED", "EXPIRED"].includes(value);

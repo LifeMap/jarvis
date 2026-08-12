@@ -196,6 +196,42 @@ describe("Jarvis Phase 1 Worker", () => {
     expect(response.status).toBe(410);
     expect(await response.json()).toMatchObject({ code: "EXPIRED", approval: { status: "EXPIRED" } });
   });
+
+  it("creates and manually executes a one-time schedule to completion", async () => {
+    const createdResponse=await api("/api/schedules",{method:"POST",body:JSON.stringify({title:"test",instruction:"안녕 Jarvis",scheduleType:"one_time",scheduleRule:{runAt:new Date(Date.now()+60_000).toISOString()},timezone:"Asia/Seoul"})});
+    expect(createdResponse.status).toBe(201);
+    const created=await createdResponse.json<{id:string;status:string;nextRunAt:string;nativeScheduleId:string}>();
+    expect(created).toMatchObject({status:"scheduled",timezone:"Asia/Seoul"});expect(created.nativeScheduleId).toBeTruthy();
+    const run=await api(`/api/schedules/${created.id}/run`,{method:"POST"});
+    expect(await run.json()).toMatchObject({ok:true,schedule:{status:"completed",nextRunAt:null}});
+    const history=await (await api(`/api/schedule-executions?scheduleId=${created.id}`)).json<{executions:unknown[]}>();expect(history.executions).toHaveLength(1);
+  });
+
+  it("reschedules recurring tasks after each execution",async()=>{
+    const created=await (await api("/api/schedules",{method:"POST",body:JSON.stringify({title:"daily",instruction:"안녕",scheduleType:"recurring",scheduleRule:{frequency:"daily",hour:8,minute:0},timezone:"Asia/Seoul"})})).json<{id:string;nextRunAt:string}>();
+    const run=await (await api(`/api/schedules/${created.id}/run`,{method:"POST"})).json<{schedule:{status:string;nextRunAt:string}}>();
+    expect(run.schedule.status).toBe("scheduled");expect(new Date(run.schedule.nextRunAt).getTime()).toBeGreaterThan(Date.now());
+  });
+
+  it("does not execute disabled schedules and supports update/delete",async()=>{
+    const created=await (await api("/api/schedules",{method:"POST",body:JSON.stringify({title:"disabled",instruction:"안녕",scheduleType:"one_time",scheduleRule:{runAt:new Date(Date.now()+60_000).toISOString()}})})).json<{id:string}>();
+    const disabled=await api(`/api/schedules/${created.id}`,{method:"PATCH",body:JSON.stringify({enabled:false})});expect(await disabled.json()).toMatchObject({enabled:false,status:"disabled"});
+    expect((await api(`/api/schedules/${created.id}/run`,{method:"POST"})).status).toBe(409);
+    expect((await api(`/api/schedules/${created.id}`,{method:"DELETE"})).status).toBe(200);
+  });
+
+  it("creates Approval instead of executing a scheduled write action",async()=>{
+    const created=await (await api("/api/schedules",{method:"POST",body:JSON.stringify({title:"mail",instruction:"메일 보내줘",scheduleType:"one_time",scheduleRule:{runAt:new Date(Date.now()+60_000).toISOString()}})})).json<{id:string}>();
+    const run=await (await api(`/api/schedules/${created.id}/run`,{method:"POST"})).json<{response:{approvalRequired:boolean;approval:{status:string;toolName:string}}}>();
+    expect(run.response).toMatchObject({approvalRequired:true,approval:{status:"PENDING",toolName:"gmail.send"}});
+  });
+
+  it("prevents duplicate concurrent schedule execution",async()=>{
+    const created=await (await api("/api/schedules",{method:"POST",body:JSON.stringify({title:"once",instruction:"안녕",scheduleType:"one_time",scheduleRule:{runAt:new Date(Date.now()+60_000).toISOString()}})})).json<{id:string}>();
+    const responses=await Promise.all([api(`/api/schedules/${created.id}/run`,{method:"POST"}),api(`/api/schedules/${created.id}/run`,{method:"POST"})]);
+    expect(responses.map(r=>r.status).sort()).toEqual([200,409]);
+  });
+
 });
 
 function api(path: string, init: RequestInit = {}): Promise<Response> {
