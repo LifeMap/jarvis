@@ -1,0 +1,28 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "jarvis-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-11",
+  "compatibility_flags": ["nodejs_compat"],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "PERSONAL_ASSISTANT_AGENT",
+        "class_name": "PersonalAssistantAgent"
+      }
+    ]
+  },
+  "exports": {
+    "PersonalAssistantAgent": {
+      "type": "durable-object",
+      "storage": "sqlite"
+    }
+  },
+  "vars": {
+    "LLM_PROVIDER": "openai",
+    "LLM_MODEL": "gpt-5-mini",
+    "OPENAI_BASE_URL": "https://api.openai.com/v1",
+    "SEARCH_PROVIDER": "brave",
+    "SYSTEM_TIMEZONE": "Asia/Seoul"
+  }
+}

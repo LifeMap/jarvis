@@ -1,0 +1,6 @@
+# Copy this file to .dev.vars for local development. Never commit the real key.
+OPENAI_API_KEY=replace-me
+JARVIS_API_TOKEN=replace-me
+GOOGLE_CLIENT_ID=replace-me.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=replace-me
+SEARCH_API_KEY=replace-me

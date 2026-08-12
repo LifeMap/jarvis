@@ -1,0 +1,18 @@
+import { cloudflareTest } from "@cloudflare/vitest-pool-workers";
+import { defineConfig } from "vitest/config";
+
+export default defineConfig({
+  plugins: [
+    cloudflareTest({
+      wrangler: { configPath: "./wrangler.jsonc" },
+      miniflare: {
+        bindings: {
+          JARVIS_API_TOKEN: "test-token",
+          LLM_PROVIDER: "test",
+          LLM_MODEL: "test-model",
+          TEST_LLM_RESPONSE: "안녕하세요. Jarvis 테스트 응답입니다.",
+        },
+      },
+    }),
+  ],
+});
