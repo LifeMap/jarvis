@@ -54,15 +54,20 @@ For local development, put both `JARVIS_API_TOKEN` and `OPENAI_API_KEY` in the u
 | `SEARCH_API_KEY` | Web Search only | Brave Search API subscription key. |
 | `SERP_API_KEY` | Optional fallback | SerpApi key used only after Brave returns HTTP 429 twice. |
 
-`LLM_PROVIDER`, `LLM_MODEL`, `OPENAI_BASE_URL`, `SEARCH_PROVIDER`, `SEARCH_FALLBACK_PROVIDER`, and `SYSTEM_TIMEZONE` are
+`DEFAULT_MODEL_PROVIDER`, `DEFAULT_MODEL`, `LLM_PROVIDER`, `LLM_MODEL`, `OPENAI_BASE_URL`,
+`SEARCH_PROVIDER`, `SEARCH_FALLBACK_PROVIDER`, and `SYSTEM_TIMEZONE` are
 non-secret defaults declared in `wrangler.jsonc`; they normally do not need to be duplicated in
 `.dev.vars`. Start with only `JARVIS_API_TOKEN` and `OPENAI_API_KEY`, then add Google and Search
 credentials when testing those tools.
 
-`wrangler.jsonc` binds Workers AI as `env.AI`. `LLM_PROVIDER` and `LLM_MODEL` are initialization
-defaults used only until an active model is saved. `WORKERS_AI_MODEL` and `OPENAI_MODEL` define the
-models explicitly registered for runtime switching. The selected provider/model is normal
-configuration stored in Durable Object SQLite; API keys remain Worker Secrets.
+`wrangler.jsonc` binds Workers AI as `env.AI`. The immutable bootstrap default is explicitly set by
+`DEFAULT_MODEL_PROVIDER` and `DEFAULT_MODEL`; production uses
+`workers-ai / @cf/qwen/qwen3-30b-a3b-fp8`. A valid active model saved in Durable Object SQLite wins
+over that default. With no saved row, Jarvis uses the default without silently selecting another
+model. If the default is unregistered or its binding is unavailable, the request fails with a
+configuration error. Qwen3 is always registered, while `WORKERS_AI_MODEL` keeps the previous Llama
+3.3 model as an additional Workers AI choice and `OPENAI_MODEL` registers the OpenAI choice.
+Provider/model choices are normal configuration; API keys remain Worker Secrets.
 
 Model management examples:
 
@@ -71,11 +76,16 @@ Model management examples:
 사용 가능한 모델 알려줘
 OpenAI 모델로 변경해
 Workers AI 모델로 변경해
+Workers AI의 @cf/qwen/qwen3-30b-a3b-fp8 모델로 변경해
 Workers AI의 @cf/meta/llama-3.3-70b-instruct-fp8-fast 모델로 변경해
+기본 모델이 뭐야?
+기본 모델로 되돌려
 ```
 
-Only explicit change phrases invoke `model.set_active`. A rejected provider/model or missing
-binding/credential leaves the previous active configuration unchanged.
+Only explicit change/reset phrases invoke `model.set_active` or `model.reset_active`. A rejected
+provider/model, missing binding/credential, or invalid default leaves the previous active
+configuration unchanged. Reset persists the immutable default as the active selection and takes
+effect on the next request without a code change or redeployment.
 
 Web Search uses Brave first. On HTTP 429 it waits one second and retries Brave once; only a second
 429 activates SerpApi. Authentication, validation, and server failures do not trigger paid-provider

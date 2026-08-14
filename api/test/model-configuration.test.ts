@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { Env } from "../src/env";
 import { ModelConfigurationRepository } from "../src/llm/model-configuration-repository";
 import { ModelConfigurationService } from "../src/llm/model-configuration-service";
-import { createModelRegistry } from "../src/llm/model-registry";
+import { createModelRegistry, DEFAULT_WORKERS_AI_MODEL } from "../src/llm/model-registry";
 import { createModelProvider } from "../src/llm/provider-factory";
 import { createModelManagementTools, parseModelManagementIntent } from "../src/llm/model-management-tools";
 import type { SqlExecutor } from "../src/storage/sql";
@@ -22,6 +22,33 @@ function fixture(env: Env) {
 }
 
 describe("Active Model configuration", () => {
+  it("bootstraps the explicit Qwen default when persistent configuration is absent", () => {
+    const env = {
+      LLM_PROVIDER: "workers-ai", LLM_MODEL: DEFAULT_WORKERS_AI_MODEL,
+      WORKERS_AI_MODEL: DEFAULT_WORKERS_AI_MODEL, AI: { run: vi.fn() },
+    } as unknown as Env;
+    const { service, getRow } = fixture(env);
+
+    expect(service.getDefault()).toMatchObject({
+      provider: "workers-ai", model: DEFAULT_WORKERS_AI_MODEL, enabled: true, isDefault: true,
+    });
+    expect(service.getActive()).toMatchObject({
+      provider: "workers-ai", model: DEFAULT_WORKERS_AI_MODEL, source: "default", isDefault: true,
+    });
+    expect(getRow()).toBeNull();
+  });
+
+  it("reports a configuration error instead of selecting another model when the default is unavailable", () => {
+    const env = {
+      LLM_PROVIDER: "openai", LLM_MODEL: "gpt-test", OPENAI_API_KEY: "secret",
+      WORKERS_AI_MODEL: DEFAULT_WORKERS_AI_MODEL,
+    } as Env;
+    const { service } = fixture(env);
+
+    expect(service.getActive()).toMatchObject({ provider: "workers-ai", model: DEFAULT_WORKERS_AI_MODEL, enabled: false });
+    expect(service.getActive().unavailableReason).toContain("Workers AI binding");
+  });
+
   it("persists a valid change and creates that Provider for the next request", async () => {
     const run = vi.fn().mockResolvedValue({ response: "switched" });
     const env = {
@@ -50,6 +77,18 @@ describe("Active Model configuration", () => {
     expect(service.getActive()).toMatchObject({ provider: "workers-ai", model: "@cf/test/model" });
   });
 
+  it("keeps Qwen as default while allowing another registered Workers AI model", () => {
+    const env = {
+      LLM_PROVIDER: "workers-ai", LLM_MODEL: DEFAULT_WORKERS_AI_MODEL,
+      WORKERS_AI_MODEL: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", AI: { run: vi.fn() },
+    } as unknown as Env;
+    const { service } = fixture(env);
+
+    service.setActive("workers-ai", "@cf/meta/llama-3.3-70b-instruct-fp8-fast");
+    expect(service.getActive()).toMatchObject({ model: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", isDefault: false });
+    expect(service.getDefault()).toMatchObject({ model: DEFAULT_WORKERS_AI_MODEL, isDefault: true });
+  });
+
   it("rejects unknown or disabled models without changing the stored selection", () => {
     const env = { LLM_PROVIDER: "openai", LLM_MODEL: "gpt-test", OPENAI_API_KEY: "secret" } as Env;
     const { service, getRow } = fixture(env);
@@ -69,5 +108,38 @@ describe("Active Model configuration", () => {
     const provider = createModelProvider(env, service.getActive());
     await expect(provider.generate({ systemPrompt: "help", messages: [{ role: "user", content: "hello" }] })).rejects.toThrow();
     expect(getRow()).toMatchObject({ provider: "workers-ai", model_id: "@cf/test/model" });
+  });
+
+  it("keeps the default immutable and explicitly resets the persisted active model", () => {
+    const env = {
+      LLM_PROVIDER: "workers-ai", LLM_MODEL: DEFAULT_WORKERS_AI_MODEL,
+      WORKERS_AI_MODEL: DEFAULT_WORKERS_AI_MODEL, AI: { run: vi.fn() },
+      OPENAI_MODEL: "gpt-test", OPENAI_API_KEY: "secret",
+    } as unknown as Env;
+    const { service, getRow } = fixture(env);
+
+    service.setActive("openai", "gpt-test");
+    expect(service.getActive()).toMatchObject({ provider: "openai", isDefault: false, source: "persistent" });
+    expect(service.getDefault()).toMatchObject({ provider: "workers-ai", model: DEFAULT_WORKERS_AI_MODEL });
+
+    service.resetToDefault();
+    expect(service.getActive()).toMatchObject({
+      provider: "workers-ai", model: DEFAULT_WORKERS_AI_MODEL, isDefault: true, source: "persistent",
+    });
+    expect(getRow()).toMatchObject({ provider: "workers-ai", model_id: DEFAULT_WORKERS_AI_MODEL });
+  });
+
+  it("maps default model queries and reset commands to management tools", () => {
+    const env = {
+      LLM_PROVIDER: "workers-ai", LLM_MODEL: DEFAULT_WORKERS_AI_MODEL,
+      WORKERS_AI_MODEL: DEFAULT_WORKERS_AI_MODEL, AI: { run: vi.fn() },
+    } as unknown as Env;
+    const { service } = fixture(env);
+
+    expect(parseModelManagementIntent("기본 모델이 뭐야?", service)).toEqual({ toolName: "model.get_default", arguments: {} });
+    expect(parseModelManagementIntent("기본 모델로 되돌려.", service)).toEqual({ toolName: "model.reset_active", arguments: {} });
+    expect(createModelManagementTools(service).map((tool) => tool.name)).toEqual(expect.arrayContaining([
+      "model.get_active", "model.get_default", "model.list_available", "model.set_active", "model.reset_active",
+    ]));
   });
 });

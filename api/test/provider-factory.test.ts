@@ -7,6 +7,8 @@ import { ToolRegistry } from "../src/tools/tool-registry";
 describe("Provider factories", () => {
   it("identifies the configured Model Provider without invoking it", () => {
     const provider = createModelProvider({
+      DEFAULT_MODEL_PROVIDER: "openai",
+      DEFAULT_MODEL: "gpt-test",
       LLM_PROVIDER: "openai",
       LLM_MODEL: "gpt-test",
       OPENAI_API_KEY: "test-secret",

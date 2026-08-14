@@ -65,9 +65,20 @@ describe("Jarvis Phase 1 Worker", () => {
     const current = await sendMessage("model-management", "현재 어떤 모델 사용하고 있어?");
     expect(current.status).toBe(200);
     await expect(current.json()).resolves.toMatchObject({
-      message: expect.stringContaining("Test Provider의 test-model"),
+      message: expect.stringContaining("Model: test-model"),
       model: "jarvis-model-management",
       toolCalls: [expect.objectContaining({ name: "model.get_active" })],
+    });
+    const defaultModel = await sendMessage("model-management", "기본 모델이 뭐야?");
+    await expect(defaultModel.json()).resolves.toMatchObject({
+      message: expect.stringContaining("Model: test-model"),
+      toolCalls: [expect.objectContaining({ name: "model.get_default" })],
+    });
+    const reset = await sendMessage("model-management", "기본 모델로 되돌려");
+    await expect(reset.json()).resolves.toMatchObject({
+      message: expect.stringContaining("기본 모델"),
+      toolCalls: [expect.objectContaining({ name: "model.reset_active" })],
+      toolResults: [expect.objectContaining({ success: true })],
     });
     const invalid = await sendMessage("model-management", "Anthropic 모델로 변경해");
     await expect(invalid.json()).resolves.toMatchObject({
@@ -75,7 +86,7 @@ describe("Jarvis Phase 1 Worker", () => {
       toolResults: [expect.objectContaining({ name: "model.set_active", success: false })],
     });
     const after = await sendMessage("model-management", "현재 모델 알려줘");
-    await expect(after.json()).resolves.toMatchObject({ message: expect.stringContaining("Test Provider의 test-model") });
+    await expect(after.json()).resolves.toMatchObject({ message: expect.stringContaining("Model: test-model") });
   });
 
   it("does not create a write approval from an ambiguous answer phrase", async () => {

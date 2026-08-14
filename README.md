@@ -33,7 +33,9 @@ flowchart LR
   U["사용자"] --> W["Web Playground / Admin"]
   W --> API["Cloudflare Worker"]
   API --> A["PersonalAssistantAgent"]
-  A --> LLM["OpenAI"]
+  A --> LLM["Dynamic Model Provider"]
+  LLM --> WAI["Workers AI / Qwen3 (기본)"]
+  LLM --> OAI["OpenAI"]
   A --> DB["Durable Object SQLite"]
   A --> T["Gmail / Calendar / Web Search"]
   A --> AP["Approval"]
@@ -44,7 +46,7 @@ flowchart LR
 
 ## 주요 기능
 
-- OpenAI 기반 자연어 대화와 Tool Calling
+- Workers AI Qwen3를 기본으로 하고 OpenAI로 런타임 전환 가능한 자연어 대화와 Tool Calling
 - 대화 기록, 프로필 및 장기 메모리
 - 사용자 위치와 timezone을 반영한 요청 처리
 - Gmail 조회·검색·상세 조회
@@ -62,7 +64,8 @@ flowchart LR
 - Node.js 22.18 이상
 - npm
 - Cloudflare 계정과 Wrangler CLI 인증(배포 시)
-- OpenAI API Key(실제 LLM 응답 사용 시)
+- Cloudflare Workers AI binding
+- OpenAI API Key(OpenAI Provider로 전환할 경우)
 - Google Cloud OAuth Web Client(Gmail/Calendar 사용 시)
 - Brave Search API Key(Web Search 사용 시)
 
@@ -87,7 +90,7 @@ cp api/.dev.vars.example api/.dev.vars
 | 변수 | 용도 | 필수 조건 |
 | --- | --- | --- |
 | `JARVIS_API_TOKEN` | Web/Admin 프록시와 API 사이의 Bearer Token | 필수 |
-| `OPENAI_API_KEY` | OpenAI Agent 응답 | 실제 LLM 사용 시 |
+| `OPENAI_API_KEY` | OpenAI Agent 응답 | OpenAI Provider 사용 시 |
 | `GOOGLE_CLIENT_ID` | Google OAuth Web Client ID | Gmail/Calendar 사용 시 |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth Client Secret | Gmail/Calendar 사용 시 |
 | `SEARCH_API_KEY` | Brave Search API Key | Web Search 사용 시 |
@@ -96,7 +99,9 @@ cp api/.dev.vars.example api/.dev.vars
 비밀 값은 `.dev.vars`에만 넣고 Git에 커밋하지 않습니다. 파일명은 `.env.vars`가 아니라
 `.dev.vars`입니다.
 
-LLM provider, model, Search provider와 기본 timezone은
+최초 bootstrap 모델은 `workers-ai / @cf/qwen/qwen3-30b-a3b-fp8`이며, 저장된 active
+model이 있으면 그 설정을 우선합니다. Active model은 Agent 명령으로 변경하거나 기본값으로
+복귀할 수 있고 Durable Object SQLite에 유지됩니다. Model Provider 등록값, Search provider와 기본 timezone은
 [`api/wrangler.jsonc`](api/wrangler.jsonc)의 non-secret 설정을 사용합니다.
 
 ### 2. Web Playground 환경변수

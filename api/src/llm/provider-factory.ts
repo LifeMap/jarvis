@@ -1,9 +1,9 @@
 import type { Env } from "../env";
 import { OpenAiProvider } from "./openai-provider";
 import { TestLlmProvider } from "./test-provider";
-import type { ModelProvider, ModelProviderId } from "./types";
+import type { ModelProvider } from "./types";
 import { LlmProviderError } from "./types";
-import type { ModelSelection } from "./model-registry";
+import { createModelRegistry, type ModelSelection } from "./model-registry";
 import { WorkersAiModelProvider } from "./workers-ai-provider";
 
 export function createModelProvider(env: Env, selection: ModelSelection = defaultSelection(env)): ModelProvider {
@@ -35,5 +35,5 @@ export function createModelProvider(env: Env, selection: ModelSelection = defaul
 export const createLlmProvider = createModelProvider;
 
 function defaultSelection(env: Env): ModelSelection {
-  return { provider: env.LLM_PROVIDER as ModelProviderId, model: env.LLM_MODEL };
+  return createModelRegistry(env).defaultModel;
 }

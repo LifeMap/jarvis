@@ -6,6 +6,8 @@ export interface Env {
   JARVIS_API_TOKEN?: string;
   LLM_PROVIDER: string;
   LLM_MODEL: string;
+  DEFAULT_MODEL_PROVIDER?: string;
+  DEFAULT_MODEL?: string;
   WORKERS_AI_MODEL?: string;
   OPENAI_MODEL?: string;
   OPENAI_API_KEY?: string;

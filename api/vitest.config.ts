@@ -10,6 +10,8 @@ export default defineConfig({
           JARVIS_API_TOKEN: "test-token",
           LLM_PROVIDER: "test",
           LLM_MODEL: "test-model",
+          DEFAULT_MODEL_PROVIDER: "test",
+          DEFAULT_MODEL: "test-model",
           TEST_LLM_RESPONSE: "안녕하세요. Jarvis 테스트 응답입니다.",
         },
       },
