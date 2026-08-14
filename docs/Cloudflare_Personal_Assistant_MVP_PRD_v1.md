@@ -834,8 +834,11 @@ GET/PATCH /api/settings
 
 Tool enable/disable 저장 모델은 현재 Backend에 없으므로 Admin Tools 화면은 실제 연결·정책·최근
 실행 상태만 조회한다. LLM Provider와 Model은 Cloudflare 환경변수 관리 항목으로 읽기 전용이며,
-Admin에서는 Profile Memory 기반 language와 timezone만 수정한다. Token Usage는 현재 LLM 계약이
-저장하지 않으므로 History에 `Unavailable`로 표시하며 값을 생성하지 않는다.
+Admin에서는 Profile Memory 기반 language와 timezone 외에 Agent의 응답 톤, 한국어 말투,
+답변 상세도 및 사용자 지정 답변 지침을 수정한다. 이 응답 설정은 Durable Object SQLite의
+Profile Memory에 저장되고 다음 Agent 요청부터 system prompt에 반영된다. 사용자 지정 지침은
+4,000자로 제한하며 안전성, 정확성, Tool Policy 및 현재 사용자 요청보다 우선하지 않는다.
+Token Usage는 현재 LLM 계약이 저장하지 않으므로 History에 `Unavailable`로 표시하며 값을 생성하지 않는다.
 
 로컬에서는 Vite server proxy, Cloudflare Pages 배포에서는 `functions/api/[[path]].ts`가 서버 측
 Bearer Token을 주입한다. 브라우저 번들에는 API Token이 포함되지 않는다. 배포된 Admin 전체는

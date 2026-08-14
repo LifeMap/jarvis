@@ -38,7 +38,7 @@ export default {
     if(url.pathname==="/api/tools"&&request.method==="GET")return json({tools:await agent.adminToolStatus()});
     if(url.pathname==="/api/settings"){
       if(request.method==="GET")return json(await agent.adminSettings());
-      if(request.method==="PATCH"){const body=await readJson(request);if(!body||typeof body!=="object")return json({error:"Invalid settings payload"},400);try{return json(await agent.updateAdminSettings(body as {language?:string;timezone?:string}))}catch(error){return json({error:"Invalid settings",detail:safeMessage(error)},400)}}
+      if(request.method==="PATCH"){const body=await readJson(request);if(!body||typeof body!=="object")return json({error:"Invalid settings payload"},400);try{return json(await agent.updateAdminSettings(body as {language?:string;timezone?:string;responseTone?:string;speechStyle?:string;responseDetail?:string;customInstructions?:string}))}catch(error){return json({error:"Invalid settings",detail:safeMessage(error)},400)}}
       return json({error:"Method not allowed"},405);
     }
     if(url.pathname==="/api/history"&&request.method==="GET")return json({runs:await agent.listAgentRuns(),scheduleExecutions:await agent.listScheduleExecutions()});
