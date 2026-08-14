@@ -23,7 +23,7 @@ export interface LlmResponse {
   model: string;
 }
 
-export type ModelProviderId = "openai" | "test";
+export type ModelProviderId = "workers-ai" | "openai" | "test";
 
 export interface ModelProvider {
   readonly providerId: ModelProviderId;

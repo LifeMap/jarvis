@@ -61,6 +61,32 @@ describe("Jarvis Phase 1 Worker", () => {
     });
   });
 
+  it("handles explicit Model Management commands without invoking the active model", async () => {
+    const current = await sendMessage("model-management", "현재 어떤 모델 사용하고 있어?");
+    expect(current.status).toBe(200);
+    await expect(current.json()).resolves.toMatchObject({
+      message: expect.stringContaining("Test Provider의 test-model"),
+      model: "jarvis-model-management",
+      toolCalls: [expect.objectContaining({ name: "model.get_active" })],
+    });
+    const invalid = await sendMessage("model-management", "Anthropic 모델로 변경해");
+    await expect(invalid.json()).resolves.toMatchObject({
+      message: expect.stringContaining("기존 모델 설정은 유지됩니다"),
+      toolResults: [expect.objectContaining({ name: "model.set_active", success: false })],
+    });
+    const after = await sendMessage("model-management", "현재 모델 알려줘");
+    await expect(after.json()).resolves.toMatchObject({ message: expect.stringContaining("Test Provider의 test-model") });
+  });
+
+  it("does not create a write approval from an ambiguous answer phrase", async () => {
+    const response = await sendMessage("model-tool-guard", "한 문장으로 답해줘");
+    await expect(response.json()).resolves.toMatchObject({
+      message: "안녕하세요. Jarvis 테스트 응답입니다.",
+      toolCalls: [],
+      approvalRequired: false,
+    });
+  });
+
   it("accepts a validated transient location and rejects invalid coordinates", async()=>{
     const valid=await api("/api/agent/message",{method:"POST",body:JSON.stringify({message:"내 주변 날씨",sessionId:"location-session",location:{latitude:37.5665,longitude:126.978,accuracyMeters:25,capturedAt:"2026-08-13T00:00:00.000Z",source:"browser"}})});
     expect(valid.status).toBe(200);

@@ -35,6 +35,14 @@ export function ensureApplicationSchema(database: SqlExecutor): void {
   `;
   database.sql`CREATE INDEX IF NOT EXISTS messages_session_created_idx ON messages (session_id, created_at)`;
   database.sql`
+    CREATE TABLE IF NOT EXISTS model_configuration (
+      id TEXT PRIMARY KEY CHECK (id = 'active'),
+      provider TEXT NOT NULL CHECK (provider IN ('workers-ai', 'openai', 'test')),
+      model_id TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+  `;
+  database.sql`
     CREATE TABLE IF NOT EXISTS profile_memories (
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL,

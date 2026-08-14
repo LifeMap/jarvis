@@ -21,9 +21,14 @@
       "storage": "sqlite"
     }
   },
+  "ai": {
+    "binding": "AI"
+  },
   "vars": {
-    "LLM_PROVIDER": "openai",
-    "LLM_MODEL": "gpt-5-mini",
+    "LLM_PROVIDER": "workers-ai",
+    "LLM_MODEL": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+    "WORKERS_AI_MODEL": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+    "OPENAI_MODEL": "gpt-5-mini",
     "OPENAI_BASE_URL": "https://api.openai.com/v1",
     "SEARCH_PROVIDER": "brave",
     "SEARCH_FALLBACK_PROVIDER": "serpapi",

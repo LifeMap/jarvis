@@ -10,6 +10,10 @@ import { ContextBuilder } from "./context/context-builder";
 import { ConversationRepository } from "./conversation/conversation-repository";
 import type { Env } from "./env";
 import { createModelProvider } from "./llm/provider-factory";
+import { ModelConfigurationRepository } from "./llm/model-configuration-repository";
+import { ModelConfigurationService } from "./llm/model-configuration-service";
+import { createModelRegistry } from "./llm/model-registry";
+import { createModelManagementTools, parseModelManagementIntent } from "./llm/model-management-tools";
 import { MemoryRepository } from "./memory/memory-repository";
 import { GoogleOAuthRepository } from "./oauth/google-oauth-repository";
 import { GoogleOAuthService } from "./oauth/google-oauth-service";
@@ -60,6 +64,8 @@ export class PersonalAssistantAgent extends Agent<Env> {
       conversations.addMessage({ sessionId, role: "user", content: message });
 
       const explicitMemory = parseExplicitMemory(message);
+      const modelConfiguration = new ModelConfigurationService(new ModelConfigurationRepository(this), createModelRegistry(this.env));
+      const modelIntent = explicitMemory ? null : parseModelManagementIntent(message, modelConfiguration);
       let savedMemoryId: string | undefined;
       let responseText = "";
       let responseModel = "";
@@ -67,7 +73,26 @@ export class PersonalAssistantAgent extends Agent<Env> {
       let toolResults: ToolResultDebug[] = [];
       let approval: Approval | undefined;
       let createdSchedule: import("./scheduler/types").JarvisSchedule | undefined;
-      if (explicitMemory) {
+      if (modelIntent) {
+        const tool = createModelManagementTools(modelConfiguration).find((candidate) => candidate.name === modelIntent.toolName)!;
+        const toolCallId = crypto.randomUUID();
+        const toolStartedAt = Date.now();
+        toolCalls = [{ id: toolCallId, name: tool.name, input: modelIntent.arguments, requiresApproval: false }];
+        try {
+          const result = await tool.execute(modelIntent.arguments, { timezone: this.env.SYSTEM_TIMEZONE ?? "UTC" });
+          const summary = tool.summarize(result);
+          const durationMs = Date.now() - toolStartedAt;
+          responseText = summary; responseModel = "jarvis-model-management";
+          toolResults = [{ toolCallId, name: tool.name, success: true, durationMs, summary }];
+          new ToolExecutionRepository(this).record({ id: crypto.randomUUID(), requestId, toolName: tool.name, toolInput: modelIntent.arguments, success: true, durationMs, resultSummary: summary });
+        } catch (error) {
+          const summary = error instanceof ToolError ? error.userMessage : "모델 관리 작업에 실패했습니다. 기존 모델 설정은 유지됩니다.";
+          const durationMs = Date.now() - toolStartedAt;
+          responseText = summary; responseModel = "jarvis-model-management";
+          toolResults = [{ toolCallId, name: tool.name, success: false, durationMs, summary, error: summary }];
+          new ToolExecutionRepository(this).record({ id: crypto.randomUUID(), requestId, toolName: tool.name, toolInput: modelIntent.arguments, success: false, durationMs, resultSummary: summary, error: summary });
+        }
+      } else if (explicitMemory) {
         const saved = memories.create({
           type: "long_term",
           content: explicitMemory,
@@ -90,12 +115,16 @@ export class PersonalAssistantAgent extends Agent<Env> {
         );
         request.systemPrompt += `\n\nCurrent date/time: ${formatLocalDateTime(new Date(), timezone)} (${timezone}). Use this when interpreting relative dates and times.`;
         if(location)request.systemPrompt+=`\n\nCurrent request location (user-authorized, transient): latitude ${location.latitude}, longitude ${location.longitude}${location.accuracyMeters!==undefined?`, accuracy approximately ${location.accuracyMeters} meters`:""}, captured at ${location.capturedAt}. Use it only when relevant to this request. Do not claim a street address unless a tool provides one.`;
-        const provider = createModelProvider(this.env);
+        const activeModel = modelConfiguration.getActive();
+        if (!activeModel.enabled) throw new Error(activeModel.unavailableReason ?? "활성 Model Provider를 사용할 수 없습니다.");
+        const provider = createModelProvider(this.env, activeModel);
         const oauth = new GoogleOAuthService(new GoogleOAuthRepository(this), this.env);
         const scheduleRepository = new ScheduleRepository(this);
         const scheduler = new SchedulerService(scheduleRepository, this, timezone);
         const registry = new ToolRegistry(createToolProviders(this.env, oauth), scheduler);
-        const selected = await provider.selectTool(request, registry.definitions());
+        const candidate = await provider.selectTool(request, registry.definitions());
+        const selected = candidate && isExplicitMutationIntent(message, candidate.name) ? candidate
+          : candidate && registry.get(candidate.name)?.policy === "APPROVAL_REQUIRED" ? null : candidate;
         if (selected) {
           const tool = registry.get(selected.name);
           if (tool) {
@@ -248,7 +277,7 @@ export class PersonalAssistantAgent extends Agent<Env> {
       permission:tool.policy==="APPROVAL_REQUIRED"?"Write with approval":"Read / safe",latestExecution:latest.find(item=>item.toolName===tool.name)??null}));
   }
 
-  adminSettings(){const profile=new MemoryRepository(this).listProfile();const value=(key:string,fallback:string)=>profile.find(x=>x.key===key)?.value??fallback;return{language:value("language","ko"),timezone:resolveTimezone(value("timezone",this.env.SYSTEM_TIMEZONE??"UTC"),this.env.SYSTEM_TIMEZONE),responseTone:value("assistant_tone","friendly"),speechStyle:value("assistant_speech_style","polite"),responseDetail:value("assistant_response_detail","balanced"),customInstructions:value("assistant_custom_instructions",""),llmProvider:this.env.LLM_PROVIDER,llmModel:this.env.LLM_MODEL,systemTimezone:this.env.SYSTEM_TIMEZONE??"UTC",secretsManagedBy:"Cloudflare Secrets"}}
+  adminSettings(){const profile=new MemoryRepository(this).listProfile();const value=(key:string,fallback:string)=>profile.find(x=>x.key===key)?.value??fallback;const active=new ModelConfigurationService(new ModelConfigurationRepository(this),createModelRegistry(this.env)).getActive();return{language:value("language","ko"),timezone:resolveTimezone(value("timezone",this.env.SYSTEM_TIMEZONE??"UTC"),this.env.SYSTEM_TIMEZONE),responseTone:value("assistant_tone","friendly"),speechStyle:value("assistant_speech_style","polite"),responseDetail:value("assistant_response_detail","balanced"),customInstructions:value("assistant_custom_instructions",""),llmProvider:active.provider,llmModel:active.model,systemTimezone:this.env.SYSTEM_TIMEZONE??"UTC",secretsManagedBy:"Cloudflare Secrets"}}
   updateAdminSettings(input:{language?:string;timezone?:string;responseTone?:string;speechStyle?:string;responseDetail?:string;customInstructions?:string}){const repo=new MemoryRepository(this);if(input.language)repo.create({type:"profile",key:"language",value:limitedText(input.language,"language",32),source:"user"});if(input.timezone){const timezone=resolveTimezone(input.timezone);if(timezone!==input.timezone)throw new Error("Invalid timezone");repo.create({type:"profile",key:"timezone",value:timezone,source:"user"})}if(input.responseTone!==undefined)repo.create({type:"profile",key:"assistant_tone",value:enumValue(input.responseTone,["friendly","professional","warm","direct"],"responseTone"),source:"user"});if(input.speechStyle!==undefined)repo.create({type:"profile",key:"assistant_speech_style",value:enumValue(input.speechStyle,["polite","casual"],"speechStyle"),source:"user"});if(input.responseDetail!==undefined)repo.create({type:"profile",key:"assistant_response_detail",value:enumValue(input.responseDetail,["concise","balanced","detailed"],"responseDetail"),source:"user"});if(input.customInstructions!==undefined)repo.create({type:"profile",key:"assistant_custom_instructions",value:limitedText(input.customInstructions,"customInstructions",4000,true),source:"user"});return this.adminSettings()}
 
   adminDashboard(){const runs=this.listAgentRuns(10);const tools=new ToolExecutionRepository(this).list(10);const approvals=new ApprovalRepository(this).list();const schedules=new ScheduleRepository(this).list();const scheduleExecutions=new ScheduleRepository(this).executions();const scheduleTitles=new Map(schedules.map(schedule=>[schedule.id,schedule.title]));return{counts:{pendingApprovals:approvals.filter(x=>x.status==="PENDING").length,activeSchedules:schedules.filter(x=>x.enabled&&(x.status==="scheduled"||x.status==="running"||x.status==="failed")).length,recentErrors:runs.filter(x=>x.status==="failed").length+tools.filter(x=>!x.success).length+(scheduleExecutions as Array<{success?:number}>).filter(x=>x.success===0).length},recentRuns:runs,recentTools:tools,recentScheduleExecutions:scheduleExecutions.slice(0,10).map(execution=>({...execution,scheduleTitle:scheduleTitles.get(String(execution.schedule_id))??null}))}}
@@ -418,6 +447,15 @@ function parseExplicitMemory(message: string): string | null {
     ?? message.match(/^\s*remember(?:\s+that)?[.!,:;\s-]+(.+)$/is);
   const content = match?.[1]?.trim();
   return content ? content : null;
+}
+
+function isExplicitMutationIntent(message: string, toolName: string): boolean {
+  if (toolName === "gmail.send") return /(메일|gmail|email)/i.test(message) && /(보내|발송|전송|send)/i.test(message);
+  if (toolName === "gmail.reply") return /(답장|회신|reply)/i.test(message);
+  if (toolName === "calendar.create") return /(일정|캘린더|calendar|회의|미팅)/i.test(message) && /(만들|생성|추가|등록|create|add)/i.test(message);
+  if (toolName === "calendar.update") return /(일정|캘린더|calendar|회의|미팅)/i.test(message) && /(수정|변경|옮겨|update|change)/i.test(message);
+  if (toolName === "calendar.delete") return /(일정|캘린더|calendar|회의|미팅)/i.test(message) && /(삭제|취소|지워|delete|cancel)/i.test(message);
+  return true;
 }
 
 function enumValue(value:string,allowed:string[],name:string):string{if(!allowed.includes(value))throw new Error(`Invalid ${name}`);return value}

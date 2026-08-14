@@ -2,9 +2,12 @@ import type { PersonalAssistantAgent } from "./personal-assistant-agent";
 
 export interface Env {
   PERSONAL_ASSISTANT_AGENT: DurableObjectNamespace<PersonalAssistantAgent>;
+  AI?: WorkersAiBinding;
   JARVIS_API_TOKEN?: string;
   LLM_PROVIDER: string;
   LLM_MODEL: string;
+  WORKERS_AI_MODEL?: string;
+  OPENAI_MODEL?: string;
   OPENAI_API_KEY?: string;
   OPENAI_BASE_URL?: string;
   TEST_LLM_RESPONSE?: string;
@@ -15,4 +18,8 @@ export interface Env {
   SEARCH_FALLBACK_PROVIDER?: string;
   SERP_API_KEY?: string;
   SYSTEM_TIMEZONE?: string;
+}
+
+export interface WorkersAiBinding {
+  run(model: string, input: Record<string, unknown>): Promise<unknown>;
 }

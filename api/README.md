@@ -6,23 +6,30 @@ Requires Node.js 22.18 or newer.
 
 ## Provider boundaries
 
-`PersonalAssistantAgent` depends on two explicit provider boundaries while preserving the existing
-runtime behavior:
+`PersonalAssistantAgent` depends on two explicit provider boundaries:
 
 ```text
 PersonalAssistantAgent
-  +-- ModelProvider        openai (test in automated tests)
+  +-- ModelProvider        workers-ai / openai (test in automated tests)
   +-- ToolProviderSet
       +-- gmail            google-api
       +-- calendar         google-api
       +-- search           brave-api (optional serpapi rate-limit fallback)
 ```
 
-`llm/provider-factory.ts` owns Model Provider construction. `tools/provider-factory.ts` owns
+`llm/provider-factory.ts` owns Model Provider construction. `llm/model-registry.ts` lists the
+explicitly supported models, and the active selection is stored in Durable Object SQLite rather
+than in a Secret. `tools/provider-factory.ts` owns
 external Tool Provider construction and environment interpretation. `ToolRegistry` receives those
 providers and is limited to registering Tools and enforcing Tool execution policy. Provider IDs are
-metadata only in this phase; runtime switching, Workers AI, MCP, and a dynamic registry are not
-implemented.
+metadata separately from credentials. Tool Provider runtime switching and MCP are not implemented.
+
+The default Model Provider is Workers AI using
+`@cf/meta/llama-3.3-70b-instruct-fp8-fast`, selected because the Cloudflare-hosted model supports
+function calling and structured output. OpenAI `gpt-5-mini` remains registered when
+`OPENAI_API_KEY` is configured. Explicit chat commands can query, list, or change the active model;
+the validated selection applies from the following request without a Worker deployment. No
+automatic model fallback is performed.
 
 ## Local setup
 
@@ -51,6 +58,24 @@ For local development, put both `JARVIS_API_TOKEN` and `OPENAI_API_KEY` in the u
 non-secret defaults declared in `wrangler.jsonc`; they normally do not need to be duplicated in
 `.dev.vars`. Start with only `JARVIS_API_TOKEN` and `OPENAI_API_KEY`, then add Google and Search
 credentials when testing those tools.
+
+`wrangler.jsonc` binds Workers AI as `env.AI`. `LLM_PROVIDER` and `LLM_MODEL` are initialization
+defaults used only until an active model is saved. `WORKERS_AI_MODEL` and `OPENAI_MODEL` define the
+models explicitly registered for runtime switching. The selected provider/model is normal
+configuration stored in Durable Object SQLite; API keys remain Worker Secrets.
+
+Model management examples:
+
+```text
+현재 모델 알려줘
+사용 가능한 모델 알려줘
+OpenAI 모델로 변경해
+Workers AI 모델로 변경해
+Workers AI의 @cf/meta/llama-3.3-70b-instruct-fp8-fast 모델로 변경해
+```
+
+Only explicit change phrases invoke `model.set_active`. A rejected provider/model or missing
+binding/credential leaves the previous active configuration unchanged.
 
 Web Search uses Brave first. On HTTP 429 it waits one second and retries Brave once; only a second
 429 activates SerpApi. Authentication, validation, and server failures do not trigger paid-provider
