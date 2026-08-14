@@ -1,10 +1,13 @@
 import type { LlmProvider, LlmRequest, LlmResponse, LlmToolCall, LlmToolDefinition } from "./types";
 
 export class TestLlmProvider implements LlmProvider {
+  readonly providerId = "test" as const;
   constructor(
     private readonly responseText: string,
     private readonly model = "test-model",
   ) {}
+
+  get modelId(): string { return this.model; }
 
   async generate(_request: LlmRequest): Promise<LlmResponse> {
     return { text: this.responseText, model: this.model };

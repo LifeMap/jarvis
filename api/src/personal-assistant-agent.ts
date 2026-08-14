@@ -9,7 +9,7 @@ import type {
 import { ContextBuilder } from "./context/context-builder";
 import { ConversationRepository } from "./conversation/conversation-repository";
 import type { Env } from "./env";
-import { createLlmProvider } from "./llm/provider-factory";
+import { createModelProvider } from "./llm/provider-factory";
 import { MemoryRepository } from "./memory/memory-repository";
 import { GoogleOAuthRepository } from "./oauth/google-oauth-repository";
 import { GoogleOAuthService } from "./oauth/google-oauth-service";
@@ -18,6 +18,7 @@ import { ScheduleRepository } from "./scheduler/schedule-repository";
 import { SchedulerService } from "./scheduler/scheduler-service";
 import type { CreateScheduleInput, UpdateScheduleInput } from "./scheduler/types";
 import { ToolExecutionRepository } from "./tools/tool-execution-repository";
+import { createToolProviders } from "./tools/provider-factory";
 import { ToolRegistry } from "./tools/tool-registry";
 import type { ToolCallDebug, ToolResultDebug } from "./tools/types";
 import { ToolError, ToolPolicyError } from "./tools/types";
@@ -89,11 +90,11 @@ export class PersonalAssistantAgent extends Agent<Env> {
         );
         request.systemPrompt += `\n\nCurrent date/time: ${formatLocalDateTime(new Date(), timezone)} (${timezone}). Use this when interpreting relative dates and times.`;
         if(location)request.systemPrompt+=`\n\nCurrent request location (user-authorized, transient): latitude ${location.latitude}, longitude ${location.longitude}${location.accuracyMeters!==undefined?`, accuracy approximately ${location.accuracyMeters} meters`:""}, captured at ${location.capturedAt}. Use it only when relevant to this request. Do not claim a street address unless a tool provides one.`;
-        const provider = createLlmProvider(this.env);
+        const provider = createModelProvider(this.env);
         const oauth = new GoogleOAuthService(new GoogleOAuthRepository(this), this.env);
         const scheduleRepository = new ScheduleRepository(this);
         const scheduler = new SchedulerService(scheduleRepository, this, timezone);
-        const registry = new ToolRegistry(this.env, oauth, scheduler);
+        const registry = new ToolRegistry(createToolProviders(this.env, oauth), scheduler);
         const selected = await provider.selectTool(request, registry.definitions());
         if (selected) {
           const tool = registry.get(selected.name);
@@ -240,9 +241,10 @@ export class PersonalAssistantAgent extends Agent<Env> {
   adminToolStatus(){
     const oauth=new GoogleOAuthService(new GoogleOAuthRepository(this),this.env).status();
     const latest=new ToolExecutionRepository(this).list(100);
-    const registry=new ToolRegistry(this.env,new GoogleOAuthService(new GoogleOAuthRepository(this),this.env),new SchedulerService(new ScheduleRepository(this),this,this.env.SYSTEM_TIMEZONE??"UTC"));
+    const registry=new ToolRegistry(createToolProviders(this.env,new GoogleOAuthService(new GoogleOAuthRepository(this),this.env)),new SchedulerService(new ScheduleRepository(this),this,this.env.SYSTEM_TIMEZONE??"UTC"));
     return registry.tools.map(tool=>({name:tool.name,description:tool.description,enabled:true,policy:tool.policy,requiresApproval:tool.requiresApproval,
-      connection:tool.name.startsWith("gmail.")||tool.name.startsWith("calendar.")||tool.name.startsWith("google_calendar.")?(oauth.connected?"connected":"disconnected"):tool.name==="web_search.search"?(this.env.SEARCH_PROVIDER&&this.env.SEARCH_API_KEY?"available":"unavailable"):"available",
+      connection:tool.name.startsWith("gmail.")||tool.name.startsWith("calendar.")||tool.name.startsWith("google_calendar.")?(oauth.connected?"connected":"disconnected"):registry.provider(tool.name)?.implementation!=="unavailable"?"available":"unavailable",
+      provider:registry.provider(tool.name),
       permission:tool.policy==="APPROVAL_REQUIRED"?"Write with approval":"Read / safe",latestExecution:latest.find(item=>item.toolName===tool.name)??null}));
   }
 
@@ -352,7 +354,7 @@ export class PersonalAssistantAgent extends Agent<Env> {
       return { ok: false, code: "EXPIRED", message: "Approval이 만료되었습니다.", approval: repository.get(id)! };
     }
     const oauth = new GoogleOAuthService(new GoogleOAuthRepository(this), this.env);
-    const registry = new ToolRegistry(this.env, oauth);
+    const registry = new ToolRegistry(createToolProviders(this.env, oauth));
     const tool = registry.get(existing.toolName);
     if (!tool) return { ok: false, code: "TOOL_NOT_FOUND", message: "요청된 Tool을 찾을 수 없습니다.", approval: existing };
     if (tool.policy !== "APPROVAL_REQUIRED") return { ok: false, code: "POLICY_MISMATCH", message: "Tool 승인 정책이 일치하지 않습니다.", approval: existing };

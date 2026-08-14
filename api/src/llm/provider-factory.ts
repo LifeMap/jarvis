@@ -1,10 +1,10 @@
 import type { Env } from "../env";
 import { OpenAiProvider } from "./openai-provider";
 import { TestLlmProvider } from "./test-provider";
-import type { LlmProvider } from "./types";
+import type { ModelProvider } from "./types";
 import { LlmProviderError } from "./types";
 
-export function createLlmProvider(env: Env): LlmProvider {
+export function createModelProvider(env: Env): ModelProvider {
   switch (env.LLM_PROVIDER) {
     case "openai": {
       if (!env.OPENAI_API_KEY) {
@@ -24,3 +24,6 @@ export function createLlmProvider(env: Env): LlmProvider {
       throw new LlmProviderError(`지원하지 않는 LLM provider입니다: ${env.LLM_PROVIDER}`);
   }
 }
+
+// Keep the old export while callers migrate to the provider terminology.
+export const createLlmProvider = createModelProvider;

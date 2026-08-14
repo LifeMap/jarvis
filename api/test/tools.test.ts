@@ -9,6 +9,7 @@ import { CalendarCreateTool, CalendarDeleteTool, CalendarUpdateTool } from "../s
 import type { CalendarMutationClient } from "../src/tools/calendar/calendar-client";
 import { ToolRegistry } from "../src/tools/tool-registry";
 import type { Env } from "../src/env";
+import { createToolProviders } from "../src/tools/provider-factory";
 import { ToolExecutionRepository } from "../src/tools/tool-execution-repository";
 import type { SqlExecutor } from "../src/storage/sql";
 
@@ -28,7 +29,7 @@ describe("External tools", () => {
 
   it("blocks direct execution of approval-required tools at the registry policy boundary", async () => {
     const oauth = { getAccessToken: vi.fn().mockResolvedValue("token") };
-    const registry = new ToolRegistry({ SEARCH_PROVIDER: "none" } as Env, oauth as never);
+    const registry = new ToolRegistry(createToolProviders({ SEARCH_PROVIDER: "none" } as Env, oauth));
     await expect(registry.execute("gmail.send", { to: "a@example.com", subject: "s", body: "secret" }, { timezone: "Asia/Seoul" }))
       .rejects.toMatchObject({ code: "APPROVAL_REQUIRED" });
   });

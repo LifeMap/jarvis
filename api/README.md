@@ -4,6 +4,26 @@ Phase 1 Cloudflare Worker and `PersonalAssistantAgent` runtime.
 
 Requires Node.js 22.18 or newer.
 
+## Provider boundaries
+
+`PersonalAssistantAgent` depends on two explicit provider boundaries while preserving the existing
+runtime behavior:
+
+```text
+PersonalAssistantAgent
+  +-- ModelProvider        openai (test in automated tests)
+  +-- ToolProviderSet
+      +-- gmail            google-api
+      +-- calendar         google-api
+      +-- search           brave-api (optional serpapi rate-limit fallback)
+```
+
+`llm/provider-factory.ts` owns Model Provider construction. `tools/provider-factory.ts` owns
+external Tool Provider construction and environment interpretation. `ToolRegistry` receives those
+providers and is limited to registering Tools and enforcing Tool execution policy. Provider IDs are
+metadata only in this phase; runtime switching, Workers AI, MCP, and a dynamic registry are not
+implemented.
+
 ## Local setup
 
 ```bash

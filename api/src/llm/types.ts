@@ -23,11 +23,18 @@ export interface LlmResponse {
   model: string;
 }
 
-export interface LlmProvider {
+export type ModelProviderId = "openai" | "test";
+
+export interface ModelProvider {
+  readonly providerId: ModelProviderId;
+  readonly modelId: string;
   generate(request: LlmRequest): Promise<LlmResponse>;
   selectTool(request: LlmRequest, tools: LlmToolDefinition[]): Promise<LlmToolCall | null>;
   generateWithToolResult(request: LlmRequest, call: LlmToolCall, result: unknown): Promise<LlmResponse>;
 }
+
+// Backward-compatible domain name for existing LLM call sites.
+export type LlmProvider = ModelProvider;
 
 export class LlmProviderError extends Error {
   constructor(message: string, options?: ErrorOptions) {

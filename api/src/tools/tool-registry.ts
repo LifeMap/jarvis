@@ -1,39 +1,31 @@
-import type { Env } from "../env";
-import type { GoogleOAuthService } from "../oauth/google-oauth-service";
-import { GoogleCalendarClient } from "./calendar/calendar-client";
 import { CalendarSearchTool } from "./calendar/calendar-tool";
 import { CalendarCreateTool, CalendarDeleteTool, CalendarUpdateTool } from "./calendar/calendar-write-tools";
-import { GoogleGmailClient } from "./gmail/gmail-client";
 import { GmailSearchTool } from "./gmail/gmail-tool";
 import { GmailReplyTool, GmailSendTool } from "./gmail/gmail-write-tools";
-import { BraveSearchProvider, RateLimitFallbackSearchProvider, SerpApiSearchProvider, UnavailableSearchProvider } from "./search/search-provider";
 import { WebSearchTool } from "./search/search-tool";
 import type { ToolContext, ToolDefinition, ToolExecutionAuthorization } from "./types";
 import { ToolPolicyError } from "./types";
 import type { SchedulerService } from "../scheduler/scheduler-service";
 import { SchedulerCreateTool } from "../scheduler/scheduler-tool";
+import type { ToolProviderIdentity, ToolProviderSet } from "./provider-types";
 
 export class ToolRegistry {
   readonly tools: ToolDefinition[];
-  constructor(env: Env, oauth: GoogleOAuthService, scheduler?: SchedulerService) {
-    const accessToken = () => oauth.getAccessToken();
-    const primarySearchProvider = env.SEARCH_PROVIDER === "brave" && env.SEARCH_API_KEY
-      ? new BraveSearchProvider(env.SEARCH_API_KEY)
-      : new UnavailableSearchProvider("SEARCH_PROVIDER 또는 SEARCH_API_KEY가 설정되지 않았습니다.");
-    const searchProvider=env.SEARCH_FALLBACK_PROVIDER==="serpapi"&&env.SERP_API_KEY
-      ?new RateLimitFallbackSearchProvider(primarySearchProvider,new SerpApiSearchProvider(env.SERP_API_KEY))
-      :primarySearchProvider;
-    const gmail = new GoogleGmailClient(accessToken);
-    const calendar = new GoogleCalendarClient(accessToken);
-    this.tools = [
-      new GmailSearchTool(gmail), new GmailSendTool(gmail), new GmailReplyTool(gmail),
-      new CalendarSearchTool(calendar), new CalendarCreateTool(calendar), new CalendarUpdateTool(calendar), new CalendarDeleteTool(calendar),
-      new WebSearchTool(searchProvider),
-      ...(scheduler ? [new SchedulerCreateTool(scheduler)] : []),
-    ];
+  readonly #providersByTool = new Map<string, ToolProviderIdentity>();
+  constructor(providers: ToolProviderSet, scheduler?: SchedulerService) {
+    const gmailTools = [new GmailSearchTool(providers.gmail.client), new GmailSendTool(providers.gmail.client), new GmailReplyTool(providers.gmail.client)];
+    const calendarTools = [new CalendarSearchTool(providers.calendar.client), new CalendarCreateTool(providers.calendar.client), new CalendarUpdateTool(providers.calendar.client), new CalendarDeleteTool(providers.calendar.client)];
+    const searchTools = [new WebSearchTool(providers.search.provider)];
+    const schedulerTools = scheduler ? [new SchedulerCreateTool(scheduler)] : [];
+    this.tools = [...gmailTools, ...calendarTools, ...searchTools, ...schedulerTools];
+    for (const tool of gmailTools) this.#providersByTool.set(tool.name, providers.gmail.identity);
+    for (const tool of calendarTools) this.#providersByTool.set(tool.name, providers.calendar.identity);
+    for (const tool of searchTools) this.#providersByTool.set(tool.name, providers.search.identity);
+    for (const tool of schedulerTools) this.#providersByTool.set(tool.name, { service: "scheduler", implementation: "cloudflare-agents" });
   }
   definitions() { return this.tools.map((tool) => ({ name: tool.name, description: tool.description, inputSchema: tool.inputSchema })); }
   get(name: string): ToolDefinition | undefined { return this.tools.find((tool) => tool.name === name); }
+  provider(name: string): ToolProviderIdentity | undefined { return this.#providersByTool.get(name); }
   async execute(name: string, input: Record<string, unknown>, context: ToolContext, authorization?: ToolExecutionAuthorization) {
     const tool = this.get(name);
     if (!tool) throw new ToolPolicyError("POLICY_MISMATCH", "Tool not found");

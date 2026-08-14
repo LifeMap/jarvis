@@ -29,6 +29,7 @@ export interface OpenAiProviderOptions {
 }
 
 export class OpenAiProvider implements LlmProvider {
+  readonly providerId = "openai" as const;
   readonly #apiKey: string;
   readonly #model: string;
   readonly #baseUrl: string;
@@ -40,6 +41,8 @@ export class OpenAiProvider implements LlmProvider {
     this.#baseUrl = (options.baseUrl ?? "https://api.openai.com/v1").replace(/\/$/, "");
     this.#fetch = options.fetch ?? ((input, init) => fetch(input, init));
   }
+
+  get modelId(): string { return this.#model; }
 
   async generate(request: LlmRequest): Promise<LlmResponse> {
     const payload = await this.request(request);
