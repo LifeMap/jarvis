@@ -89,6 +89,35 @@ describe("Jarvis Phase 1 Worker", () => {
     await expect(after.json()).resolves.toMatchObject({ message: expect.stringContaining("Model: test-model") });
   });
 
+  it("manages Tool Providers explicitly and persists changes between requests", async () => {
+    const all = await sendMessage("tool-provider-management", "현재 외부 서비스 Provider 상태를 전부 보여줘.");
+    await expect(all.json()).resolves.toMatchObject({
+      message: expect.stringContaining("brave-api"),
+      model: "jarvis-tool-provider-management",
+      toolCalls: [expect.objectContaining({ name: "tool_provider.list_active" })],
+    });
+
+    const changed = await sendMessage("tool-provider-management", "Search Provider를 serpapi로 변경해.");
+    await expect(changed.json()).resolves.toMatchObject({
+      message: expect.stringContaining("serpapi"),
+      toolResults: [expect.objectContaining({ name: "tool_provider.set_active", success: true })],
+    });
+    const persisted = await sendMessage("tool-provider-management", "현재 Search Provider 알려줘.");
+    await expect(persisted.json()).resolves.toMatchObject({ message: expect.stringContaining("Active: serpapi") });
+
+    const rejected = await sendMessage("tool-provider-management", "Gmail을 MCP로 바꿔.");
+    await expect(rejected.json()).resolves.toMatchObject({
+      message: expect.stringContaining("등록되어 있지 않습니다"),
+      toolResults: [expect.objectContaining({ name: "tool_provider.set_active", success: false })],
+    });
+
+    const reset = await sendMessage("tool-provider-management", "Search를 기본 Provider로 되돌려.");
+    await expect(reset.json()).resolves.toMatchObject({
+      message: expect.stringContaining("brave-api"),
+      toolResults: [expect.objectContaining({ name: "tool_provider.reset", success: true })],
+    });
+  });
+
   it("does not create a write approval from an ambiguous answer phrase", async () => {
     const response = await sendMessage("model-tool-guard", "한 문장으로 답해줘");
     await expect(response.json()).resolves.toMatchObject({
@@ -280,7 +309,7 @@ describe("Jarvis Phase 1 Worker", () => {
 
   it("provides authenticated Admin dashboard, tools, settings and history APIs",async()=>{
     const dashboard=await api("/api/admin/dashboard");expect(dashboard.status).toBe(200);expect(await dashboard.json()).toMatchObject({counts:{pendingApprovals:expect.any(Number),activeSchedules:expect.any(Number),recentErrors:expect.any(Number)}});
-    const toolList=await (await api("/api/tools")).json<{tools:Array<{name:string;requiresApproval:boolean;provider?:{implementation:string}}>}>();expect(toolList.tools).toEqual(expect.arrayContaining([expect.objectContaining({name:"gmail.send",requiresApproval:true,provider:{service:"gmail",implementation:"google-api"}}),expect.objectContaining({name:"scheduler.create",requiresApproval:false,provider:{service:"scheduler",implementation:"cloudflare-agents"}})]));
+    const toolList=await (await api("/api/tools")).json<{tools:Array<{name:string;requiresApproval:boolean;provider?:{implementation:string}}>}>();expect(toolList.tools).toEqual(expect.arrayContaining([expect.objectContaining({name:"gmail.send",requiresApproval:true,provider:{service:"gmail",implementation:"gmail-api"}}),expect.objectContaining({name:"scheduler.create",requiresApproval:false,provider:{service:"scheduler",implementation:"cloudflare-agents"}})]));
     const updated=await api("/api/settings",{method:"PATCH",body:JSON.stringify({language:"ko",timezone:"Asia/Seoul",responseTone:"warm",speechStyle:"polite",responseDetail:"concise",customInstructions:"결론부터 답해줘."})});expect(await updated.json()).toMatchObject({language:"ko",timezone:"Asia/Seoul",responseTone:"warm",speechStyle:"polite",responseDetail:"concise",customInstructions:"결론부터 답해줘.",llmProvider:"test",secretsManagedBy:"Cloudflare Secrets"});
     const sent=await sendMessage("admin-history","안녕 Admin");const run=await sent.json<{requestId:string}>();
     const historyList=await (await api("/api/history")).json<{runs:Array<{id:string}>}>();expect(historyList.runs).toContainEqual(expect.objectContaining({id:run.requestId}));

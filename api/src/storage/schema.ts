@@ -43,6 +43,13 @@ export function ensureApplicationSchema(database: SqlExecutor): void {
     )
   `;
   database.sql`
+    CREATE TABLE IF NOT EXISTS tool_provider_configuration (
+      service TEXT PRIMARY KEY CHECK (service IN ('gmail', 'calendar', 'search')),
+      provider_id TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+  `;
+  database.sql`
     CREATE TABLE IF NOT EXISTS profile_memories (
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL,

@@ -13,6 +13,8 @@ export default defineConfig({
           DEFAULT_MODEL_PROVIDER: "test",
           DEFAULT_MODEL: "test-model",
           TEST_LLM_RESPONSE: "안녕하세요. Jarvis 테스트 응답입니다.",
+          SEARCH_API_KEY: "test-brave-key",
+          SERP_API_KEY: "test-serp-key",
         },
       },
     }),

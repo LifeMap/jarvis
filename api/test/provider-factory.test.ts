@@ -27,8 +27,8 @@ describe("Provider factories", () => {
     } as Env, { getAccessToken: vi.fn().mockResolvedValue("google-test-token") });
     const registry = new ToolRegistry(providers);
 
-    expect(registry.provider("gmail.search_messages")).toEqual({ service: "gmail", implementation: "google-api" });
-    expect(registry.provider("google_calendar.search_events")).toEqual({ service: "calendar", implementation: "google-api" });
+    expect(registry.provider("gmail.search_messages")).toEqual({ service: "gmail", implementation: "gmail-api" });
+    expect(registry.provider("google_calendar.search_events")).toEqual({ service: "calendar", implementation: "google-calendar-api" });
     expect(registry.provider("web_search.search")).toEqual({
       service: "search",
       implementation: "brave-api",

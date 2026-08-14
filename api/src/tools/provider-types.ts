@@ -4,7 +4,8 @@ import type { SearchProvider } from "./search/search-provider";
 
 export type ToolProviderService = "gmail" | "calendar" | "search" | "scheduler";
 export type ToolProviderImplementation =
-  | "google-api"
+  | "gmail-api"
+  | "google-calendar-api"
   | "brave-api"
   | "serpapi"
   | "cloudflare-agents"

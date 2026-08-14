@@ -47,6 +47,7 @@ flowchart LR
 ## 주요 기능
 
 - Workers AI Qwen3를 기본으로 하고 OpenAI로 런타임 전환 가능한 자연어 대화와 Tool Calling
+- Gmail, Calendar, Search의 runtime-selectable Tool Provider와 SQLite 설정 영속화
 - 대화 기록, 프로필 및 장기 메모리
 - 사용자 위치와 timezone을 반영한 요청 처리
 - Gmail 조회·검색·상세 조회
@@ -103,6 +104,10 @@ cp api/.dev.vars.example api/.dev.vars
 model이 있으면 그 설정을 우선합니다. Active model은 Agent 명령으로 변경하거나 기본값으로
 복귀할 수 있고 Durable Object SQLite에 유지됩니다. Model Provider 등록값, Search provider와 기본 timezone은
 [`api/wrangler.jsonc`](api/wrangler.jsonc)의 non-secret 설정을 사용합니다.
+
+외부 Tool은 논리 서비스와 구현 Provider가 분리되어 있습니다. 최초 기본값은 Gmail API,
+Google Calendar API, Brave Search이며, Search는 기존 SerpApi 구현으로도 런타임 전환할 수
+있습니다. 선택값은 Durable Object SQLite에 저장되고 API Key/OAuth token은 저장하지 않습니다.
 
 ### 2. Web Playground 환경변수
 

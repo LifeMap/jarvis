@@ -14,7 +14,8 @@ export function createModelManagementTools(service: ModelConfigurationService): 
 
 export function parseModelManagementIntent(message: string, service: ModelConfigurationService): ModelManagementIntent | null {
   const text = message.trim();
-  if (/(기본|default).*(돌아|되돌|복귀|reset)|(돌아|되돌|복귀|reset).*(기본|default)/i.test(text)) {
+  if (/(모델|model|workers\s*-?\s*ai|open\s*-?\s*ai|오픈에이아이|워커스)/i.test(text)
+    && /((기본|default).*(돌아|되돌|복귀|reset)|(돌아|되돌|복귀|reset).*(기본|default))/i.test(text)) {
     return { toolName: "model.reset_active", arguments: {} };
   }
   if (/(사용\s*가능|사용할\s*수\s*있는|available).*(모델|model)|(모델|model).*(목록|리스트|list)/i.test(text)) {

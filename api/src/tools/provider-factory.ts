@@ -2,6 +2,7 @@ import type { Env } from "../env";
 import { GoogleCalendarClient } from "./calendar/calendar-client";
 import { GoogleGmailClient } from "./gmail/gmail-client";
 import type { AccessTokenProvider, ToolProviderSet } from "./provider-types";
+import type { ActiveToolProviders } from "./tool-provider-resolver";
 import {
   BraveSearchProvider,
   RateLimitFallbackSearchProvider,
@@ -9,26 +10,34 @@ import {
   UnavailableSearchProvider,
 } from "./search/search-provider";
 
-export function createToolProviders(env: Env, googleAuth: AccessTokenProvider): ToolProviderSet {
+const DEFAULT_PROVIDERS: ActiveToolProviders = {
+  gmail: "gmail-api", calendar: "google-calendar-api", search: "brave-api",
+};
+
+export function createToolProviders(
+  env: Env, googleAuth: AccessTokenProvider, active: ActiveToolProviders = DEFAULT_PROVIDERS,
+): ToolProviderSet {
   const accessToken = () => googleAuth.getAccessToken();
   const gmail = new GoogleGmailClient(accessToken);
   const calendar = new GoogleCalendarClient(accessToken);
-  const primarySearch = env.SEARCH_PROVIDER === "brave" && env.SEARCH_API_KEY
+  const primarySearch = active.search === "brave-api" && env.SEARCH_API_KEY
     ? new BraveSearchProvider(env.SEARCH_API_KEY)
-    : new UnavailableSearchProvider("SEARCH_PROVIDER 또는 SEARCH_API_KEY가 설정되지 않았습니다.");
+    : active.search === "serpapi" && env.SERP_API_KEY
+      ? new SerpApiSearchProvider(env.SERP_API_KEY)
+      : new UnavailableSearchProvider(`${active.search} Provider credential이 설정되지 않았습니다.`);
   const hasSerpApiFallback = env.SEARCH_FALLBACK_PROVIDER === "serpapi" && Boolean(env.SERP_API_KEY);
-  const search = hasSerpApiFallback
+  const search = active.search === "brave-api" && hasSerpApiFallback
     ? new RateLimitFallbackSearchProvider(primarySearch, new SerpApiSearchProvider(env.SERP_API_KEY!))
     : primarySearch;
 
   return {
-    gmail: { identity: { service: "gmail", implementation: "google-api" }, client: gmail },
-    calendar: { identity: { service: "calendar", implementation: "google-api" }, client: calendar },
+    gmail: { identity: { service: "gmail", implementation: active.gmail }, client: gmail },
+    calendar: { identity: { service: "calendar", implementation: active.calendar }, client: calendar },
     search: {
       identity: {
         service: "search",
-        implementation: env.SEARCH_PROVIDER === "brave" && env.SEARCH_API_KEY ? "brave-api" : "unavailable",
-        ...(hasSerpApiFallback ? { fallbackImplementation: "serpapi" as const } : {}),
+        implementation: (active.search === "brave-api" ? env.SEARCH_API_KEY : env.SERP_API_KEY) ? active.search : "unavailable",
+        ...(active.search === "brave-api" && hasSerpApiFallback ? { fallbackImplementation: "serpapi" as const } : {}),
       },
       provider: search,
     },

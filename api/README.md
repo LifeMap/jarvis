@@ -12,8 +12,8 @@ Requires Node.js 22.18 or newer.
 PersonalAssistantAgent
   +-- ModelProvider        workers-ai / openai (test in automated tests)
   +-- ToolProviderSet
-      +-- gmail            google-api
-      +-- calendar         google-api
+      +-- gmail            gmail-api
+      +-- calendar         google-calendar-api
       +-- search           brave-api (optional serpapi rate-limit fallback)
 ```
 
@@ -22,11 +22,11 @@ explicitly supported models, and the active selection is stored in Durable Objec
 than in a Secret. `tools/provider-factory.ts` owns
 external Tool Provider construction and environment interpretation. `ToolRegistry` receives those
 providers and is limited to registering Tools and enforcing Tool execution policy. Provider IDs are
-metadata separately from credentials. Tool Provider runtime switching and MCP are not implemented.
+metadata separately from credentials. Service-specific active Tool Providers are resolved from
+Durable Object SQLite; MCP transport and implementations are not implemented.
 
-The default Model Provider is Workers AI using
-`@cf/meta/llama-3.3-70b-instruct-fp8-fast`, selected because the Cloudflare-hosted model supports
-function calling and structured output. OpenAI `gpt-5-mini` remains registered when
+The default Model Provider is Workers AI using `@cf/qwen/qwen3-30b-a3b-fp8`. The previous
+`@cf/meta/llama-3.3-70b-instruct-fp8-fast` model and OpenAI `gpt-5-mini` remain registered when
 `OPENAI_API_KEY` is configured. Explicit chat commands can query, list, or change the active model;
 the validated selection applies from the following request without a Worker deployment. No
 automatic model fallback is performed.
@@ -86,6 +86,31 @@ Only explicit change/reset phrases invoke `model.set_active` or `model.reset_act
 provider/model, missing binding/credential, or invalid default leaves the previous active
 configuration unchanged. Reset persists the immutable default as the active selection and takes
 effect on the next request without a code change or redeployment.
+
+### Dynamic Tool Providers
+
+| Service | Default Provider | Other registered Provider |
+| --- | --- | --- |
+| Gmail | `gmail-api` | None yet |
+| Calendar | `google-calendar-api` | None yet |
+| Search | `brave-api` | `serpapi` |
+
+Active selections are stored in Durable Object SQLite table `tool_provider_configuration`. With no
+stored selection, the explicit service default is used. Changes validate service registration,
+Provider registration, credentials, OAuth connection, and availability before storage is updated.
+Unimplemented MCP Provider IDs are rejected without changing the active Provider.
+
+```text
+현재 Gmail Provider 알려줘
+현재 외부 서비스 Provider 상태를 전부 보여줘
+Search Provider 목록 알려줘
+Search Provider를 serpapi로 변경해
+Search를 기본 Provider로 되돌려
+```
+
+Model and Tool Provider configurations use separate repositories and tables. Existing Brave 429 →
+SerpApi fallback remains part of `brave-api`; selecting `serpapi` makes it the direct Search
+Provider.
 
 Web Search uses Brave first. On HTTP 429 it waits one second and retries Brave once; only a second
 429 activates SerpApi. Authentication, validation, and server failures do not trigger paid-provider
