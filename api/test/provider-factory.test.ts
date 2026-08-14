@@ -26,8 +26,8 @@ describe("Provider factories", () => {
     } as Env, { getAccessToken: vi.fn().mockResolvedValue("google-test-token") });
     const registry = new ToolRegistry(providers);
 
-    expect(registry.provider("gmail.search_messages")).toEqual({ service: "gmail", implementation: "gmail-api" });
-    expect(registry.provider("google_calendar.search_events")).toEqual({ service: "calendar", implementation: "google-calendar-api" });
+    expect(registry.provider("gmail.search_messages")).toEqual({ service: "gmail", implementation: "gmail-api",capabilities:["read","send","reply"] });
+    expect(registry.provider("google_calendar.search_events")).toEqual({ service: "calendar", implementation: "google-calendar-api",capabilities:["read","create","update","delete"] });
     expect(registry.provider("web_search.search")).toEqual({ service: "search", implementation: "brave-api" });
   });
 
@@ -37,5 +37,12 @@ describe("Provider factories", () => {
     });
 
     expect(providers.search.identity).toEqual({ service: "search", implementation: "unavailable" });
+  });
+
+  it("carries OAuth scopes into Tool execution capability checks",async()=>{
+    const providers=createToolProviders({SEARCH_PROVIDER:"none"} as Env,{getAccessToken:vi.fn().mockResolvedValue("token"),status:()=>({scopes:["https://www.googleapis.com/auth/gmail.readonly","https://www.googleapis.com/auth/calendar.readonly"]})});
+    const registry=new ToolRegistry(providers);
+    expect(registry.provider("gmail.send")?.capabilities).toEqual(["read"]);
+    await expect(registry.execute("gmail.send",{to:"a@example.com",subject:"s",body:"b"},{timezone:"UTC"},{approvalId:"a",toolName:"gmail.send"})).rejects.toThrow("send 권한");
   });
 });

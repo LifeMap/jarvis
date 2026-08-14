@@ -1,5 +1,6 @@
 import type { Env } from "../env";
 import type { GoogleOAuthStore, GoogleToken } from "./google-oauth-repository";
+import { safeErrorMessage } from "../security/redaction";
 
 const GOOGLE_SCOPES = [
   "https://www.googleapis.com/auth/gmail.readonly",
@@ -58,16 +59,24 @@ export class GoogleOAuthService {
     if (!token) throw new Error("Google 계정이 연결되지 않았습니다.");
     if (token.expiresAt > Date.now() + 60_000) return token.accessToken;
     if (!token.refreshToken) throw new Error("Google refresh token이 없어 다시 연결해야 합니다.");
-    const payload = await this.requestToken({ refresh_token: token.refreshToken, grant_type: "refresh_token" });
-    const refreshed = toToken(payload, token);
-    this.repository.saveToken(refreshed);
-    return refreshed.accessToken;
+    try {
+      const payload = await this.requestToken({ refresh_token: token.refreshToken, grant_type: "refresh_token" });
+      const refreshed = toToken(payload, token);
+      this.repository.saveToken(refreshed);
+      return refreshed.accessToken;
+    } catch(error) {
+      this.repository.updateStatus?.("refresh-failed",safeErrorMessage(error,"Google OAuth 갱신에 실패했습니다."));
+      throw new Error("Google 인증 갱신에 실패했습니다. 계정을 다시 연결해 주세요.");
+    }
   }
 
   status() {
     const token = this.repository.getToken();
+    const lifecycle=!token?"authorization-required":token.expiresAt<=Date.now()?token.refreshToken?"expiring":"expired":token.expiresAt<=Date.now()+5*60_000?"expiring":"valid";
     return {
       connected: Boolean(token),
+      status:lifecycle,
+      credentialRef:"google-oauth-main",
       scopes: token?.scope.split(" ").filter(Boolean) ?? [],
       expiresAt: token ? new Date(token.expiresAt).toISOString() : null,
       hasRefreshToken: Boolean(token?.refreshToken),
@@ -86,7 +95,7 @@ export class GoogleOAuthService {
     });
     const payload = await response.json() as TokenResponse;
     if (!response.ok || !payload.access_token) {
-      throw new Error(`Google OAuth token 요청 실패: ${payload.error_description ?? payload.error ?? response.status}`);
+      throw new Error(`Google OAuth token 요청 실패: ${safeErrorMessage(payload.error_description ?? payload.error ?? String(response.status))}`);
     }
     return payload;
   }

@@ -4,11 +4,12 @@ import { ToolError } from "../tools/types";
 import type { GenericMcpClient } from "./generic-mcp-client";
 import type { McpServerRepository } from "./mcp-server-repository";
 import type { McpServerRegistration, StoredMcpServer } from "./types";
+import { safeErrorMessage } from "../security/redaction";
 
 const REQUIRED:Record<string,string[]>={gmail:["searchMessages","sendMessage","replyMessage"],calendar:["searchEvents","createEvent","updateEvent","deleteEvent"],search:["search"]};
 
 export class McpRegistryService {
-  constructor(private readonly repo:McpServerRepository,private readonly client:GenericMcpClient,private readonly env:Env){}
+  constructor(private readonly repo:McpServerRepository,private readonly client:GenericMcpClient,private readonly env:Env,private readonly credentialResolver?:(reference:string)=>string|undefined){}
   list(){return this.repo.list().map(server=>({...server,connection:this.client.status(server.id)}));}
   get(id:string){const server=this.repo.get(id);return server?{...server,connection:this.client.status(id)}:undefined;}
   async register(input:McpServerRegistration){validate(input);const stored=this.repo.create(input);if(stored.enabled){try{return{server:stored,connection:await this.client.connect(stored)}}catch(error){return{server:stored,connection:{serverId:stored.id,state:"failed",connected:false,error:message(error)}}}}return{server:stored,connection:this.client.status(stored.id)};}
@@ -26,8 +27,8 @@ export class McpRegistryService {
   });}
   serverForProvider(providerId:string):StoredMcpServer|undefined{return this.repo.list().find(server=>server.providerId===providerId);}
   private require(id:string){const server=this.repo.get(id);if(!server)throw new ToolError("MCP server not found","등록되지 않은 MCP 서버입니다.");return server;}
-  private credential(reference:string):string|undefined{return (this.env as unknown as Record<string,unknown>)[reference] as string|undefined;}
+  private credential(reference:string):string|undefined{return this.credentialResolver?.(reference)??(this.env as unknown as Record<string,unknown>)[reference] as string|undefined;}
 }
 
 function validate(input:McpServerRegistration){if(!/^[a-z0-9][a-z0-9_-]{0,63}$/i.test(input.id))throw new ToolError("Invalid MCP server id","MCP 서버 ID는 안전한 문자 1~64자로 입력해 주세요.");if(!input.name.trim()||input.name.length>100)throw new ToolError("Invalid MCP server name","MCP 서버 이름이 올바르지 않습니다.");let url:URL;try{url=new URL(input.endpoint)}catch{throw new ToolError("Invalid MCP endpoint","MCP endpoint URL이 올바르지 않습니다.")}if(url.username||url.password)throw new ToolError("Credentials in MCP URL are forbidden","MCP URL에 인증정보를 포함할 수 없습니다.");if(url.protocol!=="https:"&&!(url.protocol==="http:"&&(url.hostname==="localhost"||url.hostname==="127.0.0.1")))throw new ToolError("Insecure MCP endpoint","MCP endpoint는 HTTPS여야 합니다.");if((input.authType==="bearer"||input.authType==="api-key")&&!input.credentialReference)throw new ToolError("Missing credential reference","Secret 이름(credentialReference)이 필요합니다.");if(input.providerId&&!input.service)throw new ToolError("Missing MCP service","Provider에는 service가 필요합니다.");for(const [capability,tool] of Object.entries(input.capabilityMapping)){if(!capability||!tool)throw new ToolError("Invalid capability mapping","MCP capability mapping이 올바르지 않습니다.");}}
-function message(error:unknown){return error instanceof Error?error.message:"MCP connection failed"}
+function message(error:unknown){return safeErrorMessage(error,"MCP connection failed")}

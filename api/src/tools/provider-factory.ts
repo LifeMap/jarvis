@@ -21,6 +21,9 @@ export function createToolProviders(
   mcp?: { client: GenericMcpClient; registry: McpRegistryService },
 ): ToolProviderSet {
   const accessToken = () => googleAuth.getAccessToken();
+  const scopes=googleAuth.status?.().scopes;
+  const gmailCapabilities=!scopes?["read","send","reply"]:[...(scopes.includes("https://www.googleapis.com/auth/gmail.readonly")?["read"]:[]),...(scopes.includes("https://www.googleapis.com/auth/gmail.send")?["send","reply"]:[])];
+  const calendarCapabilities=!scopes||scopes.includes("https://www.googleapis.com/auth/calendar.events")?["read","create","update","delete"]:scopes.includes("https://www.googleapis.com/auth/calendar.readonly")?["read"]:[];
   const gmail = new GoogleGmailClient(accessToken);
   const calendar = new GoogleCalendarClient(accessToken);
   const mcpGmail=mcp?.registry.serverForProvider(active.gmail);
@@ -36,8 +39,8 @@ export function createToolProviders(
   const search = primarySearch;
 
   return {
-    gmail: { identity: { service: "gmail", implementation: active.gmail }, client: mcpGmail&&mcp?new McpGmailClient(mcp.client,mcpGmail):gmail },
-    calendar: { identity: { service: "calendar", implementation: active.calendar }, client: mcpCalendar&&mcp?new McpCalendarClient(mcp.client,mcpCalendar):calendar },
+    gmail: { identity: { service: "gmail", implementation: active.gmail,capabilities:mcpGmail?Object.keys(mcpGmail.capabilityMapping):gmailCapabilities }, client: mcpGmail&&mcp?new McpGmailClient(mcp.client,mcpGmail):gmail },
+    calendar: { identity: { service: "calendar", implementation: active.calendar,capabilities:mcpCalendar?Object.keys(mcpCalendar.capabilityMapping):calendarCapabilities }, client: mcpCalendar&&mcp?new McpCalendarClient(mcp.client,mcpCalendar):calendar },
     search: {
       identity: {
         service: "search",

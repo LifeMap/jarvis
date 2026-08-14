@@ -17,6 +17,7 @@ export interface ToolProviderIdentity {
   service: ToolProviderService;
   implementation: ToolProviderImplementation;
   fallbackImplementation?: ToolProviderImplementation;
+  capabilities?: string[];
 }
 
 export interface ToolProviderSet {
@@ -27,4 +28,5 @@ export interface ToolProviderSet {
 
 export interface AccessTokenProvider {
   getAccessToken(): Promise<string>;
+  status?():{scopes:string[]};
 }

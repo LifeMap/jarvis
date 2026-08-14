@@ -1,4 +1,5 @@
 import type { SqlExecutor } from "../storage/sql";
+import { redactText, redactValue } from "../security/redaction";
 
 export class ToolExecutionRepository {
   constructor(private readonly database: SqlExecutor) {}
@@ -13,14 +14,14 @@ export class ToolExecutionRepository {
     resultSummary: string;
     error?: string;
   }): void {
-    const error = input.error ?? null;
+    const error = input.error ? redactText(input.error) : null;
     this.database.sql`
       INSERT INTO tool_executions (
         id, request_id, tool_name, input_json, success, execution_time_ms,
         result_summary, error_message, created_at
       ) VALUES (
         ${input.id}, ${input.requestId}, ${input.toolName}, ${JSON.stringify(sanitizeInput(input.toolInput))},
-        ${input.success ? 1 : 0}, ${input.durationMs}, ${input.resultSummary}, ${error}, ${new Date().toISOString()}
+        ${input.success ? 1 : 0}, ${input.durationMs}, ${redactText(input.resultSummary)}, ${error}, ${new Date().toISOString()}
       )
     `;
   }
@@ -49,7 +50,7 @@ export class ToolExecutionRepository {
 }
 
 function sanitizeInput(input: Record<string, unknown>): Record<string, unknown> {
-  return sanitizeObject(input);
+  return redactValue(sanitizeObject(input)) as Record<string, unknown>;
 }
 function sanitizeObject(input: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(Object.entries(input).map(([key, value]) => {

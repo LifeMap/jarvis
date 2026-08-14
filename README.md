@@ -250,6 +250,15 @@ Admin과 Playground를 Cloudflare Pages에 배포할 때는 서버 측 프록시
 - Tool 실행 기록에는 Secret과 OAuth Token을 저장하지 않습니다.
 - Gmail 본문 등 민감 데이터는 필요한 최소 범위만 처리하고 로그에는 요약만 저장합니다.
 - `.dev.vars`, `.env.local`과 배포 Secret은 Git에 커밋하지 않습니다.
+- OpenAI, Search, Google OAuth Client Secret은 운영 환경에서 Cloudflare Worker Secret으로 관리합니다.
+- Gmail/Calendar OAuth Token은 일반 Runtime 설정과 분리된 Credential Store에 저장합니다.
+- Runtime 상태 조회에는 credential reference, 상태, scope, 만료 시각만 포함하며 실제 값은 제외합니다.
+- 외부 오류와 실행 이력은 Bearer Token, API Key, OAuth Token 및 Client Secret 패턴을 공통으로 제거합니다.
+
+인증 상태는 `GET /api/auth/status` 또는 Jarvis의 `현재 인증 상태 알려줘` 명령으로 확인할 수
+있습니다. `Gmail 연결해`는 기존 Google OAuth 사용자 승인 절차를 안내하며, `Gmail 연결
+해제해`는 저장된 Runtime OAuth credential을 삭제합니다. Jarvis는 Cloudflare Secret 자체를
+생성하거나 변경하지 않습니다.
 
 ## 제외 범위
 

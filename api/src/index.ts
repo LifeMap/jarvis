@@ -3,6 +3,7 @@ import type { Env } from "./env";
 import type { ApprovalStatus } from "./approval/approval-repository";
 import type { CreateScheduleInput, UpdateScheduleInput } from "./scheduler/types";
 import { routeAgentRequest } from "agents";
+import { safeErrorMessage } from "./security/redaction";
 
 export { PersonalAssistantAgent } from "./personal-assistant-agent";
 
@@ -45,6 +46,7 @@ export default {
     if(url.pathname==="/api/provider-health"&&request.method==="GET")return json({health:await agent.providerHealth(url.searchParams.get("target")??undefined)});
     if(url.pathname==="/api/fallbacks"&&request.method==="GET")return json({fallbacks:await agent.fallbackConfiguration()});
     if(url.pathname==="/api/fallback-events"&&request.method==="GET")return json({events:await agent.fallbackEvents(Number(url.searchParams.get("limit")??50))});
+    if(url.pathname==="/api/auth/status"&&request.method==="GET")return json({auth:await agent.authStatuses(url.searchParams.get("target")??undefined)});
 
     if(url.pathname==="/api/mcp/servers"){
       if(request.method==="GET")return json({servers:await agent.listMcpServers()});
@@ -182,7 +184,7 @@ async function handleAgentMessage(request: Request, agent: AgentStub): Promise<R
     try {
       return json(await agent.message(message, sessionId, location));
     } catch (error) {
-      console.error("Agent request failed", error);
+      console.error("Agent request failed", safeErrorMessage(error));
       return json(
         { error: "Agent request failed", detail: error instanceof Error ? error.message : "Unknown error" },
         502,
@@ -242,7 +244,7 @@ function matchApprovalPath(pathname: string): { id: string; action?: "approve" |
 function matchSchedulePath(pathname:string):{id:string;action?:"run"}|null{const m=pathname.match(/^\/api\/schedules\/([^/]+)(?:\/(run))?$/);if(!m?.[1])return null;try{return m[2]?{id:decodeURIComponent(m[1]),action:"run"}:{id:decodeURIComponent(m[1])}}catch{return null}}
 function matchMcpPath(pathname:string):{id:string;action?:"enable"|"disable"|"test"|"tools"}|null{const m=pathname.match(/^\/api\/mcp\/servers\/([^/]+)(?:\/(enable|disable|test|tools))?$/);if(!m?.[1])return null;try{return m[2]?{id:decodeURIComponent(m[1]),action:m[2] as "enable"|"disable"|"test"|"tools"}:{id:decodeURIComponent(m[1])}}catch{return null}}
 function isCreateSchedule(v:unknown):v is CreateScheduleInput{if(!v||typeof v!=="object")return false;const x=v as Record<string,unknown>;return typeof x.title==="string"&&typeof x.instruction==="string"&&(x.scheduleType==="one_time"||x.scheduleType==="recurring")&&Boolean(x.scheduleRule)&&typeof x.scheduleRule==="object"}
-function safeMessage(error:unknown){return error instanceof Error?error.message:"Unknown error"}
+function safeMessage(error:unknown){return safeErrorMessage(error,"Unknown error")}
 
 function isApprovalStatus(value: string): value is ApprovalStatus {
   return ["PENDING", "APPROVED", "REJECTED", "EXECUTED", "FAILED", "EXPIRED"].includes(value);

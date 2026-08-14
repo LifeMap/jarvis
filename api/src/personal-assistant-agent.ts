@@ -43,6 +43,9 @@ import { ProviderHealthRepository } from "./runtime/provider-health";
 import { ProviderHealthService } from "./runtime/provider-health-service";
 import { createReliabilityManagementTools, parseReliabilityManagementIntent } from "./runtime/reliability-management-tools";
 import { FallbackModelProvider } from "./llm/fallback-model-provider";
+import { DurableObjectCredentialStore } from "./security/credential-store";
+import { AuthStatusService } from "./security/auth-status-service";
+import { createAuthManagementTools, parseAuthManagementIntent } from "./security/auth-management-tools";
 
 interface RunRow {
   id: string;
@@ -88,12 +91,14 @@ export class PersonalAssistantAgent extends Agent<Env> {
       await this.mcp.waitForConnections();
       await mcpRuntime.registry.ensureEnabledConnections();
       const toolProviderConfiguration = this.toolProviderConfiguration(oauth,mcpRuntime.registry);
+      const authService=new AuthStatusService(this.env,mcpRuntime.credentials,oauth,mcpRuntime.registry);
       const reliability=this.reliabilityServices(modelConfiguration,toolProviderConfiguration,mcpRuntime.registry);
-      const runtimeManager=this.runtimeConfigurationManager(modelConfiguration,toolProviderConfiguration,mcpRuntime.registry,reliability.fallbacks,reliability.health);
-      const reliabilityIntent=explicitMemory?null:parseReliabilityManagementIntent(message);
-      const runtimeIntent=explicitMemory||reliabilityIntent?null:parseRuntimeConfigurationIntent(message);
-      const mcpIntent=explicitMemory||reliabilityIntent||runtimeIntent||modelIntent?null:parseMcpManagementIntent(message);
-      const toolProviderIntent = explicitMemory || reliabilityIntent || runtimeIntent || modelIntent || mcpIntent ? null : parseToolProviderManagementIntent(message);
+      const runtimeManager=this.runtimeConfigurationManager(modelConfiguration,toolProviderConfiguration,mcpRuntime.registry,reliability.fallbacks,reliability.health,authService);
+      const authIntent=explicitMemory?null:parseAuthManagementIntent(message);
+      const reliabilityIntent=explicitMemory||authIntent?null:parseReliabilityManagementIntent(message);
+      const runtimeIntent=explicitMemory||authIntent||reliabilityIntent?null:parseRuntimeConfigurationIntent(message);
+      const mcpIntent=explicitMemory||authIntent||reliabilityIntent||runtimeIntent||modelIntent?null:parseMcpManagementIntent(message);
+      const toolProviderIntent = explicitMemory || authIntent || reliabilityIntent || runtimeIntent || modelIntent || mcpIntent ? null : parseToolProviderManagementIntent(message);
       let savedMemoryId: string | undefined;
       let responseText = "";
       let responseModel = "";
@@ -101,7 +106,10 @@ export class PersonalAssistantAgent extends Agent<Env> {
       let toolResults: ToolResultDebug[] = [];
       let approval: Approval | undefined;
       let createdSchedule: import("./scheduler/types").JarvisSchedule | undefined;
-      if(reliabilityIntent){
+      if(authIntent){
+        const tool=createAuthManagementTools(authService).find(candidate=>candidate.name===authIntent.toolName)!;const toolCallId=crypto.randomUUID(),toolStartedAt=Date.now();toolCalls=[{id:toolCallId,name:tool.name,input:authIntent.arguments,requiresApproval:false}];
+        try{const before=authService.list();const result=await tool.execute(authIntent.arguments,{timezone:this.env.SYSTEM_TIMEZONE??"UTC"});if(tool.name==="auth.disconnect")runtimeManager.recordMutation(tool.name,`auth.${String(authIntent.arguments.target)}`,before,authService.list());const summary=tool.summarize(result as never),durationMs=Date.now()-toolStartedAt;responseText=summary;responseModel="jarvis-auth-management";toolResults=[{toolCallId,name:tool.name,success:true,durationMs,summary}];new ToolExecutionRepository(this).record({id:crypto.randomUUID(),requestId,toolName:tool.name,toolInput:authIntent.arguments,success:true,durationMs,resultSummary:summary});}catch(error){const summary=error instanceof ToolError?error.userMessage:"인증 관리 작업에 실패했습니다.",durationMs=Date.now()-toolStartedAt;responseText=summary;responseModel="jarvis-auth-management";toolResults=[{toolCallId,name:tool.name,success:false,durationMs,summary,error:summary}];new ToolExecutionRepository(this).record({id:crypto.randomUUID(),requestId,toolName:tool.name,toolInput:authIntent.arguments,success:false,durationMs,resultSummary:summary,error:summary});}
+      }else if(reliabilityIntent){
         const tool=createReliabilityManagementTools(reliability.fallbacks,reliability.health).find(candidate=>candidate.name===reliabilityIntent.toolName)!;const toolCallId=crypto.randomUUID();const toolStartedAt=Date.now();toolCalls=[{id:toolCallId,name:tool.name,input:reliabilityIntent.arguments,requiresApproval:false}];
         try{const before=reliability.fallbacks.list();const result=await tool.execute(reliabilityIntent.arguments,{timezone:this.env.SYSTEM_TIMEZONE??"UTC"});if(tool.name==="fallback.set"||tool.name==="fallback.remove")runtimeManager.recordMutation(tool.name,`fallback.${String(reliabilityIntent.arguments.target)}`,before,reliability.fallbacks.list());const summary=tool.summarize(result as never);const durationMs=Date.now()-toolStartedAt;responseText=summary;responseModel="jarvis-reliability-management";toolResults=[{toolCallId,name:tool.name,success:true,durationMs,summary}];new ToolExecutionRepository(this).record({id:crypto.randomUUID(),requestId,toolName:tool.name,toolInput:reliabilityIntent.arguments,success:true,durationMs,resultSummary:summary});}catch(error){const summary=error instanceof ToolError?error.userMessage:"Provider 상태 또는 fallback 설정 처리에 실패했습니다. 기존 설정은 유지됩니다.";const durationMs=Date.now()-toolStartedAt;responseText=summary;responseModel="jarvis-reliability-management";toolResults=[{toolCallId,name:tool.name,success:false,durationMs,summary,error:summary}];new ToolExecutionRepository(this).record({id:crypto.randomUUID(),requestId,toolName:tool.name,toolInput:reliabilityIntent.arguments,success:false,durationMs,resultSummary:summary,error:summary});}
       }else if(runtimeIntent){
@@ -393,6 +401,8 @@ export class PersonalAssistantAgent extends Agent<Env> {
     return new GoogleOAuthService(new GoogleOAuthRepository(this), this.env).status();
   }
 
+  authStatuses(target?:string){const oauth=new GoogleOAuthService(new GoogleOAuthRepository(this),this.env),runtime=this.mcpRuntime();const service=new AuthStatusService(this.env,runtime.credentials,oauth,runtime.registry);return target?service.get(target):service.list()}
+
   disconnectGoogle(): boolean {
     return new GoogleOAuthService(new GoogleOAuthRepository(this), this.env).disconnect();
   }
@@ -487,19 +497,19 @@ export class PersonalAssistantAgent extends Agent<Env> {
   async removeMcpServerRegistration(id:string){const runtime=this.mcpRuntime(),before=runtime.registry.get(id);const result=await runtime.registry.remove(id);new RuntimeConfigurationHistoryRepository(this).record({changeType:"mcp.remove",target:`mcp.${id}`,previousValue:before??null,newValue:null,source:"user-command"});return result}
   testMcpServer(id:string){return this.mcpRuntime().registry.test(id)}
   listMcpTools(id:string){return this.mcpRuntime().registry.tools(id)}
-  runtimeConfiguration(){const models=new ModelConfigurationService(new ModelConfigurationRepository(this),createModelRegistry(this.env));const mcp=this.mcpRuntime().registry;const oauth=new GoogleOAuthService(new GoogleOAuthRepository(this),this.env);const tools=this.toolProviderConfiguration(oauth,mcp);const reliability=this.reliabilityServices(models,tools,mcp);return this.runtimeConfigurationManager(models,tools,mcp,reliability.fallbacks,reliability.health).getConfiguration()}
+  runtimeConfiguration(){const models=new ModelConfigurationService(new ModelConfigurationRepository(this),createModelRegistry(this.env));const runtime=this.mcpRuntime(),mcp=runtime.registry;const oauth=new GoogleOAuthService(new GoogleOAuthRepository(this),this.env);const tools=this.toolProviderConfiguration(oauth,mcp);const reliability=this.reliabilityServices(models,tools,mcp),auth=new AuthStatusService(this.env,runtime.credentials,oauth,mcp);return this.runtimeConfigurationManager(models,tools,mcp,reliability.fallbacks,reliability.health,auth).getConfiguration()}
   runtimeConfigurationHistory(limit=50){return new RuntimeConfigurationHistoryRepository(this).list(limit)}
   providerHealth(target?:string){const models=new ModelConfigurationService(new ModelConfigurationRepository(this),createModelRegistry(this.env));const mcp=this.mcpRuntime().registry;const tools=this.toolProviderConfiguration(new GoogleOAuthService(new GoogleOAuthRepository(this),this.env),mcp);return this.reliabilityServices(models,tools,mcp).health.check(target)}
   fallbackConfiguration(){const models=new ModelConfigurationService(new ModelConfigurationRepository(this),createModelRegistry(this.env));const mcp=this.mcpRuntime().registry;const tools=this.toolProviderConfiguration(new GoogleOAuthService(new GoogleOAuthRepository(this),this.env),mcp);return this.reliabilityServices(models,tools,mcp).fallbacks.list()}
   fallbackEvents(limit=50){return new FallbackConfigurationRepository(this).events(limit)}
 
-  private mcpRuntime(){const client=new GenericMcpClient(this as never,reference=>(this.env as unknown as Record<string,unknown>)[reference] as string|undefined);return{client,registry:new McpRegistryService(new McpServerRepository(this),client,this.env)}}
-  private runtimeConfigurationManager(models:ModelConfigurationService,tools:ToolProviderConfigurationService,mcp:McpRegistryService,fallbacks?:FallbackConfigurationService,health?:ProviderHealthService){return new RuntimeConfigurationManager(models,tools,mcp,new RuntimeConfigurationHistoryRepository(this),callback=>this.ctx.storage.transactionSync(callback),fallbacks,health)}
+  private mcpRuntime(){const credentials=new DurableObjectCredentialStore(this);const resolve=(reference:string)=>{const infrastructure=(this.env as unknown as Record<string,unknown>)[reference];if(typeof infrastructure==="string")return infrastructure;const value=credentials.getCredential(reference)?.value;return typeof value?.value==="string"?value.value:undefined};const client=new GenericMcpClient(this as never,resolve);return{client,credentials,registry:new McpRegistryService(new McpServerRepository(this),client,this.env,resolve)}}
+  private runtimeConfigurationManager(models:ModelConfigurationService,tools:ToolProviderConfigurationService,mcp:McpRegistryService,fallbacks?:FallbackConfigurationService,health?:ProviderHealthService,auth?:AuthStatusService){return new RuntimeConfigurationManager(models,tools,mcp,new RuntimeConfigurationHistoryRepository(this),callback=>this.ctx.storage.transactionSync(callback),fallbacks,health,auth)}
   private reliabilityServices(models:ModelConfigurationService,tools:ToolProviderConfigurationService,mcp:McpRegistryService){const fallbacks=new FallbackConfigurationService(new FallbackConfigurationRepository(this),models,tools);const health=new ProviderHealthService(new ProviderHealthRepository(this),models,tools,mcp);return{fallbacks,health}}
   private toolProviderConfiguration(oauth: GoogleOAuthService,mcpRegistry=this.mcpRuntime().registry): ToolProviderConfigurationService {
     return new ToolProviderConfigurationService(
       new ToolProviderConfigurationRepository(this),
-      createToolProviderRegistry(this.env, { googleConnected: oauth.status().connected },mcpRegistry.providers()),
+      createToolProviderRegistry(this.env, { googleConnected: oauth.status().connected,googleScopes:oauth.status().scopes },mcpRegistry.providers()),
     );
   }
 }

@@ -1,3 +1,5 @@
+import { redactText } from "../../security/redaction";
+
 export interface GmailMessage {
   id: string;
   threadId: string;
@@ -68,7 +70,7 @@ export class GoogleGmailClient implements GmailClient {
 async function gmailApiError(response:Response):Promise<GmailApiError>{
   let reason="Google API error";
   try{const payload=await response.json() as {error?:{message?:string;errors?:Array<{reason?:string}>}};reason=payload.error?.errors?.[0]?.reason??payload.error?.message??reason}catch{}
-  return new GmailApiError(response.status,reason);
+  return new GmailApiError(response.status,redactText(reason));
 }
 
 function encodeMime(input: GmailSendRequest): string {

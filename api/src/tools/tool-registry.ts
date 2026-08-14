@@ -55,6 +55,8 @@ export class ToolRegistry {
     }
     if (tool.policy === "AUTO" && authorization) throw new ToolPolicyError("POLICY_MISMATCH", "Read-only Tool에는 승인 권한을 사용할 수 없습니다.");
     const primary = this.provider(name);
+    const capability=requiredCapability(name);
+    if(primary?.capabilities&&capability&&!primary.capabilities.includes(capability))throw new ToolPolicyError("POLICY_MISMATCH",`현재 ${primary.implementation} 인증에는 ${capability} 권한이 없습니다. 계정을 필요한 scope로 다시 연결해 주세요.`);
     const started = Date.now();
     try {
       const result = await tool.execute(input, context);
@@ -62,7 +64,7 @@ export class ToolRegistry {
       return { tool, result, fallbackUsed: false };
     } catch (error) {
       const failure = classifyProviderFailure(error);
-      if (primary && this.fallback) this.fallback.health.markFailure(toolTarget(primary), failure.type, Date.now() - started);
+      if (primary && this.fallback && failure.fallbackEligible) this.fallback.health.markFailure(toolTarget(primary), failure.type, Date.now() - started);
       const fallbackTool = this.#fallbackTools.get(name);
       const fallbackProvider = this.#fallbackProvidersByTool.get(name);
       // Mutation tools are never replayed: a timeout may mean the first provider already committed the change.
@@ -85,3 +87,4 @@ export class ToolRegistry {
 }
 
 function toolTarget(identity: ToolProviderIdentity) { return `tools.${identity.service}.${identity.implementation}`; }
+function requiredCapability(name:string){if(name==="gmail.search_messages")return"read";if(name==="gmail.send")return"send";if(name==="gmail.reply")return"reply";if(name==="google_calendar.search_events")return"read";if(name==="calendar.create")return"create";if(name==="calendar.update")return"update";if(name==="calendar.delete")return"delete";return undefined;}

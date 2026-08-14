@@ -1,5 +1,6 @@
 import type { LlmProvider, LlmRequest, LlmResponse, LlmToolCall, LlmToolDefinition } from "./types";
 import { LlmProviderError } from "./types";
+import { redactText } from "../security/redaction";
 
 interface OpenAiResponse {
   id?: string;
@@ -120,7 +121,7 @@ export class OpenAiProvider implements LlmProvider {
     const payload = await parseJson(response);
     if (!response.ok) {
       throw new LlmProviderError(
-        `LLM 요청이 실패했습니다 (${response.status}): ${payload.error?.message ?? "알 수 없는 오류"}`,
+        `LLM 요청이 실패했습니다 (${response.status}): ${redactText(payload.error?.message ?? "알 수 없는 오류")}`,
       );
     }
 

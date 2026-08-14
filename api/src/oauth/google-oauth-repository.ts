@@ -1,4 +1,7 @@
 import type { SqlExecutor } from "../storage/sql";
+import { DurableObjectCredentialStore, type CredentialStatus, type CredentialStore } from "../security/credential-store";
+
+export const GOOGLE_CREDENTIAL_REF = "google-oauth-main";
 
 export interface GoogleToken {
   accessToken: string;
@@ -14,45 +17,39 @@ export interface GoogleOAuthStore {
   deleteToken(): boolean;
   createState(state: string, redirectUri: string): void;
   consumeState(state: string): string | null;
+  updateStatus?(status:CredentialStatus,error?:string):void;
 }
 
 export class GoogleOAuthRepository implements GoogleOAuthStore {
-  constructor(private readonly database: SqlExecutor) {}
+  private readonly credentials:CredentialStore;
+  constructor(private readonly database: SqlExecutor,credentials?:CredentialStore) {this.credentials=credentials??new DurableObjectCredentialStore(database);}
 
   getToken(): GoogleToken | null {
+    const stored=this.credentials.getCredential(GOOGLE_CREDENTIAL_REF);
+    if(stored){const value=stored.value;return{accessToken:String(value.accessToken),refreshToken:typeof value.refreshToken==="string"?value.refreshToken:null,tokenType:String(value.tokenType??"Bearer"),scope:String(value.scope??""),expiresAt:Number(value.expiresAt)};}
     const [row] = this.database.sql<{
       access_token: string; refresh_token: string | null; token_type: string; scope: string; expires_at: number;
     }>`SELECT access_token, refresh_token, token_type, scope, expires_at FROM google_oauth_tokens WHERE provider = 'google'`;
-    return row ? {
+    const legacy=row ? {
       accessToken: row.access_token,
       refreshToken: row.refresh_token,
       tokenType: row.token_type,
       scope: row.scope,
       expiresAt: row.expires_at,
     } : null;
+    if(legacy){this.saveToken(legacy);this.database.sql`DELETE FROM google_oauth_tokens WHERE provider='google'`;}
+    return legacy;
   }
 
   saveToken(token: GoogleToken): void {
-    const now = new Date().toISOString();
-    this.database.sql`
-      INSERT INTO google_oauth_tokens (
-        provider, access_token, refresh_token, token_type, scope, expires_at, created_at, updated_at
-      ) VALUES ('google', ${token.accessToken}, ${token.refreshToken}, ${token.tokenType}, ${token.scope}, ${token.expiresAt}, ${now}, ${now})
-      ON CONFLICT(provider) DO UPDATE SET
-        access_token = excluded.access_token,
-        refresh_token = COALESCE(excluded.refresh_token, google_oauth_tokens.refresh_token),
-        token_type = excluded.token_type,
-        scope = excluded.scope,
-        expires_at = excluded.expires_at,
-        updated_at = excluded.updated_at
-    `;
+    this.credentials.setCredential(GOOGLE_CREDENTIAL_REF,{accessToken:token.accessToken,refreshToken:token.refreshToken,tokenType:token.tokenType,scope:token.scope,expiresAt:token.expiresAt},{type:"oauth",provider:"google",status:token.expiresAt<=Date.now()?"expired":token.expiresAt<=Date.now()+5*60_000?"expiring":"valid",scopes:token.scope.split(" ").filter(Boolean),expiresAt:token.expiresAt});
   }
 
   deleteToken(): boolean {
-    return this.database.sql<{ provider: string }>`
-      DELETE FROM google_oauth_tokens WHERE provider = 'google' RETURNING provider
-    `.length > 0;
+    const deleted=this.credentials.deleteCredential(GOOGLE_CREDENTIAL_REF);this.database.sql`DELETE FROM google_oauth_tokens WHERE provider='google'`;return deleted;
   }
+
+  updateStatus(status:CredentialStatus,error?:string){this.credentials.updateCredentialStatus(GOOGLE_CREDENTIAL_REF,status,error);}
 
   createState(state: string, redirectUri: string): void {
     const now = new Date().toISOString();

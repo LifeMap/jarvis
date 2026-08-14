@@ -899,6 +899,11 @@ MVP Agent 안정화 이후 별도 프로젝트로 진행한다.
 - Secret은 Cloudflare Secrets 사용
 - 클라이언트에 외부 API Key 노출 금지
 - 상태 변경 Tool은 Approval 적용
+- 장기 Infrastructure Secret과 런타임 OAuth Credential을 분리한다.
+- Provider와 MCP Registry는 실제 인증정보 대신 credential reference만 저장한다.
+- Runtime Configuration, Change History, Health, Fallback 이력에는 Secret 값을 저장하지 않는다.
+- 인증 상태와 Provider health 상태를 별도로 관리한다.
+- OAuth 연결과 해제는 사용자의 명시적인 요청과 사용자 consent를 요구한다.
 
 ## 장애 대응
 

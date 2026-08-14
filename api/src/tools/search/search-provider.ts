@@ -1,3 +1,5 @@
+import { redactText } from "../../security/redaction";
+
 export interface SearchResult { title: string; url: string; snippet: string; source: string; provider?: string }
 export interface SearchProvider { search(query: string, count: number): Promise<SearchResult[]> }
 
@@ -31,7 +33,7 @@ export class SerpApiSearchProvider implements SearchProvider {
     url.search=new URLSearchParams({engine:"google",q:query.slice(0,400),num:String(Math.min(Math.max(count,1),10)),api_key:this.apiKey}).toString();
     const response=await this.fetcher(url,{headers:{accept:"application/json"}});
     const payload=await response.json() as {error?:string;organic_results?:Array<{title?:string;link?:string;snippet?:string;source?:string;displayed_link?:string}>};
-    if(!response.ok||payload.error)throw new SearchProviderError("serpapi",response.status,payload.error??`SerpApi 요청 실패 (${response.status})`);
+    if(!response.ok||payload.error)throw new SearchProviderError("serpapi",response.status,redactText(payload.error??`SerpApi 요청 실패 (${response.status})`));
     return(payload.organic_results??[]).filter(item=>item.title&&item.link).map(item=>({title:item.title!,url:item.link!,snippet:item.snippet??"",source:item.source??item.displayed_link??new URL(item.link!).hostname,provider:"serpapi"}));
   }
 }

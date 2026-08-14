@@ -236,3 +236,46 @@ Search fallback을 제거해
 Configuration changes are recorded in `runtime_configuration_history`; actual failover attempts are
 stored separately in `fallback_events`. Neither table stores credentials, OAuth tokens, request
 authorization headers, or Tool payloads.
+
+## Authentication and credential storage
+
+Infrastructure Secrets remain Cloudflare Worker bindings and are never copied into SQLite:
+
+| Reference | Purpose |
+| --- | --- |
+| `env:JARVIS_API_TOKEN` | Jarvis API authentication |
+| `env:OPENAI_API_KEY` | OpenAI Provider |
+| `env:SEARCH_API_KEY` | Brave Search Provider |
+| `env:SERP_API_KEY` | Optional SerpApi Provider |
+| `env:GOOGLE_CLIENT_ID` | Google OAuth client configuration |
+| `env:GOOGLE_CLIENT_SECRET` | Google OAuth client secret |
+| `binding:AI` | Workers AI binding |
+
+Runtime OAuth credentials use `DurableObjectCredentialStore`. Secret material is isolated in
+`runtime_credentials`; normal Runtime Configuration, MCP Registry, status APIs, and history contain
+only a `credentialRef`, lifecycle status, scopes, and expiration metadata. Existing Google tokens in
+`google_oauth_tokens` migrate to `google-oauth-main` on first read and the legacy row is deleted.
+
+Authentication lifecycle values include `authorization-required`, `valid`, `expiring`, `expired`,
+`refresh-failed`, and `revoked`. Google access tokens refresh once when needed; a refresh failure is
+recorded as metadata and requires reconnection rather than an unbounded retry.
+
+```text
+GET /api/auth/status
+GET /api/auth/status?target=gmail
+```
+
+Natural-language examples:
+
+```text
+현재 인증 상태 알려줘
+Gmail 인증 상태 확인해
+인증이 필요한 서비스 보여줘
+Gmail 연결해
+Gmail 연결 해제해
+```
+
+`Gmail 연결해` returns the existing `/api/oauth/google/authorize` entry point; Google consent still
+requires the user’s browser interaction. MCP OAuth credentials and connection lifecycle remain under
+the Cloudflare Agents SDK, while Registry metadata stores only references. No chat command can create
+or rotate Cloudflare Worker Secrets.

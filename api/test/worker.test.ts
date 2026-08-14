@@ -89,6 +89,20 @@ describe("Jarvis Phase 1 Worker", () => {
     await expect(after.json()).resolves.toMatchObject({ message: expect.stringContaining("Model: test-model") });
   });
 
+  it("reports authentication metadata without returning secret values",async()=>{
+    const response=await sendMessage("auth-management","현재 인증 상태 알려줘");
+    expect(response.status).toBe(200);
+    const body=await response.json<{message:string;model:string;toolCalls:Array<{name:string}>}>();
+    expect(body.model).toBe("jarvis-auth-management");
+    expect(body.toolCalls[0]?.name).toBe("auth.list");
+    expect(body.message).toContain("openai");
+    expect(body.message).not.toContain("test-openai-key");
+    const api=await handler.fetch(new Request("https://example.test/api/auth/status",{headers:{authorization:"Bearer test-token"}}),testEnv);
+    const serialized=JSON.stringify(await api.json());
+    expect(serialized).not.toContain("test-openai-key");
+    expect(serialized).not.toContain("test-brave-key");
+  });
+
   it("manages Tool Providers explicitly and persists changes between requests", async () => {
     const all = await sendMessage("tool-provider-management", "현재 외부 서비스 Provider 상태를 전부 보여줘.");
     await expect(all.json()).resolves.toMatchObject({
@@ -320,7 +334,7 @@ describe("Jarvis Phase 1 Worker", () => {
 
   it("provides authenticated Admin dashboard, tools, settings and history APIs",async()=>{
     const dashboard=await api("/api/admin/dashboard");expect(dashboard.status).toBe(200);expect(await dashboard.json()).toMatchObject({counts:{pendingApprovals:expect.any(Number),activeSchedules:expect.any(Number),recentErrors:expect.any(Number)}});
-    const toolList=await (await api("/api/tools")).json<{tools:Array<{name:string;requiresApproval:boolean;provider?:{implementation:string}}>}>();expect(toolList.tools).toEqual(expect.arrayContaining([expect.objectContaining({name:"gmail.send",requiresApproval:true,provider:{service:"gmail",implementation:"gmail-api"}}),expect.objectContaining({name:"scheduler.create",requiresApproval:false,provider:{service:"scheduler",implementation:"cloudflare-agents"}})]));
+    const toolList=await (await api("/api/tools")).json<{tools:Array<{name:string;requiresApproval:boolean;provider?:{implementation:string}}>}>();expect(toolList.tools).toEqual(expect.arrayContaining([expect.objectContaining({name:"gmail.send",requiresApproval:true,provider:expect.objectContaining({service:"gmail",implementation:"gmail-api"})}),expect.objectContaining({name:"scheduler.create",requiresApproval:false,provider:expect.objectContaining({service:"scheduler",implementation:"cloudflare-agents"})})]));
     const updated=await api("/api/settings",{method:"PATCH",body:JSON.stringify({language:"ko",timezone:"Asia/Seoul",responseTone:"warm",speechStyle:"polite",responseDetail:"concise",customInstructions:"결론부터 답해줘."})});expect(await updated.json()).toMatchObject({language:"ko",timezone:"Asia/Seoul",responseTone:"warm",speechStyle:"polite",responseDetail:"concise",customInstructions:"결론부터 답해줘.",llmProvider:"test",secretsManagedBy:"Cloudflare Secrets"});
     const sent=await sendMessage("admin-history","안녕 Admin");const run=await sent.json<{requestId:string}>();
     const historyList=await (await api("/api/history")).json<{runs:Array<{id:string}>}>();expect(historyList.runs).toContainEqual(expect.objectContaining({id:run.requestId}));

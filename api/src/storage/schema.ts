@@ -110,6 +110,20 @@ export function ensureApplicationSchema(database: SqlExecutor): void {
   `;
   database.sql`CREATE INDEX IF NOT EXISTS fallback_events_created_idx ON fallback_events (created_at)`;
   database.sql`
+    CREATE TABLE IF NOT EXISTS runtime_credentials (
+      credential_ref TEXT PRIMARY KEY,
+      secret_json TEXT NOT NULL,
+      type TEXT NOT NULL,
+      provider TEXT NOT NULL,
+      status TEXT NOT NULL,
+      scopes_json TEXT NOT NULL,
+      expires_at INTEGER,
+      last_error TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+  `;
+  database.sql`
     CREATE TABLE IF NOT EXISTS profile_memories (
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL,

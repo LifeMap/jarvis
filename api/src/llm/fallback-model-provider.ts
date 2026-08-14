@@ -44,7 +44,7 @@ export class FallbackModelProvider implements ModelProvider {
       return response;
     } catch (error) {
       const failure = classifyProviderFailure(error);
-      this.health.markFailure(this.primaryTarget, failure.type);
+      if (failure.fallbackEligible) this.health.markFailure(this.primaryTarget, failure.type);
       if (!failure.fallbackEligible) throw error;
       try {
         const fallbackStarted = Date.now();
@@ -75,7 +75,7 @@ export class FallbackModelProvider implements ModelProvider {
       return { value, usedFallback: false };
     } catch (error) {
       const failure = classifyProviderFailure(error);
-      this.health.markFailure(this.primaryTarget, failure.type, Date.now() - started);
+      if (failure.fallbackEligible) this.health.markFailure(this.primaryTarget, failure.type, Date.now() - started);
       if (!failure.fallbackEligible) throw error;
       try {
         const fallbackStarted = Date.now();
