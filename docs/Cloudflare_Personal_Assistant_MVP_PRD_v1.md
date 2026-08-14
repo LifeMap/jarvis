@@ -1,5 +1,7 @@
 # Cloudflare Personal Assistant MVP PRD
 
+> 구현 메모 (2026-08-14): 리팩터링 Phase 4에서 Agents SDK 공식 MCP Client 기반 Generic MCP Consumer가 추가되었다. `mcp_server_configuration`은 Secret을 제외한 서버 metadata, enabled 상태, service/provider ID 및 capability mapping을 영속화한다. Secret은 `credentialReference`로만 참조한다. 논리 Tool 이름은 유지하고 mapping layer가 발견된 MCP Tool 이름으로 변환하며, 연결·credential·필수 capability 검증 실패 시 기존 active Provider를 보존한다. 미매핑 동적 Tool adapter는 보수적으로 Approval Required 정책을 사용하고 서비스 정책에 명시적으로 편입되기 전에는 LLM에 자동 노출하지 않는다. Cloudflare 공식 Documentation MCP를 통해 `brave-api → cloudflare-docs-mcp → brave-api` 무배포 전환과 실제 Tool 호출을 검증했다. Documentation MCP는 Cloudflare 문서 검색 전용이다.
+
 ## 1. 문서 개요
 
 - 문서명: Cloudflare Personal Assistant MVP PRD

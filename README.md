@@ -263,3 +263,9 @@ Admin과 Playground를 Cloudflare Pages에 배포할 때는 서버 측 프록시
 - [Web Playground 안내](web/README.md)
 - [Admin 안내](admin/README.md)
 - [MVP PRD](docs/Cloudflare_Personal_Assistant_MVP_PRD_v1.md)
+
+## Runtime MCP 서버
+
+Jarvis는 원격 MCP 연결에 Cloudflare Agents SDK의 공식 MCP Client를 사용합니다. 서버 메타데이터와 service capability mapping은 PersonalAssistantAgent SQLite에 저장하며, 연결/OAuth 상태는 SDK 관리 Agent 저장소에 분리합니다. Registry에는 Secret 값 대신 Cloudflare Secret binding을 가리키는 `credentialReference`만 저장합니다.
+
+인증이 필요한 관리 API는 `/api/mcp/servers`와 `/api/mcp/servers/:id` 아래의 `enable`, `disable`, `test`, `tools` endpoint입니다. 검증 PoC는 Cloudflare 공식 Documentation MCP인 `https://docs.mcp.cloudflare.com/mcp`를 사용합니다. 이 Provider는 Cloudflare 문서 전용 검색이며 Brave의 일반 웹 검색을 완전히 대체하지 않습니다.

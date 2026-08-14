@@ -25,5 +25,5 @@ export class ToolProviderConfigurationRepository {
 
 function isService(value: string): value is DynamicToolService { return value === "gmail" || value === "calendar" || value === "search"; }
 function isProvider(value: string): value is DynamicToolProviderId {
-  return value === "gmail-api" || value === "google-calendar-api" || value === "brave-api" || value === "serpapi";
+  return /^[a-z0-9][a-z0-9_-]{0,63}$/i.test(value);
 }

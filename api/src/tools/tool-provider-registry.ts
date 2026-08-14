@@ -1,7 +1,7 @@
 import type { Env } from "../env";
 
 export type DynamicToolService = "gmail" | "calendar" | "search";
-export type DynamicToolProviderId = "gmail-api" | "google-calendar-api" | "brave-api" | "serpapi";
+export type DynamicToolProviderId = string;
 
 export interface ToolProviderSelection {
   service: DynamicToolService;
@@ -14,6 +14,8 @@ export interface RegisteredToolProvider extends ToolProviderSelection {
   requiresAuth: boolean;
   capabilities: string[];
   unavailableReason?: string;
+  type?: "api" | "mcp";
+  mcpServerId?: string;
 }
 
 export interface ToolProviderAvailability {
@@ -42,7 +44,7 @@ export class ToolProviderRegistry {
   }
 }
 
-export function createToolProviderRegistry(env: Env, availability: ToolProviderAvailability): ToolProviderRegistry {
+export function createToolProviderRegistry(env: Env, availability: ToolProviderAvailability, dynamic: RegisteredToolProvider[] = []): ToolProviderRegistry {
   const googleConfigured = Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
   const googleEnabled = googleConfigured && availability.googleConnected;
   const googleReason = !googleConfigured
@@ -53,6 +55,7 @@ export function createToolProviderRegistry(env: Env, availability: ToolProviderA
     provider("calendar", "google-calendar-api", "Google Calendar API", googleEnabled, true, ["read", "create", "update", "delete"], googleReason),
     provider("search", "brave-api", "Brave Search API", Boolean(env.SEARCH_API_KEY), true, ["search"], env.SEARCH_API_KEY ? undefined : "SEARCH_API_KEY가 설정되지 않았습니다."),
     provider("search", "serpapi", "SerpApi", Boolean(env.SERP_API_KEY), true, ["search"], env.SERP_API_KEY ? undefined : "SERP_API_KEY가 설정되지 않았습니다."),
+    ...dynamic,
   ]);
 }
 
@@ -60,5 +63,5 @@ function provider(
   service: DynamicToolService, providerId: DynamicToolProviderId, displayName: string,
   enabled: boolean, requiresAuth: boolean, capabilities: string[], unavailableReason?: string,
 ): RegisteredToolProvider {
-  return { service, providerId, displayName, enabled, requiresAuth, capabilities, ...(unavailableReason ? { unavailableReason } : {}) };
+  return { service, providerId, displayName, enabled, requiresAuth, capabilities, type: "api", ...(unavailableReason ? { unavailableReason } : {}) };
 }

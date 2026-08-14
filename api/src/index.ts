@@ -2,6 +2,7 @@ import type { AgentMessageRequest, CreateMemoryInput, MemorySource, UpdateMemory
 import type { Env } from "./env";
 import type { ApprovalStatus } from "./approval/approval-repository";
 import type { CreateScheduleInput, UpdateScheduleInput } from "./scheduler/types";
+import { routeAgentRequest } from "agents";
 
 export { PersonalAssistantAgent } from "./personal-assistant-agent";
 
@@ -10,6 +11,11 @@ const AGENT_NAME = "primary";
 export default {
   async fetch(request, env): Promise<Response> {
     const url = new URL(request.url);
+
+    if (url.pathname.startsWith("/agents/") && url.pathname.endsWith("/callback")) {
+      const response = await routeAgentRequest(request, env);
+      if (response) return response;
+    }
 
     if (request.method === "GET" && url.pathname === "/health") {
       return json({ status: "ok", service: "jarvis-api" });
@@ -33,6 +39,24 @@ export default {
     }
 
     const agent = env.PERSONAL_ASSISTANT_AGENT.getByName(AGENT_NAME);
+
+    if(url.pathname==="/api/mcp/servers"){
+      if(request.method==="GET")return json({servers:await agent.listMcpServers()});
+      if(request.method==="POST"){const body=await readJson(request);if(!body||typeof body!=="object")return json({error:"Invalid MCP server payload"},400);try{return json(await agent.registerMcpServer(body as import("./mcp/types").McpServerRegistration),201)}catch(error){return json({error:"MCP registration failed",detail:safeMessage(error)},400)}}
+      return json({error:"Method not allowed"},405);
+    }
+    const mcpPath=matchMcpPath(url.pathname);
+    if(mcpPath){
+      try{
+        if(!mcpPath.action&&request.method==="GET"){const value=await agent.getMcpServer(mcpPath.id);return value?json(value):json({error:"MCP server not found"},404)}
+        if(!mcpPath.action&&request.method==="DELETE")return json({removed:await agent.removeMcpServerRegistration(mcpPath.id)});
+        if(mcpPath.action==="enable"&&request.method==="POST")return json(await agent.enableMcpServer(mcpPath.id));
+        if(mcpPath.action==="disable"&&request.method==="POST")return json(await agent.disableMcpServer(mcpPath.id));
+        if(mcpPath.action==="test"&&request.method==="POST")return json(await agent.testMcpServer(mcpPath.id));
+        if(mcpPath.action==="tools"&&request.method==="GET")return json({tools:await agent.listMcpTools(mcpPath.id)});
+      }catch(error){return json({error:"MCP operation failed",detail:safeMessage(error)},400)}
+      return json({error:"Method not allowed"},405);
+    }
 
     if(url.pathname==="/api/admin/dashboard"&&request.method==="GET")return json(await agent.adminDashboard());
     if(url.pathname==="/api/tools"&&request.method==="GET")return json({tools:await agent.adminToolStatus()});
@@ -210,6 +234,7 @@ function matchApprovalPath(pathname: string): { id: string; action?: "approve" |
   } catch { return null; }
 }
 function matchSchedulePath(pathname:string):{id:string;action?:"run"}|null{const m=pathname.match(/^\/api\/schedules\/([^/]+)(?:\/(run))?$/);if(!m?.[1])return null;try{return m[2]?{id:decodeURIComponent(m[1]),action:"run"}:{id:decodeURIComponent(m[1])}}catch{return null}}
+function matchMcpPath(pathname:string):{id:string;action?:"enable"|"disable"|"test"|"tools"}|null{const m=pathname.match(/^\/api\/mcp\/servers\/([^/]+)(?:\/(enable|disable|test|tools))?$/);if(!m?.[1])return null;try{return m[2]?{id:decodeURIComponent(m[1]),action:m[2] as "enable"|"disable"|"test"|"tools"}:{id:decodeURIComponent(m[1])}}catch{return null}}
 function isCreateSchedule(v:unknown):v is CreateScheduleInput{if(!v||typeof v!=="object")return false;const x=v as Record<string,unknown>;return typeof x.title==="string"&&typeof x.instruction==="string"&&(x.scheduleType==="one_time"||x.scheduleType==="recurring")&&Boolean(x.scheduleRule)&&typeof x.scheduleRule==="object"}
 function safeMessage(error:unknown){return error instanceof Error?error.message:"Unknown error"}
 

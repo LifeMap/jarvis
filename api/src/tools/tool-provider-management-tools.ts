@@ -17,7 +17,8 @@ export function createToolProviderManagementTools(service: ToolProviderConfigura
 
 export function parseToolProviderManagementIntent(message: string): ToolProviderManagementIntent | null {
   const text = message.trim();
-  const management = /(provider|프로바이더|연결\s*방식|외부\s*서비스.*상태|mcp)/i.test(text);
+  const management = /(provider|프로바이더|연결\s*방식|외부\s*서비스.*상태)/i.test(text)
+    || (/mcp/i.test(text) && /(바꿔|변경|설정|전환|사용해|switch|change|set)/i.test(text));
   if (!management) return null;
   if (/(전부|전체|모두|all).*(상태|provider|프로바이더)|(외부\s*서비스).*(상태|보여|알려)/i.test(text)) {
     return { toolName: "tool_provider.list_active", arguments: {} };
@@ -103,6 +104,8 @@ function parseService(text: string): DynamicToolService | null {
 function parseProviderId(text: string, service: DynamicToolService): string {
   const known = ["gmail-api", "google-calendar-api", "brave-api", "serpapi"].find((id) => text.toLowerCase().includes(id));
   if (known) return known;
+  const configured=text.match(/(?:provider|프로바이더)(?:를|로|으로)?\s+([a-z0-9][a-z0-9_-]{1,63})/i)?.[1];
+  if(configured)return configured.toLowerCase();
   if (/mcp/i.test(text)) return `${service}-mcp`;
   return service === "gmail" ? "gmail-api" : service === "calendar" ? "google-calendar-api" : /serp/i.test(text) ? "serpapi" : "brave-api";
 }

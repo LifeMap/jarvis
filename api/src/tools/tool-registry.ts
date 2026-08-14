@@ -12,16 +12,17 @@ import type { ToolProviderIdentity, ToolProviderSet } from "./provider-types";
 export class ToolRegistry {
   readonly tools: ToolDefinition[];
   readonly #providersByTool = new Map<string, ToolProviderIdentity>();
-  constructor(providers: ToolProviderSet, scheduler?: SchedulerService) {
+  constructor(providers: ToolProviderSet, scheduler?: SchedulerService, additional: Array<{tool:ToolDefinition;identity:ToolProviderIdentity}> = []) {
     const gmailTools = [new GmailSearchTool(providers.gmail.client), new GmailSendTool(providers.gmail.client), new GmailReplyTool(providers.gmail.client)];
     const calendarTools = [new CalendarSearchTool(providers.calendar.client), new CalendarCreateTool(providers.calendar.client), new CalendarUpdateTool(providers.calendar.client), new CalendarDeleteTool(providers.calendar.client)];
     const searchTools = [new WebSearchTool(providers.search.provider)];
     const schedulerTools = scheduler ? [new SchedulerCreateTool(scheduler)] : [];
-    this.tools = [...gmailTools, ...calendarTools, ...searchTools, ...schedulerTools];
+    this.tools = [...gmailTools, ...calendarTools, ...searchTools, ...schedulerTools,...additional.map(item=>item.tool)];
     for (const tool of gmailTools) this.#providersByTool.set(tool.name, providers.gmail.identity);
     for (const tool of calendarTools) this.#providersByTool.set(tool.name, providers.calendar.identity);
     for (const tool of searchTools) this.#providersByTool.set(tool.name, providers.search.identity);
     for (const tool of schedulerTools) this.#providersByTool.set(tool.name, { service: "scheduler", implementation: "cloudflare-agents" });
+    for(const item of additional)this.#providersByTool.set(item.tool.name,item.identity);
   }
   definitions() { return this.tools.map((tool) => ({ name: tool.name, description: tool.description, inputSchema: tool.inputSchema })); }
   get(name: string): ToolDefinition | undefined { return this.tools.find((tool) => tool.name === name); }

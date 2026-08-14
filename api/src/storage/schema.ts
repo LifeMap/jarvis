@@ -50,6 +50,23 @@ export function ensureApplicationSchema(database: SqlExecutor): void {
     )
   `;
   database.sql`
+    CREATE TABLE IF NOT EXISTS mcp_server_configuration (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      endpoint TEXT NOT NULL,
+      transport TEXT NOT NULL CHECK (transport IN ('streamable-http', 'sse', 'auto')),
+      enabled INTEGER NOT NULL,
+      auth_type TEXT NOT NULL CHECK (auth_type IN ('none', 'oauth', 'bearer', 'api-key')),
+      credential_reference TEXT,
+      service TEXT CHECK (service IS NULL OR service IN ('gmail', 'calendar', 'search')),
+      provider_id TEXT,
+      description TEXT,
+      capability_mapping_json TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+  `;
+  database.sql`
     CREATE TABLE IF NOT EXISTS profile_memories (
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL,

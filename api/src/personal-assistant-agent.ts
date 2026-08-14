@@ -31,6 +31,10 @@ import { createToolProviderRegistry } from "./tools/tool-provider-registry";
 import { ToolProviderResolver } from "./tools/tool-provider-resolver";
 import type { ToolCallDebug, ToolResultDebug } from "./tools/types";
 import { ToolError, ToolPolicyError } from "./tools/types";
+import { GenericMcpClient } from "./mcp/generic-mcp-client";
+import { McpServerRepository } from "./mcp/mcp-server-repository";
+import { McpRegistryService } from "./mcp/mcp-registry-service";
+import { createMcpManagementTools, parseMcpManagementIntent } from "./mcp/mcp-management-tools";
 
 interface RunRow {
   id: string;
@@ -72,8 +76,12 @@ export class PersonalAssistantAgent extends Agent<Env> {
       const modelConfiguration = new ModelConfigurationService(new ModelConfigurationRepository(this), createModelRegistry(this.env));
       const modelIntent = explicitMemory ? null : parseModelManagementIntent(message, modelConfiguration);
       const oauth = new GoogleOAuthService(new GoogleOAuthRepository(this), this.env);
-      const toolProviderConfiguration = this.toolProviderConfiguration(oauth);
-      const toolProviderIntent = explicitMemory || modelIntent ? null : parseToolProviderManagementIntent(message);
+      const mcpRuntime=this.mcpRuntime();
+      await this.mcp.waitForConnections();
+      await mcpRuntime.registry.ensureEnabledConnections();
+      const toolProviderConfiguration = this.toolProviderConfiguration(oauth,mcpRuntime.registry);
+      const mcpIntent=explicitMemory||modelIntent?null:parseMcpManagementIntent(message);
+      const toolProviderIntent = explicitMemory || modelIntent || mcpIntent ? null : parseToolProviderManagementIntent(message);
       let savedMemoryId: string | undefined;
       let responseText = "";
       let responseModel = "";
@@ -81,7 +89,10 @@ export class PersonalAssistantAgent extends Agent<Env> {
       let toolResults: ToolResultDebug[] = [];
       let approval: Approval | undefined;
       let createdSchedule: import("./scheduler/types").JarvisSchedule | undefined;
-      if (modelIntent) {
+      if(mcpIntent){
+        const tool=createMcpManagementTools(mcpRuntime.registry).find(candidate=>candidate.name===mcpIntent.toolName)!;const toolCallId=crypto.randomUUID();const toolStartedAt=Date.now();toolCalls=[{id:toolCallId,name:tool.name,input:mcpIntent.arguments,requiresApproval:false}];
+        try{const result=await tool.execute(mcpIntent.arguments,{timezone:this.env.SYSTEM_TIMEZONE??"UTC"});const summary=tool.summarize(result as never);const durationMs=Date.now()-toolStartedAt;responseText=summary;responseModel="jarvis-mcp-management";toolResults=[{toolCallId,name:tool.name,success:true,durationMs,summary}];new ToolExecutionRepository(this).record({id:crypto.randomUUID(),requestId,toolName:tool.name,toolInput:mcpIntent.arguments,success:true,durationMs,resultSummary:summary});}catch(error){const summary=error instanceof ToolError?error.userMessage:"MCP 관리 작업에 실패했습니다. 기존 설정은 유지됩니다.";const durationMs=Date.now()-toolStartedAt;responseText=summary;responseModel="jarvis-mcp-management";toolResults=[{toolCallId,name:tool.name,success:false,durationMs,summary,error:summary}];new ToolExecutionRepository(this).record({id:crypto.randomUUID(),requestId,toolName:tool.name,toolInput:mcpIntent.arguments,success:false,durationMs,resultSummary:summary,error:summary});}
+      } else if (modelIntent) {
         const tool = createModelManagementTools(modelConfiguration).find((candidate) => candidate.name === modelIntent.toolName)!;
         const toolCallId = crypto.randomUUID();
         const toolStartedAt = Date.now();
@@ -148,7 +159,7 @@ export class PersonalAssistantAgent extends Agent<Env> {
         const scheduleRepository = new ScheduleRepository(this);
         const scheduler = new SchedulerService(scheduleRepository, this, timezone);
         const activeToolProviders = new ToolProviderResolver(toolProviderConfiguration).resolveAll();
-        const registry = new ToolRegistry(createToolProviders(this.env, oauth, activeToolProviders), scheduler);
+        const registry = new ToolRegistry(createToolProviders(this.env, oauth, activeToolProviders,mcpRuntime), scheduler);
         const candidate = await provider.selectTool(request, registry.definitions());
         const selected = candidate && isExplicitMutationIntent(message, candidate.name) ? candidate
           : candidate && registry.get(candidate.name)?.policy === "APPROVAL_REQUIRED" ? null : candidate;
@@ -297,7 +308,7 @@ export class PersonalAssistantAgent extends Agent<Env> {
   adminToolStatus(){
     const oauthService=new GoogleOAuthService(new GoogleOAuthRepository(this),this.env);const oauth=oauthService.status();
     const latest=new ToolExecutionRepository(this).list(100);
-    const registry=new ToolRegistry(createToolProviders(this.env,oauthService,new ToolProviderResolver(this.toolProviderConfiguration(oauthService)).resolveAll()),new SchedulerService(new ScheduleRepository(this),this,this.env.SYSTEM_TIMEZONE??"UTC"));
+    const mcpRuntime=this.mcpRuntime();const registry=new ToolRegistry(createToolProviders(this.env,oauthService,new ToolProviderResolver(this.toolProviderConfiguration(oauthService,mcpRuntime.registry)).resolveAll(),mcpRuntime),new SchedulerService(new ScheduleRepository(this),this,this.env.SYSTEM_TIMEZONE??"UTC"));
     return registry.tools.map(tool=>({name:tool.name,description:tool.description,enabled:true,policy:tool.policy,requiresApproval:tool.requiresApproval,
       connection:tool.name.startsWith("gmail.")||tool.name.startsWith("calendar.")||tool.name.startsWith("google_calendar.")?(oauth.connected?"connected":"disconnected"):registry.provider(tool.name)?.implementation!=="unavailable"?"available":"unavailable",
       provider:registry.provider(tool.name),
@@ -410,7 +421,7 @@ export class PersonalAssistantAgent extends Agent<Env> {
       return { ok: false, code: "EXPIRED", message: "Approval이 만료되었습니다.", approval: repository.get(id)! };
     }
     const oauth = new GoogleOAuthService(new GoogleOAuthRepository(this), this.env);
-    const registry = new ToolRegistry(createToolProviders(this.env, oauth, new ToolProviderResolver(this.toolProviderConfiguration(oauth)).resolveAll()));
+    const mcpRuntime=this.mcpRuntime();const registry = new ToolRegistry(createToolProviders(this.env, oauth, new ToolProviderResolver(this.toolProviderConfiguration(oauth,mcpRuntime.registry)).resolveAll(),mcpRuntime));
     const tool = registry.get(existing.toolName);
     if (!tool) return { ok: false, code: "TOOL_NOT_FOUND", message: "요청된 Tool을 찾을 수 없습니다.", approval: existing };
     if (tool.policy !== "APPROVAL_REQUIRED") return { ok: false, code: "POLICY_MISMATCH", message: "Tool 승인 정책이 일치하지 않습니다.", approval: existing };
@@ -436,10 +447,20 @@ export class PersonalAssistantAgent extends Agent<Env> {
     }
   }
 
-  private toolProviderConfiguration(oauth: GoogleOAuthService): ToolProviderConfigurationService {
+  listMcpServers(){return this.mcpRuntime().registry.list()}
+  getMcpServer(id:string){return this.mcpRuntime().registry.get(id)}
+  registerMcpServer(input:import("./mcp/types").McpServerRegistration){return this.mcpRuntime().registry.register(input)}
+  enableMcpServer(id:string){return this.mcpRuntime().registry.enable(id)}
+  disableMcpServer(id:string){return this.mcpRuntime().registry.disable(id)}
+  removeMcpServerRegistration(id:string){return this.mcpRuntime().registry.remove(id)}
+  testMcpServer(id:string){return this.mcpRuntime().registry.test(id)}
+  listMcpTools(id:string){return this.mcpRuntime().registry.tools(id)}
+
+  private mcpRuntime(){const client=new GenericMcpClient(this as never,reference=>(this.env as unknown as Record<string,unknown>)[reference] as string|undefined);return{client,registry:new McpRegistryService(new McpServerRepository(this),client,this.env)}}
+  private toolProviderConfiguration(oauth: GoogleOAuthService,mcpRegistry=this.mcpRuntime().registry): ToolProviderConfigurationService {
     return new ToolProviderConfigurationService(
       new ToolProviderConfigurationRepository(this),
-      createToolProviderRegistry(this.env, { googleConnected: oauth.status().connected }),
+      createToolProviderRegistry(this.env, { googleConnected: oauth.status().connected },mcpRegistry.providers()),
     );
   }
 }

@@ -1,4 +1,4 @@
-export interface SearchResult { title: string; url: string; snippet: string; source: string; provider?: "brave" | "serpapi" }
+export interface SearchResult { title: string; url: string; snippet: string; source: string; provider?: string }
 export interface SearchProvider { search(query: string, count: number): Promise<SearchResult[]> }
 
 export class SearchProviderError extends Error {

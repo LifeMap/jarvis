@@ -192,3 +192,8 @@ time, for example `{ "frequency":"weekly", "weekday":1, "hour":8, "minute":0 }`.
 Jarvis calculates each next occurrence in the schedule timezone and registers it as a one-time
 Agent schedule. This preserves Profile timezone and daylight-saving behavior rather than treating
 a cron expression as implicitly UTC.
+# MCP runtime configuration
+
+The Worker exposes authenticated MCP management endpoints at `/api/mcp/servers`. Registration metadata is persisted in Durable Object SQLite. OAuth tokens and live connection state are managed by the Cloudflare Agents SDK. `credentialReference` must contain a binding name, never a credential value.
+
+Supported operations: list/register/detail/remove, enable, disable, connection test, and dynamic Tool discovery. OAuth callbacks use the Agents SDK `/agents/{agent}/{instance}/callback` route.
