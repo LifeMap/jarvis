@@ -124,6 +124,21 @@ export function ensureApplicationSchema(database: SqlExecutor): void {
     )
   `;
   database.sql`
+    CREATE TABLE IF NOT EXISTS capability_gaps (
+      id TEXT PRIMARY KEY,
+      request_text TEXT NOT NULL,
+      requested_capability TEXT NOT NULL,
+      service TEXT,
+      label TEXT NOT NULL CHECK (label = 'code-required'),
+      reason TEXT NOT NULL,
+      status TEXT NOT NULL CHECK (status IN ('unresolved','reviewed','ignored')),
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+  `;
+  database.sql`CREATE INDEX IF NOT EXISTS capability_gaps_status_created_idx ON capability_gaps (status, created_at)`;
+  database.sql`CREATE INDEX IF NOT EXISTS capability_gaps_service_idx ON capability_gaps (service)`;
+  database.sql`
     CREATE TABLE IF NOT EXISTS profile_memories (
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL,

@@ -279,3 +279,23 @@ Gmail 연결 해제해
 requires the user’s browser interaction. MCP OAuth credentials and connection lifecycle remain under
 the Cloudflare Agents SDK, while Registry metadata stores only references. No chat command can create
 or rotate Cloudflare Worker Secrets.
+
+## Capability Gap logging
+
+Jarvis conservatively records an explicit unsupported external-service mutation as `code-required`
+only when no registered Tool Provider or MCP server can supply that integration. Provider errors,
+disabled configuration, authentication failures, missing input, timeouts, and rate limits remain in
+their existing error flows and are never capability gaps. Logging is best-effort and cannot fail the
+Agent response.
+
+```text
+GET   /api/capability-gaps?status=unresolved&service=notion
+GET   /api/capability-gaps/summary
+GET   /api/capability-gaps/:id
+PATCH /api/capability-gaps/:id  { "status": "reviewed" }
+```
+
+Entries are stored independently from Runtime Configuration and Change History. Repeated requests are
+retained; the summary endpoint groups exact `service + requestedCapability` pairs. Request text and
+reason pass through Secret redaction before persistence. This feature does not generate code, create
+issues, alter configuration, or install integrations.

@@ -47,6 +47,13 @@ export default {
     if(url.pathname==="/api/fallbacks"&&request.method==="GET")return json({fallbacks:await agent.fallbackConfiguration()});
     if(url.pathname==="/api/fallback-events"&&request.method==="GET")return json({events:await agent.fallbackEvents(Number(url.searchParams.get("limit")??50))});
     if(url.pathname==="/api/auth/status"&&request.method==="GET")return json({auth:await agent.authStatuses(url.searchParams.get("target")??undefined)});
+    if(url.pathname==="/api/capability-gaps"){
+      if(request.method==="GET"){const status=url.searchParams.get("status"),service=url.searchParams.get("service")??undefined,from=url.searchParams.get("from")??undefined,to=url.searchParams.get("to")??undefined;if(status&&!isCapabilityGapStatus(status))return json({error:"Invalid capability gap status"},400);return json({gaps:await agent.listCapabilityGaps({...status&&isCapabilityGapStatus(status)?{status}:{},...(service?{service}:{}),...(from?{from}:{}),...(to?{to}:{})})});}
+      return json({error:"Method not allowed"},405);
+    }
+    if(url.pathname==="/api/capability-gaps/summary"&&request.method==="GET")return json({summary:await agent.capabilityGapSummary()});
+    const capabilityGapId=matchPath(url.pathname,"/api/capability-gaps/");
+    if(capabilityGapId){if(request.method==="GET"){const gap=await agent.getCapabilityGap(capabilityGapId);return gap?json(gap):json({error:"Capability gap not found"},404)}if(request.method==="PATCH"){const body=await readJson(request),status=body&&typeof body==="object"?(body as {status?:unknown}).status:undefined;if(!isCapabilityGapStatus(status))return json({error:"Invalid capability gap status"},400);const gap=await agent.updateCapabilityGapStatus(capabilityGapId,status);return gap?json(gap):json({error:"Capability gap not found"},404)}return json({error:"Method not allowed"},405);}
 
     if(url.pathname==="/api/mcp/servers"){
       if(request.method==="GET")return json({servers:await agent.listMcpServers()});
@@ -253,6 +260,7 @@ function isApprovalStatus(value: string): value is ApprovalStatus {
 function isValidId(value: string): boolean { return value.length <= 128 && /^[A-Za-z0-9._:-]+$/.test(value); }
 function isText(value: unknown): value is string { return typeof value === "string" && value.trim().length > 0 && value.length <= 10_000; }
 function isMemorySource(value: unknown): value is MemorySource { return value === "user" || value === "agent" || value === "system"; }
+function isCapabilityGapStatus(value:unknown):value is import("./capability-gap/capability-gap-repository").CapabilityGapStatus{return value==="unresolved"||value==="reviewed"||value==="ignored"}
 function parseRequestLocation(value:unknown):import("./contracts").RequestLocation|undefined{
   if(value===undefined)return undefined;
   if(!value||typeof value!=="object")return undefined;

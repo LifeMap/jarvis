@@ -1,4 +1,4 @@
-import{api}from"./api-client";import type{Approval,DashboardData,Memory,Run,Schedule,ScheduleExecution,Settings,ToolStatus}from"../types";
+import{api}from"./api-client";import type{Approval,CapabilityGap,CapabilityGapStatus,CapabilityGapSummary,DashboardData,Memory,Run,Schedule,ScheduleExecution,Settings,ToolStatus}from"../types";
 export const dashboard=()=>api<DashboardData>("/admin/dashboard");
 export const memories={list:()=>api<{profile:Memory[];longTerm:Memory[]}>("/memories"),create:(body:unknown)=>api<Memory>("/memories",{method:"POST",body:JSON.stringify(body)}),update:(id:string,body:unknown)=>api<Memory>(`/memories/${encodeURIComponent(id)}`,{method:"PATCH",body:JSON.stringify(body)}),remove:(id:string)=>api<{deleted:boolean}>(`/memories/${encodeURIComponent(id)}`,{method:"DELETE"})};
 export const approvals={list:(status?:string)=>api<{approvals:Approval[]}>(`/approvals${status?`?status=${status}`:""}`),resolve:(id:string,action:"approve"|"reject")=>api<{approval:Approval}>(`/approvals/${id}/${action}`,{method:"POST"})};
@@ -6,3 +6,4 @@ export const schedules={list:()=>api<{schedules:Schedule[]}>("/schedules"),creat
 export const history={list:()=>api<{runs:Run[];scheduleExecutions:ScheduleExecution[]}>("/history"),detail:(id:string)=>api<Run>(`/history/${id}`)};
 export const tools=()=>api<{tools:ToolStatus[]}>("/tools");
 export const settings={get:()=>api<Settings>("/settings"),update:(body:Partial<Settings>)=>api<Settings>("/settings",{method:"PATCH",body:JSON.stringify(body)})};
+export const capabilityGaps={list:(filter:{status?:string;service?:string})=>{const query=new URLSearchParams(Object.entries(filter).filter((entry):entry is [string,string]=>Boolean(entry[1])));return api<{gaps:CapabilityGap[]}>(`/capability-gaps${query.size?`?${query}`:""}`)},summary:()=>api<{summary:CapabilityGapSummary[]}>("/capability-gaps/summary"),updateStatus:(id:string,status:CapabilityGapStatus)=>api<CapabilityGap>(`/capability-gaps/${encodeURIComponent(id)}`,{method:"PATCH",body:JSON.stringify({status})})};

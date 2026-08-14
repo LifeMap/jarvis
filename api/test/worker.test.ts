@@ -103,6 +103,17 @@ describe("Jarvis Phase 1 Worker", () => {
     expect(serialized).not.toContain("test-brave-key");
   });
 
+  it("records redacted code-required requests and manages them independently",async()=>{
+    const first=await sendMessage("capability-gap","Notion 데이터베이스에 회의 내용을 등록해줘. Authorization: Bearer capability-secret");
+    await expect(first.json()).resolves.toMatchObject({model:"jarvis-code-required",message:expect.stringContaining("기능 요청으로 기록")});
+    await sendMessage("capability-gap","Notion 데이터베이스에 회의 내용을 등록해줘");
+    const list=await (await api("/api/capability-gaps?status=unresolved&service=notion")).json<{gaps:Array<{id:string;requestText:string;status:string;label:string}>}>();
+    expect(list.gaps.length).toBeGreaterThanOrEqual(2);expect(list.gaps[0]).toMatchObject({status:"unresolved",label:"code-required"});expect(JSON.stringify(list)).not.toContain("capability-secret");
+    const summary=await (await api("/api/capability-gaps/summary")).json<{summary:Array<{service:string;count:number}>}>();expect(summary.summary).toContainEqual(expect.objectContaining({service:"notion",count:expect.any(Number)}));
+    const updated=await (await api(`/api/capability-gaps/${list.gaps[0]!.id}`,{method:"PATCH",body:JSON.stringify({status:"reviewed"})})).json<{status:string}>();expect(updated.status).toBe("reviewed");
+    expect((await api(`/api/capability-gaps/${list.gaps[0]!.id}`)).status).toBe(200);
+  });
+
   it("manages Tool Providers explicitly and persists changes between requests", async () => {
     const all = await sendMessage("tool-provider-management", "현재 외부 서비스 Provider 상태를 전부 보여줘.");
     await expect(all.json()).resolves.toMatchObject({

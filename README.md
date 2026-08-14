@@ -243,6 +243,41 @@ Admin과 Playground를 Cloudflare Pages에 배포할 때는 서버 측 프록시
 `JARVIS_API_TOKEN`을 설정합니다. Admin 전체는 Cloudflare Access의 Single User 정책으로
 보호하는 것을 권장합니다.
 
+Admin의 `기능 요청` 메뉴에서는 현재 Tool, Provider, MCP 또는 Runtime 설정으로 처리할 수
+없는 명시적인 외부 서비스 작업 요청을 확인할 수 있습니다. 요청은 미검토, 검토함, 제외
+상태로 관리할 수 있고 서비스와 상태로 필터링할 수 있습니다. 동일 기능의 반복 요청은
+삭제하지 않고 집계하여 향후 개발 우선순위 판단 자료로만 사용합니다.
+
+## TODO — Phase 8: Self-Extension / Development Agent
+
+Jarvis가 현재 보유한 Tool, Provider, MCP, Runtime Configuration만으로 처리할 수 없는 기능
+요청에 대해 필요한 코드를 직접 추가할 수 있는 Self-Extension 구조를 검토합니다. 현재
+수집 중인 `code-required` Capability Gap 로그를 기반으로 실제 필요성이 확인된 기능부터
+대상으로 합니다.
+
+주요 검토 범위:
+
+- `code-required` 요청 분석 및 개발 대상 선정
+- 필요한 외부 API, SDK, MCP 지원 여부 조사
+- 기존 방식으로 해결할 수 없는 경우 코드 생성
+- 격리된 환경에서 코드 수정 및 테스트
+- 기존 기능 회귀 테스트
+- 변경 내용 검토 및 승인 절차
+- 안전한 반영 및 rollback 구조
+- Secret, Credential, 인프라 권한과 개발 권한의 분리
+
+원칙:
+
+- 일반적인 모델 변경, Provider 변경, MCP 추가는 Self-Extension 대상이 아닙니다.
+- Runtime Configuration만으로 해결 가능한 요청은 코드 수정으로 처리하지 않습니다.
+- Jarvis가 사용자의 명시적인 지시 없이 임의로 Self-Extension을 수행하지 않습니다.
+- 실제 구현 범위와 권한 정책은 `code-required` Capability Gap 데이터가 충분히 축적된 뒤 결정합니다.
+
+```text
+Status: Deferred
+Trigger: 실제 사용 중 축적된 code-required Capability Gap을 검토해 Self-Extension 필요성이 확인되면 진행
+```
+
 ## 보안 원칙
 
 - API Key, OAuth Token 및 Client Secret을 브라우저에 노출하지 않습니다.
