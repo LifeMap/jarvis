@@ -40,6 +40,9 @@ export default {
 
     const agent = env.PERSONAL_ASSISTANT_AGENT.getByName(AGENT_NAME);
 
+    if(url.pathname==="/api/runtime-configuration"&&request.method==="GET")return json(await agent.runtimeConfiguration());
+    if(url.pathname==="/api/runtime-configuration/history"&&request.method==="GET")return json({history:await agent.runtimeConfigurationHistory(Number(url.searchParams.get("limit")??50))});
+
     if(url.pathname==="/api/mcp/servers"){
       if(request.method==="GET")return json({servers:await agent.listMcpServers()});
       if(request.method==="POST"){const body=await readJson(request);if(!body||typeof body!=="object")return json({error:"Invalid MCP server payload"},400);try{return json(await agent.registerMcpServer(body as import("./mcp/types").McpServerRegistration),201)}catch(error){return json({error:"MCP registration failed",detail:safeMessage(error)},400)}}

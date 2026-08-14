@@ -197,3 +197,10 @@ a cron expression as implicitly UTC.
 The Worker exposes authenticated MCP management endpoints at `/api/mcp/servers`. Registration metadata is persisted in Durable Object SQLite. OAuth tokens and live connection state are managed by the Cloudflare Agents SDK. `credentialReference` must contain a binding name, never a credential value.
 
 Supported operations: list/register/detail/remove, enable, disable, connection test, and dynamic Tool discovery. OAuth callbacks use the Agents SDK `/agents/{agent}/{instance}/callback` route.
+
+## Unified runtime configuration
+
+- `GET /api/runtime-configuration`: secret-free active/default Model, Tool Provider, and MCP connection snapshot
+- `GET /api/runtime-configuration/history?limit=50`: recent configuration changes
+
+`RuntimeConfigurationManager` orchestrates the existing Model, Tool Provider, and MCP services. Composite Model/Tool changes are validated as one plan and then persist selections plus history inside one Durable Object `transactionSync` transaction. Change history stores only sanitized selection metadata and never credentials or authorization headers.

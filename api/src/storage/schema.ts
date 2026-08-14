@@ -67,6 +67,18 @@ export function ensureApplicationSchema(database: SqlExecutor): void {
     )
   `;
   database.sql`
+    CREATE TABLE IF NOT EXISTS runtime_configuration_history (
+      id TEXT PRIMARY KEY,
+      change_type TEXT NOT NULL,
+      target TEXT NOT NULL,
+      previous_value_json TEXT NOT NULL,
+      new_value_json TEXT NOT NULL,
+      source TEXT NOT NULL CHECK (source IN ('user-command', 'system-bootstrap')),
+      created_at TEXT NOT NULL
+    )
+  `;
+  database.sql`CREATE INDEX IF NOT EXISTS runtime_configuration_history_created_idx ON runtime_configuration_history (created_at)`;
+  database.sql`
     CREATE TABLE IF NOT EXISTS profile_memories (
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL,

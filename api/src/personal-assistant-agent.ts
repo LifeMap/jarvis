@@ -35,6 +35,9 @@ import { GenericMcpClient } from "./mcp/generic-mcp-client";
 import { McpServerRepository } from "./mcp/mcp-server-repository";
 import { McpRegistryService } from "./mcp/mcp-registry-service";
 import { createMcpManagementTools, parseMcpManagementIntent } from "./mcp/mcp-management-tools";
+import { RuntimeConfigurationHistoryRepository } from "./runtime/runtime-configuration-history-repository";
+import { RuntimeConfigurationManager } from "./runtime/runtime-configuration-manager";
+import { createRuntimeConfigurationTools,parseRuntimeConfigurationIntent } from "./runtime/runtime-configuration-tools";
 
 interface RunRow {
   id: string;
@@ -80,8 +83,10 @@ export class PersonalAssistantAgent extends Agent<Env> {
       await this.mcp.waitForConnections();
       await mcpRuntime.registry.ensureEnabledConnections();
       const toolProviderConfiguration = this.toolProviderConfiguration(oauth,mcpRuntime.registry);
-      const mcpIntent=explicitMemory||modelIntent?null:parseMcpManagementIntent(message);
-      const toolProviderIntent = explicitMemory || modelIntent || mcpIntent ? null : parseToolProviderManagementIntent(message);
+      const runtimeManager=this.runtimeConfigurationManager(modelConfiguration,toolProviderConfiguration,mcpRuntime.registry);
+      const runtimeIntent=explicitMemory?null:parseRuntimeConfigurationIntent(message);
+      const mcpIntent=explicitMemory||runtimeIntent||modelIntent?null:parseMcpManagementIntent(message);
+      const toolProviderIntent = explicitMemory || runtimeIntent || modelIntent || mcpIntent ? null : parseToolProviderManagementIntent(message);
       let savedMemoryId: string | undefined;
       let responseText = "";
       let responseModel = "";
@@ -89,16 +94,21 @@ export class PersonalAssistantAgent extends Agent<Env> {
       let toolResults: ToolResultDebug[] = [];
       let approval: Approval | undefined;
       let createdSchedule: import("./scheduler/types").JarvisSchedule | undefined;
-      if(mcpIntent){
+      if(runtimeIntent){
+        const tool=createRuntimeConfigurationTools(runtimeManager).find(candidate=>candidate.name===runtimeIntent.toolName)!;const toolCallId=crypto.randomUUID();const toolStartedAt=Date.now();toolCalls=[{id:toolCallId,name:tool.name,input:runtimeIntent.arguments,requiresApproval:false}];
+        try{const result=await tool.execute(runtimeIntent.arguments,{timezone:this.env.SYSTEM_TIMEZONE??"UTC"});const summary=tool.summarize(result as never);const durationMs=Date.now()-toolStartedAt;responseText=summary;responseModel="jarvis-runtime-configuration";toolResults=[{toolCallId,name:tool.name,success:true,durationMs,summary}];new ToolExecutionRepository(this).record({id:crypto.randomUUID(),requestId,toolName:tool.name,toolInput:runtimeIntent.arguments,success:true,durationMs,resultSummary:summary});}catch(error){const summary=error instanceof ToolError?error.userMessage:"Runtime 설정 변경에 실패했습니다. 기존 설정은 유지됩니다.";const durationMs=Date.now()-toolStartedAt;responseText=summary;responseModel="jarvis-runtime-configuration";toolResults=[{toolCallId,name:tool.name,success:false,durationMs,summary,error:summary}];new ToolExecutionRepository(this).record({id:crypto.randomUUID(),requestId,toolName:tool.name,toolInput:runtimeIntent.arguments,success:false,durationMs,resultSummary:summary,error:summary});}
+      }else if(mcpIntent){
         const tool=createMcpManagementTools(mcpRuntime.registry).find(candidate=>candidate.name===mcpIntent.toolName)!;const toolCallId=crypto.randomUUID();const toolStartedAt=Date.now();toolCalls=[{id:toolCallId,name:tool.name,input:mcpIntent.arguments,requiresApproval:false}];
-        try{const result=await tool.execute(mcpIntent.arguments,{timezone:this.env.SYSTEM_TIMEZONE??"UTC"});const summary=tool.summarize(result as never);const durationMs=Date.now()-toolStartedAt;responseText=summary;responseModel="jarvis-mcp-management";toolResults=[{toolCallId,name:tool.name,success:true,durationMs,summary}];new ToolExecutionRepository(this).record({id:crypto.randomUUID(),requestId,toolName:tool.name,toolInput:mcpIntent.arguments,success:true,durationMs,resultSummary:summary});}catch(error){const summary=error instanceof ToolError?error.userMessage:"MCP 관리 작업에 실패했습니다. 기존 설정은 유지됩니다.";const durationMs=Date.now()-toolStartedAt;responseText=summary;responseModel="jarvis-mcp-management";toolResults=[{toolCallId,name:tool.name,success:false,durationMs,summary,error:summary}];new ToolExecutionRepository(this).record({id:crypto.randomUUID(),requestId,toolName:tool.name,toolInput:mcpIntent.arguments,success:false,durationMs,resultSummary:summary,error:summary});}
+        try{const before=mcpRuntime.registry.list();const result=await tool.execute(mcpIntent.arguments,{timezone:this.env.SYSTEM_TIMEZONE??"UTC"});if(/register|remove|enable|disable/.test(tool.name))runtimeManager.recordMutation(tool.name,`mcp.${String(mcpIntent.arguments.id??"server")}`,before,mcpRuntime.registry.list());const summary=tool.summarize(result as never);const durationMs=Date.now()-toolStartedAt;responseText=summary;responseModel="jarvis-mcp-management";toolResults=[{toolCallId,name:tool.name,success:true,durationMs,summary}];new ToolExecutionRepository(this).record({id:crypto.randomUUID(),requestId,toolName:tool.name,toolInput:mcpIntent.arguments,success:true,durationMs,resultSummary:summary});}catch(error){const summary=error instanceof ToolError?error.userMessage:"MCP 관리 작업에 실패했습니다. 기존 설정은 유지됩니다.";const durationMs=Date.now()-toolStartedAt;responseText=summary;responseModel="jarvis-mcp-management";toolResults=[{toolCallId,name:tool.name,success:false,durationMs,summary,error:summary}];new ToolExecutionRepository(this).record({id:crypto.randomUUID(),requestId,toolName:tool.name,toolInput:mcpIntent.arguments,success:false,durationMs,resultSummary:summary,error:summary});}
       } else if (modelIntent) {
         const tool = createModelManagementTools(modelConfiguration).find((candidate) => candidate.name === modelIntent.toolName)!;
         const toolCallId = crypto.randomUUID();
         const toolStartedAt = Date.now();
         toolCalls = [{ id: toolCallId, name: tool.name, input: modelIntent.arguments, requiresApproval: false }];
         try {
+          const previousModel=modelConfiguration.getActive();
           const result = await tool.execute(modelIntent.arguments, { timezone: this.env.SYSTEM_TIMEZONE ?? "UTC" });
+          if(tool.name==="model.set_active"||tool.name==="model.reset_active")runtimeManager.recordMutation(tool.name,"model",{provider:previousModel.provider,model:previousModel.model},result);
           const summary = tool.summarize(result);
           const durationMs = Date.now() - toolStartedAt;
           responseText = summary; responseModel = "jarvis-model-management";
@@ -117,7 +127,9 @@ export class PersonalAssistantAgent extends Agent<Env> {
         const toolStartedAt = Date.now();
         toolCalls = [{ id: toolCallId, name: tool.name, input: toolProviderIntent.arguments, requiresApproval: false }];
         try {
+          const targetService=typeof toolProviderIntent.arguments.service==="string"?toolProviderIntent.arguments.service:null;const previousProvider=targetService&&["gmail","calendar","search"].includes(targetService)?toolProviderConfiguration.getActive(targetService as import("./tools/tool-provider-registry").DynamicToolService):null;
           const result = await tool.execute(toolProviderIntent.arguments, { timezone: this.env.SYSTEM_TIMEZONE ?? "UTC" });
+          if((tool.name==="tool_provider.set_active"||tool.name==="tool_provider.reset")&&previousProvider)runtimeManager.recordMutation(tool.name,`tools.${previousProvider.service}`,{service:previousProvider.service,providerId:previousProvider.providerId},result);
           const summary = tool.summarize(result as never);
           const durationMs = Date.now() - toolStartedAt;
           responseText = summary; responseModel = "jarvis-tool-provider-management";
@@ -449,14 +461,17 @@ export class PersonalAssistantAgent extends Agent<Env> {
 
   listMcpServers(){return this.mcpRuntime().registry.list()}
   getMcpServer(id:string){return this.mcpRuntime().registry.get(id)}
-  registerMcpServer(input:import("./mcp/types").McpServerRegistration){return this.mcpRuntime().registry.register(input)}
-  enableMcpServer(id:string){return this.mcpRuntime().registry.enable(id)}
-  disableMcpServer(id:string){return this.mcpRuntime().registry.disable(id)}
-  removeMcpServerRegistration(id:string){return this.mcpRuntime().registry.remove(id)}
+  async registerMcpServer(input:import("./mcp/types").McpServerRegistration){const runtime=this.mcpRuntime();const result=await runtime.registry.register(input);new RuntimeConfigurationHistoryRepository(this).record({changeType:"mcp.register",target:`mcp.${input.id}`,previousValue:null,newValue:{id:input.id,enabled:input.enabled,authType:input.authType,service:input.service,providerId:input.providerId},source:"user-command"});return result}
+  async enableMcpServer(id:string){const runtime=this.mcpRuntime(),before=runtime.registry.get(id);const result=await runtime.registry.enable(id);new RuntimeConfigurationHistoryRepository(this).record({changeType:"mcp.enable",target:`mcp.${id}`,previousValue:before??null,newValue:runtime.registry.get(id)??null,source:"user-command"});return result}
+  async disableMcpServer(id:string){const runtime=this.mcpRuntime(),before=runtime.registry.get(id);const result=await runtime.registry.disable(id);new RuntimeConfigurationHistoryRepository(this).record({changeType:"mcp.disable",target:`mcp.${id}`,previousValue:before??null,newValue:runtime.registry.get(id)??null,source:"user-command"});return result}
+  async removeMcpServerRegistration(id:string){const runtime=this.mcpRuntime(),before=runtime.registry.get(id);const result=await runtime.registry.remove(id);new RuntimeConfigurationHistoryRepository(this).record({changeType:"mcp.remove",target:`mcp.${id}`,previousValue:before??null,newValue:null,source:"user-command"});return result}
   testMcpServer(id:string){return this.mcpRuntime().registry.test(id)}
   listMcpTools(id:string){return this.mcpRuntime().registry.tools(id)}
+  runtimeConfiguration(){const models=new ModelConfigurationService(new ModelConfigurationRepository(this),createModelRegistry(this.env));const mcp=this.mcpRuntime().registry;const oauth=new GoogleOAuthService(new GoogleOAuthRepository(this),this.env);return this.runtimeConfigurationManager(models,this.toolProviderConfiguration(oauth,mcp),mcp).getConfiguration()}
+  runtimeConfigurationHistory(limit=50){return new RuntimeConfigurationHistoryRepository(this).list(limit)}
 
   private mcpRuntime(){const client=new GenericMcpClient(this as never,reference=>(this.env as unknown as Record<string,unknown>)[reference] as string|undefined);return{client,registry:new McpRegistryService(new McpServerRepository(this),client,this.env)}}
+  private runtimeConfigurationManager(models:ModelConfigurationService,tools:ToolProviderConfigurationService,mcp:McpRegistryService){return new RuntimeConfigurationManager(models,tools,mcp,new RuntimeConfigurationHistoryRepository(this),callback=>this.ctx.storage.transactionSync(callback))}
   private toolProviderConfiguration(oauth: GoogleOAuthService,mcpRegistry=this.mcpRuntime().registry): ToolProviderConfigurationService {
     return new ToolProviderConfigurationService(
       new ToolProviderConfigurationRepository(this),

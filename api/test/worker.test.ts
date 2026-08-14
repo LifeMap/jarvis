@@ -107,8 +107,8 @@ describe("Jarvis Phase 1 Worker", () => {
 
     const rejected = await sendMessage("tool-provider-management", "Gmail을 MCP로 바꿔.");
     await expect(rejected.json()).resolves.toMatchObject({
-      message: expect.stringContaining("등록되어 있지 않습니다"),
-      toolResults: [expect.objectContaining({ name: "tool_provider.set_active", success: false })],
+      message: expect.stringContaining("사용 가능한 gmail MCP Provider가 없습니다"),
+      toolResults: [expect.objectContaining({ name: "runtime.apply_changes", success: false })],
     });
 
     const reset = await sendMessage("tool-provider-management", "Search를 기본 Provider로 되돌려.");
@@ -116,6 +116,17 @@ describe("Jarvis Phase 1 Worker", () => {
       message: expect.stringContaining("brave-api"),
       toolResults: [expect.objectContaining({ name: "tool_provider.reset", success: true })],
     });
+  });
+
+  it("manages the unified Runtime Configuration with natural-language composite changes and history",async()=>{
+    const snapshot=await sendMessage("runtime-management","현재 Jarvis 설정 알려줘.");
+    await expect(snapshot.json()).resolves.toMatchObject({model:"jarvis-runtime-configuration",toolCalls:[expect.objectContaining({name:"runtime.get_configuration"})],message:expect.stringContaining("Tool Providers")});
+    const changed=await sendMessage("runtime-management","모델은 기본 모델로 되돌리고 Search Provider를 serpapi로 변경해.");
+    await expect(changed.json()).resolves.toMatchObject({toolCalls:[expect.objectContaining({name:"runtime.apply_changes"})],toolResults:[expect.objectContaining({success:true})],message:expect.stringContaining("tools.search")});
+    const persisted=await api("/api/runtime-configuration");expect(persisted.status).toBe(200);await expect(persisted.json()).resolves.toMatchObject({model:{active:{provider:"test"}},tools:{search:{active:{providerId:"serpapi"}}}});
+    const history=await sendMessage("runtime-management","최근 설정 변경 내역 보여줘.");await expect(history.json()).resolves.toMatchObject({toolCalls:[expect.objectContaining({name:"runtime.list_history"})],message:expect.stringContaining("tools.search")});
+    const historyApi=await api("/api/runtime-configuration/history");const historyBody=await historyApi.json<{history:Array<{target:string}>}>();expect(historyBody.history).toEqual(expect.arrayContaining([expect.objectContaining({target:"model"}),expect.objectContaining({target:"tools.search"})]));
+    await sendMessage("runtime-management","Search를 기본 Provider로 되돌려.");
   });
 
   it("does not create a write approval from an ambiguous answer phrase", async () => {
