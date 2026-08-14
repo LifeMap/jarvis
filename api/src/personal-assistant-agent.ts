@@ -38,6 +38,11 @@ import { createMcpManagementTools, parseMcpManagementIntent } from "./mcp/mcp-ma
 import { RuntimeConfigurationHistoryRepository } from "./runtime/runtime-configuration-history-repository";
 import { RuntimeConfigurationManager } from "./runtime/runtime-configuration-manager";
 import { createRuntimeConfigurationTools,parseRuntimeConfigurationIntent } from "./runtime/runtime-configuration-tools";
+import { FallbackConfigurationRepository, FallbackConfigurationService } from "./runtime/fallback-configuration";
+import { ProviderHealthRepository } from "./runtime/provider-health";
+import { ProviderHealthService } from "./runtime/provider-health-service";
+import { createReliabilityManagementTools, parseReliabilityManagementIntent } from "./runtime/reliability-management-tools";
+import { FallbackModelProvider } from "./llm/fallback-model-provider";
 
 interface RunRow {
   id: string;
@@ -83,10 +88,12 @@ export class PersonalAssistantAgent extends Agent<Env> {
       await this.mcp.waitForConnections();
       await mcpRuntime.registry.ensureEnabledConnections();
       const toolProviderConfiguration = this.toolProviderConfiguration(oauth,mcpRuntime.registry);
-      const runtimeManager=this.runtimeConfigurationManager(modelConfiguration,toolProviderConfiguration,mcpRuntime.registry);
-      const runtimeIntent=explicitMemory?null:parseRuntimeConfigurationIntent(message);
-      const mcpIntent=explicitMemory||runtimeIntent||modelIntent?null:parseMcpManagementIntent(message);
-      const toolProviderIntent = explicitMemory || runtimeIntent || modelIntent || mcpIntent ? null : parseToolProviderManagementIntent(message);
+      const reliability=this.reliabilityServices(modelConfiguration,toolProviderConfiguration,mcpRuntime.registry);
+      const runtimeManager=this.runtimeConfigurationManager(modelConfiguration,toolProviderConfiguration,mcpRuntime.registry,reliability.fallbacks,reliability.health);
+      const reliabilityIntent=explicitMemory?null:parseReliabilityManagementIntent(message);
+      const runtimeIntent=explicitMemory||reliabilityIntent?null:parseRuntimeConfigurationIntent(message);
+      const mcpIntent=explicitMemory||reliabilityIntent||runtimeIntent||modelIntent?null:parseMcpManagementIntent(message);
+      const toolProviderIntent = explicitMemory || reliabilityIntent || runtimeIntent || modelIntent || mcpIntent ? null : parseToolProviderManagementIntent(message);
       let savedMemoryId: string | undefined;
       let responseText = "";
       let responseModel = "";
@@ -94,7 +101,10 @@ export class PersonalAssistantAgent extends Agent<Env> {
       let toolResults: ToolResultDebug[] = [];
       let approval: Approval | undefined;
       let createdSchedule: import("./scheduler/types").JarvisSchedule | undefined;
-      if(runtimeIntent){
+      if(reliabilityIntent){
+        const tool=createReliabilityManagementTools(reliability.fallbacks,reliability.health).find(candidate=>candidate.name===reliabilityIntent.toolName)!;const toolCallId=crypto.randomUUID();const toolStartedAt=Date.now();toolCalls=[{id:toolCallId,name:tool.name,input:reliabilityIntent.arguments,requiresApproval:false}];
+        try{const before=reliability.fallbacks.list();const result=await tool.execute(reliabilityIntent.arguments,{timezone:this.env.SYSTEM_TIMEZONE??"UTC"});if(tool.name==="fallback.set"||tool.name==="fallback.remove")runtimeManager.recordMutation(tool.name,`fallback.${String(reliabilityIntent.arguments.target)}`,before,reliability.fallbacks.list());const summary=tool.summarize(result as never);const durationMs=Date.now()-toolStartedAt;responseText=summary;responseModel="jarvis-reliability-management";toolResults=[{toolCallId,name:tool.name,success:true,durationMs,summary}];new ToolExecutionRepository(this).record({id:crypto.randomUUID(),requestId,toolName:tool.name,toolInput:reliabilityIntent.arguments,success:true,durationMs,resultSummary:summary});}catch(error){const summary=error instanceof ToolError?error.userMessage:"Provider 상태 또는 fallback 설정 처리에 실패했습니다. 기존 설정은 유지됩니다.";const durationMs=Date.now()-toolStartedAt;responseText=summary;responseModel="jarvis-reliability-management";toolResults=[{toolCallId,name:tool.name,success:false,durationMs,summary,error:summary}];new ToolExecutionRepository(this).record({id:crypto.randomUUID(),requestId,toolName:tool.name,toolInput:reliabilityIntent.arguments,success:false,durationMs,resultSummary:summary,error:summary});}
+      }else if(runtimeIntent){
         const tool=createRuntimeConfigurationTools(runtimeManager).find(candidate=>candidate.name===runtimeIntent.toolName)!;const toolCallId=crypto.randomUUID();const toolStartedAt=Date.now();toolCalls=[{id:toolCallId,name:tool.name,input:runtimeIntent.arguments,requiresApproval:false}];
         try{const result=await tool.execute(runtimeIntent.arguments,{timezone:this.env.SYSTEM_TIMEZONE??"UTC"});const summary=tool.summarize(result as never);const durationMs=Date.now()-toolStartedAt;responseText=summary;responseModel="jarvis-runtime-configuration";toolResults=[{toolCallId,name:tool.name,success:true,durationMs,summary}];new ToolExecutionRepository(this).record({id:crypto.randomUUID(),requestId,toolName:tool.name,toolInput:runtimeIntent.arguments,success:true,durationMs,resultSummary:summary});}catch(error){const summary=error instanceof ToolError?error.userMessage:"Runtime 설정 변경에 실패했습니다. 기존 설정은 유지됩니다.";const durationMs=Date.now()-toolStartedAt;responseText=summary;responseModel="jarvis-runtime-configuration";toolResults=[{toolCallId,name:tool.name,success:false,durationMs,summary,error:summary}];new ToolExecutionRepository(this).record({id:crypto.randomUUID(),requestId,toolName:tool.name,toolInput:runtimeIntent.arguments,success:false,durationMs,resultSummary:summary,error:summary});}
       }else if(mcpIntent){
@@ -167,11 +177,19 @@ export class PersonalAssistantAgent extends Agent<Env> {
         if(location)request.systemPrompt+=`\n\nCurrent request location (user-authorized, transient): latitude ${location.latitude}, longitude ${location.longitude}${location.accuracyMeters!==undefined?`, accuracy approximately ${location.accuracyMeters} meters`:""}, captured at ${location.capturedAt}. Use it only when relevant to this request. Do not claim a street address unless a tool provides one.`;
         const activeModel = modelConfiguration.getActive();
         if (!activeModel.enabled) throw new Error(activeModel.unavailableReason ?? "활성 Model Provider를 사용할 수 없습니다.");
-        const provider = createModelProvider(this.env, activeModel);
+        let provider = createModelProvider(this.env, activeModel);
+        const modelFallback=reliability.fallbacks.get("model");
+        if(modelFallback?.model){
+          try{provider=new FallbackModelProvider(provider,createModelProvider(this.env,{provider:modelFallback.providerId as import("./llm/types").ModelProviderId,model:modelFallback.model}),reliability.fallbacks,reliability.health)}catch(error){reliability.health.markFailure(`model.${modelFallback.providerId}.${modelFallback.model}`,error instanceof Error?error.message:"fallback unavailable");}
+        }
         const scheduleRepository = new ScheduleRepository(this);
         const scheduler = new SchedulerService(scheduleRepository, this, timezone);
         const activeToolProviders = new ToolProviderResolver(toolProviderConfiguration).resolveAll();
-        const registry = new ToolRegistry(createToolProviders(this.env, oauth, activeToolProviders,mcpRuntime), scheduler);
+        const toolFallbackSelections=reliability.fallbacks.list().filter(item=>item.target.startsWith("tools."));
+        const fallbackServices=new Set<"gmail"|"calendar"|"search">();
+        const fallbackActive={...activeToolProviders};
+        for(const selection of toolFallbackSelections){const service=selection.target.slice(6) as "gmail"|"calendar"|"search";fallbackServices.add(service);fallbackActive[service]=selection.providerId;}
+        const registry = new ToolRegistry(createToolProviders(this.env, oauth, activeToolProviders,mcpRuntime), scheduler, [], fallbackServices.size?{providers:createToolProviders(this.env,oauth,fallbackActive,mcpRuntime),services:fallbackServices,configuration:reliability.fallbacks,health:reliability.health}:undefined);
         const candidate = await provider.selectTool(request, registry.definitions());
         const selected = candidate && isExplicitMutationIntent(message, candidate.name) ? candidate
           : candidate && registry.get(candidate.name)?.policy === "APPROVAL_REQUIRED" ? null : candidate;
@@ -200,10 +218,12 @@ export class PersonalAssistantAgent extends Agent<Env> {
             let error: string | undefined;
             let summary: string;
             try {
-              toolPayload = (await registry.execute(selected.name, selected.arguments, { timezone })).result;
+              const execution = await registry.execute(selected.name, selected.arguments, { timezone });
+              toolPayload = execution.result;
               if (selected.name === "scheduler.create") createdSchedule = toolPayload as import("./scheduler/types").JarvisSchedule;
               success = true;
               summary = tool.summarize(toolPayload);
+              if (execution.fallbackUsed) summary += ` (Fallback 사용: ${execution.primaryProvider} → ${execution.fallbackProvider}, ${execution.failureType})`;
             } catch (toolError) {
               error = toolError instanceof ToolError ? toolError.userMessage : "Tool 실행 중 오류가 발생했습니다.";
               toolPayload = { error };
@@ -467,11 +487,15 @@ export class PersonalAssistantAgent extends Agent<Env> {
   async removeMcpServerRegistration(id:string){const runtime=this.mcpRuntime(),before=runtime.registry.get(id);const result=await runtime.registry.remove(id);new RuntimeConfigurationHistoryRepository(this).record({changeType:"mcp.remove",target:`mcp.${id}`,previousValue:before??null,newValue:null,source:"user-command"});return result}
   testMcpServer(id:string){return this.mcpRuntime().registry.test(id)}
   listMcpTools(id:string){return this.mcpRuntime().registry.tools(id)}
-  runtimeConfiguration(){const models=new ModelConfigurationService(new ModelConfigurationRepository(this),createModelRegistry(this.env));const mcp=this.mcpRuntime().registry;const oauth=new GoogleOAuthService(new GoogleOAuthRepository(this),this.env);return this.runtimeConfigurationManager(models,this.toolProviderConfiguration(oauth,mcp),mcp).getConfiguration()}
+  runtimeConfiguration(){const models=new ModelConfigurationService(new ModelConfigurationRepository(this),createModelRegistry(this.env));const mcp=this.mcpRuntime().registry;const oauth=new GoogleOAuthService(new GoogleOAuthRepository(this),this.env);const tools=this.toolProviderConfiguration(oauth,mcp);const reliability=this.reliabilityServices(models,tools,mcp);return this.runtimeConfigurationManager(models,tools,mcp,reliability.fallbacks,reliability.health).getConfiguration()}
   runtimeConfigurationHistory(limit=50){return new RuntimeConfigurationHistoryRepository(this).list(limit)}
+  providerHealth(target?:string){const models=new ModelConfigurationService(new ModelConfigurationRepository(this),createModelRegistry(this.env));const mcp=this.mcpRuntime().registry;const tools=this.toolProviderConfiguration(new GoogleOAuthService(new GoogleOAuthRepository(this),this.env),mcp);return this.reliabilityServices(models,tools,mcp).health.check(target)}
+  fallbackConfiguration(){const models=new ModelConfigurationService(new ModelConfigurationRepository(this),createModelRegistry(this.env));const mcp=this.mcpRuntime().registry;const tools=this.toolProviderConfiguration(new GoogleOAuthService(new GoogleOAuthRepository(this),this.env),mcp);return this.reliabilityServices(models,tools,mcp).fallbacks.list()}
+  fallbackEvents(limit=50){return new FallbackConfigurationRepository(this).events(limit)}
 
   private mcpRuntime(){const client=new GenericMcpClient(this as never,reference=>(this.env as unknown as Record<string,unknown>)[reference] as string|undefined);return{client,registry:new McpRegistryService(new McpServerRepository(this),client,this.env)}}
-  private runtimeConfigurationManager(models:ModelConfigurationService,tools:ToolProviderConfigurationService,mcp:McpRegistryService){return new RuntimeConfigurationManager(models,tools,mcp,new RuntimeConfigurationHistoryRepository(this),callback=>this.ctx.storage.transactionSync(callback))}
+  private runtimeConfigurationManager(models:ModelConfigurationService,tools:ToolProviderConfigurationService,mcp:McpRegistryService,fallbacks?:FallbackConfigurationService,health?:ProviderHealthService){return new RuntimeConfigurationManager(models,tools,mcp,new RuntimeConfigurationHistoryRepository(this),callback=>this.ctx.storage.transactionSync(callback),fallbacks,health)}
+  private reliabilityServices(models:ModelConfigurationService,tools:ToolProviderConfigurationService,mcp:McpRegistryService){const fallbacks=new FallbackConfigurationService(new FallbackConfigurationRepository(this),models,tools);const health=new ProviderHealthService(new ProviderHealthRepository(this),models,tools,mcp);return{fallbacks,health}}
   private toolProviderConfiguration(oauth: GoogleOAuthService,mcpRegistry=this.mcpRuntime().registry): ToolProviderConfigurationService {
     return new ToolProviderConfigurationService(
       new ToolProviderConfigurationRepository(this),

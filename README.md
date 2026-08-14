@@ -52,7 +52,7 @@ flowchart LR
 - 사용자 위치와 timezone을 반영한 요청 처리
 - Gmail 조회·검색·상세 조회
 - Google Calendar 일정 조회
-- Brave Search와 SerpApi 제한적 fallback
+- Brave Search와 명시적으로 설정 가능한 SerpApi fallback
 - Gmail 발송·답장과 Calendar 생성·수정·삭제에 대한 승인 정책
 - 일회성 및 반복 Agent 작업 예약
 - Tool, Approval, Schedule 및 Agent 실행 기록
@@ -273,3 +273,14 @@ Jarvis는 원격 MCP 연결에 Cloudflare Agents SDK의 공식 MCP Client를 사
 ## Runtime Configuration 관리
 
 Model, Tool Provider, MCP 상태는 하나의 Runtime Configuration 관리 영역으로 조회할 수 있습니다. `GET /api/runtime-configuration`은 Secret이 제거된 snapshot을, `GET /api/runtime-configuration/history`는 최근 변경 내역을 반환합니다. 자연어 복합 변경은 모든 항목의 validation이 성공한 뒤 적용되며 실패 시 기존 구성을 유지합니다. 전체 기본값 reset은 active Model과 Tool Provider만 변경하고 MCP Server Registry는 삭제하지 않습니다.
+
+Provider 장애 대응은 명시적으로 설정한 fallback만 사용합니다. Active Provider는 그대로
+유지되며 각 요청은 항상 primary부터 시작합니다. 네트워크·timeout·429·5xx만 fallback 대상이고,
+인증·권한·잘못된 입력 오류는 즉시 반환합니다. 중복 상태 변경을 막기 위해 Gmail 발송 및
+Calendar 쓰기처럼 Approval이 필요한 Tool은 fallback으로 재실행하지 않습니다.
+
+```text
+GET /api/provider-health
+GET /api/fallbacks
+GET /api/fallback-events
+```

@@ -42,6 +42,9 @@ export default {
 
     if(url.pathname==="/api/runtime-configuration"&&request.method==="GET")return json(await agent.runtimeConfiguration());
     if(url.pathname==="/api/runtime-configuration/history"&&request.method==="GET")return json({history:await agent.runtimeConfigurationHistory(Number(url.searchParams.get("limit")??50))});
+    if(url.pathname==="/api/provider-health"&&request.method==="GET")return json({health:await agent.providerHealth(url.searchParams.get("target")??undefined)});
+    if(url.pathname==="/api/fallbacks"&&request.method==="GET")return json({fallbacks:await agent.fallbackConfiguration()});
+    if(url.pathname==="/api/fallback-events"&&request.method==="GET")return json({events:await agent.fallbackEvents(Number(url.searchParams.get("limit")??50))});
 
     if(url.pathname==="/api/mcp/servers"){
       if(request.method==="GET")return json({servers:await agent.listMcpServers()});

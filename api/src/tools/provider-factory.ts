@@ -8,7 +8,6 @@ import type { McpRegistryService } from "../mcp/mcp-registry-service";
 import { McpCalendarClient, McpGmailClient, McpSearchProvider } from "../mcp/mcp-tool-providers";
 import {
   BraveSearchProvider,
-  RateLimitFallbackSearchProvider,
   SerpApiSearchProvider,
   UnavailableSearchProvider,
 } from "./search/search-provider";
@@ -34,10 +33,7 @@ export function createToolProviders(
     : active.search === "serpapi" && env.SERP_API_KEY
       ? new SerpApiSearchProvider(env.SERP_API_KEY)
       : new UnavailableSearchProvider(`${active.search} Provider credential이 설정되지 않았습니다.`);
-  const hasSerpApiFallback = env.SEARCH_FALLBACK_PROVIDER === "serpapi" && Boolean(env.SERP_API_KEY);
-  const search = !mcpSearch && active.search === "brave-api" && hasSerpApiFallback
-    ? new RateLimitFallbackSearchProvider(primarySearch, new SerpApiSearchProvider(env.SERP_API_KEY!))
-    : primarySearch;
+  const search = primarySearch;
 
   return {
     gmail: { identity: { service: "gmail", implementation: active.gmail }, client: mcpGmail&&mcp?new McpGmailClient(mcp.client,mcpGmail):gmail },
@@ -46,7 +42,6 @@ export function createToolProviders(
       identity: {
         service: "search",
         implementation: mcpSearch ? active.search : (active.search === "brave-api" ? env.SEARCH_API_KEY : env.SERP_API_KEY) ? active.search : "unavailable",
-        ...(active.search === "brave-api" && hasSerpApiFallback ? { fallbackImplementation: "serpapi" as const } : {}),
       },
       provider: search,
     },

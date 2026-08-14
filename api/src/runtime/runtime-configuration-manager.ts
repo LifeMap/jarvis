@@ -5,6 +5,8 @@ import type { ToolProviderConfigurationService,ToolProviderState } from "../tool
 import type { DynamicToolService } from "../tools/tool-provider-registry";
 import { ToolError } from "../tools/types";
 import type { RuntimeConfigurationHistoryRepository,RuntimeChangeSource } from "./runtime-configuration-history-repository";
+import type { FallbackConfigurationService } from "./fallback-configuration";
+import type { ProviderHealthService } from "./provider-health-service";
 
 export type RuntimeChange=
   |{kind:"model.set";provider:ModelProviderId;model?:string}
@@ -14,8 +16,8 @@ export type RuntimeChange=
 export interface RuntimeChangePlanItem{change:RuntimeChange;target:string;previousValue:unknown;newValue:unknown;validation:string[]}
 
 export class RuntimeConfigurationManager{
-  constructor(readonly models:ModelConfigurationService,readonly tools:ToolProviderConfigurationService,readonly mcp:McpRegistryService,private readonly history:RuntimeConfigurationHistoryRepository,private readonly transaction:<T>(callback:()=>T)=>T=callback=>callback()){}
-  getConfiguration(){return{model:{active:this.models.getActive(),default:this.models.getDefault(),available:this.models.listAvailable().map(({provider,model,enabled,displayName,capabilities})=>({provider,model,enabled,displayName,capabilities}))},tools:Object.fromEntries(this.tools.registry.services().map(service=>[service,{active:this.tools.getActive(service),default:this.tools.getDefault(service),available:this.tools.list(service)}])),mcp:{servers:this.mcp.list().map(server=>({id:server.id,name:server.name,enabled:server.enabled,authType:server.authType,service:server.service,providerId:server.providerId,connection:{state:server.connection.state,connected:server.connection.connected,...(server.connection.error?{error:server.connection.error}:{})},capabilities:Object.keys(server.capabilityMapping)}))}};}
+  constructor(readonly models:ModelConfigurationService,readonly tools:ToolProviderConfigurationService,readonly mcp:McpRegistryService,private readonly history:RuntimeConfigurationHistoryRepository,private readonly transaction:<T>(callback:()=>T)=>T=callback=>callback(),readonly fallbacks?:FallbackConfigurationService,readonly health?:ProviderHealthService){}
+  getConfiguration(){const selections=this.fallbacks?.list()??[];const fallbackFor=(target:string)=>selections.find(item=>item.target===target)??null;return{model:{active:this.models.getActive(),default:this.models.getDefault(),fallback:fallbackFor("model"),available:this.models.listAvailable().map(({provider,model,enabled,displayName,capabilities})=>({provider,model,enabled,displayName,capabilities}))},tools:Object.fromEntries(this.tools.registry.services().map(service=>[service,{active:this.tools.getActive(service),default:this.tools.getDefault(service),fallback:fallbackFor(`tools.${service}`),available:this.tools.list(service)}])),mcp:{servers:this.mcp.list().map(server=>({id:server.id,name:server.name,enabled:server.enabled,authType:server.authType,service:server.service,providerId:server.providerId,connection:{state:server.connection.state,connected:server.connection.connected,...(server.connection.error?{error:server.connection.error}:{})},capabilities:Object.keys(server.capabilityMapping)}))},health:this.health?.cached()??[],fallbacks:selections};}
   getSection(section:"model"|"tools"|"mcp"){return this.getConfiguration()[section];}
   getHistory(limit=50){return this.history.list(limit);}
   recordMutation(changeType:string,target:string,previousValue:unknown,newValue:unknown,source:RuntimeChangeSource="user-command"){return this.history.record({changeType,target,previousValue,newValue,source});}

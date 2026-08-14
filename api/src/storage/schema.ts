@@ -79,6 +79,37 @@ export function ensureApplicationSchema(database: SqlExecutor): void {
   `;
   database.sql`CREATE INDEX IF NOT EXISTS runtime_configuration_history_created_idx ON runtime_configuration_history (created_at)`;
   database.sql`
+    CREATE TABLE IF NOT EXISTS runtime_fallback_configuration (
+      target TEXT PRIMARY KEY,
+      provider_id TEXT NOT NULL,
+      model_id TEXT,
+      updated_at TEXT NOT NULL
+    )
+  `;
+  database.sql`
+    CREATE TABLE IF NOT EXISTS provider_health_cache (
+      target TEXT PRIMARY KEY,
+      status TEXT NOT NULL CHECK (status IN ('healthy','degraded','unavailable','unknown')),
+      latency_ms INTEGER,
+      reason TEXT,
+      consecutive_failures INTEGER NOT NULL,
+      checked_at TEXT NOT NULL,
+      expires_at TEXT NOT NULL
+    )
+  `;
+  database.sql`
+    CREATE TABLE IF NOT EXISTS fallback_events (
+      id TEXT PRIMARY KEY,
+      target TEXT NOT NULL,
+      primary_provider TEXT NOT NULL,
+      fallback_provider TEXT NOT NULL,
+      failure_type TEXT NOT NULL,
+      fallback_result TEXT NOT NULL CHECK (fallback_result IN ('success','failed','blocked')),
+      created_at TEXT NOT NULL
+    )
+  `;
+  database.sql`CREATE INDEX IF NOT EXISTS fallback_events_created_idx ON fallback_events (created_at)`;
+  database.sql`
     CREATE TABLE IF NOT EXISTS profile_memories (
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL,

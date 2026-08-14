@@ -52,10 +52,10 @@ For local development, put both `JARVIS_API_TOKEN` and `OPENAI_API_KEY` in the u
 | `GOOGLE_CLIENT_ID` | Gmail/Calendar only | OAuth 2.0 Web application client ID from Google Cloud Console. |
 | `GOOGLE_CLIENT_SECRET` | Gmail/Calendar only | Secret belonging to the Google OAuth client above. |
 | `SEARCH_API_KEY` | Web Search only | Brave Search API subscription key. |
-| `SERP_API_KEY` | Optional fallback | SerpApi key used only after Brave returns HTTP 429 twice. |
+| `SERP_API_KEY` | Optional | SerpApi key used when `serpapi` is selected as active or configured fallback Provider. |
 
 `DEFAULT_MODEL_PROVIDER`, `DEFAULT_MODEL`, `LLM_PROVIDER`, `LLM_MODEL`, `OPENAI_BASE_URL`,
-`SEARCH_PROVIDER`, `SEARCH_FALLBACK_PROVIDER`, and `SYSTEM_TIMEZONE` are
+`SEARCH_PROVIDER` and `SYSTEM_TIMEZONE` are
 non-secret defaults declared in `wrangler.jsonc`; they normally do not need to be duplicated in
 `.dev.vars`. Start with only `JARVIS_API_TOKEN` and `OPENAI_API_KEY`, then add Google and Search
 credentials when testing those tools.
@@ -108,14 +108,10 @@ Search Provider를 serpapi로 변경해
 Search를 기본 Provider로 되돌려
 ```
 
-Model and Tool Provider configurations use separate repositories and tables. Existing Brave 429 →
-SerpApi fallback remains part of `brave-api`; selecting `serpapi` makes it the direct Search
-Provider.
-
-Web Search uses Brave first. On HTTP 429 it waits one second and retries Brave once; only a second
-429 activates SerpApi. Authentication, validation, and server failures do not trigger paid-provider
-fallback. If SerpApi also returns 429 because its free allowance is exhausted, Jarvis reports the
-search failure and does not retry indefinitely.
+Model and Tool Provider configurations use separate repositories and tables. `serpapi` can be
+selected as the direct Search Provider or explicitly configured as the fallback for `brave-api`.
+No Search fallback is created during bootstrap. When configured, timeout, network, HTTP 429, and
+HTTP 5xx failures can invoke SerpApi once; authentication and validation failures never do.
 
 Phase 4 external tools additionally require:
 
@@ -204,3 +200,39 @@ Supported operations: list/register/detail/remove, enable, disable, connection t
 - `GET /api/runtime-configuration/history?limit=50`: recent configuration changes
 
 `RuntimeConfigurationManager` orchestrates the existing Model, Tool Provider, and MCP services. Composite Model/Tool changes are validated as one plan and then persist selections plus history inside one Durable Object `transactionSync` transaction. Change history stores only sanitized selection metadata and never credentials or authorization headers.
+
+## Provider health and fallback
+
+Provider health is recorded as `healthy`, `degraded`, `unavailable`, or `unknown` with check time,
+latency, and a safe reason. Runtime fallback is opt-in: no fallback row is created during bootstrap.
+Model and service fallback selections are stored separately from active selections, so a fallback
+execution never changes the active Provider.
+
+Fallback is eligible only for transient Provider failures such as timeout, network failure, HTTP
+429, and HTTP 5xx. Authentication, permission, invalid argument, and not-found failures are returned
+without fallback. Read-only Tool calls may be attempted once through the configured fallback.
+Approval-gated write Tool calls are never replayed through fallback because a timeout can occur after
+the external service committed the mutation.
+
+Authenticated inspection endpoints:
+
+```text
+GET /api/provider-health?target=search
+GET /api/fallbacks
+GET /api/fallback-events?limit=50
+```
+
+Natural-language examples:
+
+```text
+Provider 상태 확인해줘
+OpenAI가 실패하면 Workers AI를 fallback으로 사용해
+Search fallback으로 brave-api를 설정해
+현재 fallback 설정 보여줘
+최근 fallback 실행 내역 보여줘
+Search fallback을 제거해
+```
+
+Configuration changes are recorded in `runtime_configuration_history`; actual failover attempts are
+stored separately in `fallback_events`. Neither table stores credentials, OAuth tokens, request
+authorization headers, or Tool payloads.

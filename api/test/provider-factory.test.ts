@@ -22,18 +22,13 @@ describe("Provider factories", () => {
     const providers = createToolProviders({
       SEARCH_PROVIDER: "brave",
       SEARCH_API_KEY: "brave-test-key",
-      SEARCH_FALLBACK_PROVIDER: "serpapi",
       SERP_API_KEY: "serp-test-key",
     } as Env, { getAccessToken: vi.fn().mockResolvedValue("google-test-token") });
     const registry = new ToolRegistry(providers);
 
     expect(registry.provider("gmail.search_messages")).toEqual({ service: "gmail", implementation: "gmail-api" });
     expect(registry.provider("google_calendar.search_events")).toEqual({ service: "calendar", implementation: "google-calendar-api" });
-    expect(registry.provider("web_search.search")).toEqual({
-      service: "search",
-      implementation: "brave-api",
-      fallbackImplementation: "serpapi",
-    });
+    expect(registry.provider("web_search.search")).toEqual({ service: "search", implementation: "brave-api" });
   });
 
   it("marks search unavailable without inventing a runtime Provider", () => {

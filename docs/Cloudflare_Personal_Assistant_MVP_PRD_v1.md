@@ -905,6 +905,11 @@ MVP Agent 안정화 이후 별도 프로젝트로 진행한다.
 - Tool 실패 시 전체 Agent 요청이 비정상 종료되지 않아야 한다.
 - Tool 오류 내용을 Agent가 사용자에게 이해 가능한 형태로 반환한다.
 - Scheduler 실패 기록을 저장한다.
+- Model, Tool Provider, MCP 연결 상태는 `healthy`, `degraded`, `unavailable`, `unknown`으로 조회한다.
+- Fallback은 사용자 설정이 있는 경우에만 timeout, network, rate-limit, 5xx 오류에 대해 한 단계만 수행한다.
+- Fallback 실행은 active Provider를 변경하지 않으며 별도 실행 이력으로 기록한다.
+- 인증, 권한, 입력 검증 오류에는 fallback을 수행하지 않는다.
+- 상태 변경 Tool은 외부 반영 여부가 불확실할 수 있으므로 fallback으로 재실행하지 않는다.
 
 ---
 
