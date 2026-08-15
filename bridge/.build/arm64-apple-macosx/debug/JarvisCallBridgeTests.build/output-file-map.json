@@ -1,0 +1,26 @@
+{
+  "": {
+    "swift-dependencies": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/primary.swiftdeps"
+  },
+  "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/AudioRouteManagerTests.swift": {
+    "dependencies": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/AudioRouteManagerTests.d",
+    "object": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/AudioRouteManagerTests.swift.o",
+    "swiftmodule": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/AudioRouteManagerTests~partial.swiftmodule",
+    "swift-dependencies": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/AudioRouteManagerTests.swiftdeps",
+    "diagnostics": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/AudioRouteManagerTests.dia"
+  },
+  "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/BridgeStateMachineTests.swift": {
+    "dependencies": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/BridgeStateMachineTests.d",
+    "object": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/BridgeStateMachineTests.swift.o",
+    "swiftmodule": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/BridgeStateMachineTests~partial.swiftmodule",
+    "swift-dependencies": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/BridgeStateMachineTests.swiftdeps",
+    "diagnostics": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/BridgeStateMachineTests.dia"
+  },
+  "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/PhoneAppDiscoveryTests.swift": {
+    "dependencies": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/PhoneAppDiscoveryTests.d",
+    "object": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/PhoneAppDiscoveryTests.swift.o",
+    "swiftmodule": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/PhoneAppDiscoveryTests~partial.swiftmodule",
+    "swift-dependencies": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/PhoneAppDiscoveryTests.swiftdeps",
+    "diagnostics": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/PhoneAppDiscoveryTests.dia"
+  }
+}

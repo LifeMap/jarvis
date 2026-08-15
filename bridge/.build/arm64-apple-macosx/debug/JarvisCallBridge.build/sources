@@ -1,0 +1,10 @@
+/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/App/BridgeViewModel.swift
+/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/App/JarvisCallBridgeApp.swift
+/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/AccessibilityStatus.swift
+/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/CallControlService.swift
+/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/PhoneAppDiscovery.swift
+/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Logging/BridgeLogger.swift
+/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/State/BridgeState.swift
+/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/State/BridgeStateMachine.swift
+/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/System/AudioRouteManager.swift
+/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/UI/ContentView.swift

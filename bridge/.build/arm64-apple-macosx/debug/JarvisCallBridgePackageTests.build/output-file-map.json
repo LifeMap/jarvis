@@ -1,0 +1,12 @@
+{
+  "": {
+    "swift-dependencies": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgePackageTests.build/primary.swiftdeps"
+  },
+  "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgePackageTests.derived/runner.swift": {
+    "dependencies": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgePackageTests.build/runner.d",
+    "object": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgePackageTests.build/runner.swift.o",
+    "swiftmodule": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgePackageTests.build/runner~partial.swiftmodule",
+    "swift-dependencies": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgePackageTests.build/runner.swiftdeps",
+    "diagnostics": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgePackageTests.build/runner.dia"
+  }
+}

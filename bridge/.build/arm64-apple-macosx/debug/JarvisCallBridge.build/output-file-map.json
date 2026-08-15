@@ -1,0 +1,75 @@
+{
+  "": {
+    "swift-dependencies": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/primary.swiftdeps"
+  },
+  "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/App/BridgeViewModel.swift": {
+    "dependencies": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/BridgeViewModel.d",
+    "object": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/BridgeViewModel.swift.o",
+    "swiftmodule": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/BridgeViewModel~partial.swiftmodule",
+    "swift-dependencies": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/BridgeViewModel.swiftdeps",
+    "diagnostics": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/BridgeViewModel.dia"
+  },
+  "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/App/JarvisCallBridgeApp.swift": {
+    "dependencies": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/JarvisCallBridgeApp.d",
+    "object": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/JarvisCallBridgeApp.swift.o",
+    "swiftmodule": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/JarvisCallBridgeApp~partial.swiftmodule",
+    "swift-dependencies": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/JarvisCallBridgeApp.swiftdeps",
+    "diagnostics": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/JarvisCallBridgeApp.dia"
+  },
+  "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/AccessibilityStatus.swift": {
+    "dependencies": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AccessibilityStatus.d",
+    "object": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AccessibilityStatus.swift.o",
+    "swiftmodule": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AccessibilityStatus~partial.swiftmodule",
+    "swift-dependencies": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AccessibilityStatus.swiftdeps",
+    "diagnostics": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AccessibilityStatus.dia"
+  },
+  "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/CallControlService.swift": {
+    "dependencies": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/CallControlService.d",
+    "object": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/CallControlService.swift.o",
+    "swiftmodule": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/CallControlService~partial.swiftmodule",
+    "swift-dependencies": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/CallControlService.swiftdeps",
+    "diagnostics": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/CallControlService.dia"
+  },
+  "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/PhoneAppDiscovery.swift": {
+    "dependencies": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/PhoneAppDiscovery.d",
+    "object": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/PhoneAppDiscovery.swift.o",
+    "swiftmodule": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/PhoneAppDiscovery~partial.swiftmodule",
+    "swift-dependencies": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/PhoneAppDiscovery.swiftdeps",
+    "diagnostics": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/PhoneAppDiscovery.dia"
+  },
+  "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Logging/BridgeLogger.swift": {
+    "dependencies": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/BridgeLogger.d",
+    "object": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/BridgeLogger.swift.o",
+    "swiftmodule": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/BridgeLogger~partial.swiftmodule",
+    "swift-dependencies": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/BridgeLogger.swiftdeps",
+    "diagnostics": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/BridgeLogger.dia"
+  },
+  "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/State/BridgeState.swift": {
+    "dependencies": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/BridgeState.d",
+    "object": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/BridgeState.swift.o",
+    "swiftmodule": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/BridgeState~partial.swiftmodule",
+    "swift-dependencies": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/BridgeState.swiftdeps",
+    "diagnostics": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/BridgeState.dia"
+  },
+  "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/State/BridgeStateMachine.swift": {
+    "dependencies": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/BridgeStateMachine.d",
+    "object": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/BridgeStateMachine.swift.o",
+    "swiftmodule": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/BridgeStateMachine~partial.swiftmodule",
+    "swift-dependencies": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/BridgeStateMachine.swiftdeps",
+    "diagnostics": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/BridgeStateMachine.dia"
+  },
+  "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/System/AudioRouteManager.swift": {
+    "dependencies": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AudioRouteManager.d",
+    "object": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AudioRouteManager.swift.o",
+    "swiftmodule": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AudioRouteManager~partial.swiftmodule",
+    "swift-dependencies": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AudioRouteManager.swiftdeps",
+    "diagnostics": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AudioRouteManager.dia"
+  },
+  "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/UI/ContentView.swift": {
+    "dependencies": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/ContentView.d",
+    "object": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/ContentView.swift.o",
+    "swiftmodule": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/ContentView~partial.swiftmodule",
+    "swift-dependencies": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/ContentView.swiftdeps",
+    "diagnostics": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/ContentView.dia"
+  }
+}

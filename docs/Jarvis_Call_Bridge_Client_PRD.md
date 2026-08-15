@@ -4,633 +4,822 @@
 
 - 프로젝트명: Jarvis
 - 모듈명: Call Bridge Client
-- 문서 버전: v1.1
-- 개발 단계: Jarvis Phase 7-1 이후 별도 PoC
-- 대상 플랫폼: macOS 26 이상
-- 기본 통화 Host: macOS Phone.app
-- 개발 언어: Swift
-- UI Framework: SwiftUI
-- 목적: iPhone의 기존 셀룰러 번호를 유지하면서 macOS 26+의 Phone.app 및 iPhone Cellular Calls/Continuity 경로를 이용해 Jarvis AI가 실제 전화 통화에 개입할 수 있는 Call Bridge를 구현한다.
-- 대상 사용자: 초기 단일 사용자 본인
-- SaaS / 멀티사용자 기능: 제외
+- 문서 버전: **v2.1**
+- 작성일: 2026-08-15
+- 대상 플랫폼: **macOS 26 이상**
+- 기본 통화 Host: **macOS Phone.app**
+- 개발 언어: **Swift**
+- UI Framework: **SwiftUI**
+- 개발 위치: **`bridge/`**
+- 대상 사용자: **개인용 단일 사용자**
+- 핵심 사용 목적: **업무 중 사용자가 직접 전화를 받기 어려울 때 Jarvis가 iPhone 기존 번호의 착신 통화를 대신 받아 용건을 파악하고 필요한 정보를 처리한다.**
+- SaaS / Multi-tenant / 과금 기능: 제외
 
 ---
 
-## 2. v1.1 변경 요약
+# 2. v2.0 재설계 배경
 
-v1.0의 전체 제품 방향은 유지한다.
-
-Phase 0 조사 결과 다음이 확인되었다.
-
-- 네이티브 macOS에서 `CXCallObserver`를 이용한 직접 Continuity call-state 감지는 사용할 수 없었다.
-- FaceTime 프로세스 출력 오디오를 ScreenCaptureKit으로 캡처하는 RX 후보는 구현됐지만 실제 iPhone 셀룰러 통화에서 caller voice 포함 여부는 미검증이다.
-- Continuity 통화 송신 stream에 직접 PCM을 주입하는 공개 API는 확인되지 않았다.
-- 공개 Core Audio / AudioDriverKit 기반 Virtual Audio Input 방식은 아직 검증하지 않았다.
-- 따라서 "직접 Continuity API가 없다"는 이유만으로 Call Bridge 전체를 실패로 판정하지 않는다.
-
-v1.1에서는 다음 방향으로 변경한다.
+v1.x에서는 다음 구조를 검증했다.
 
 ```text
-기존
-iPhone
-  ↓
-Continuity
-  ↓
-Mac
-  ↓
-Direct Call API / Direct TX API 탐색
+RX
+Phone.app
+→ ScreenCaptureKit
+→ Call Bridge
 
-변경
-iPhone Cellular Call
-  ↓
-Calls on Other Devices / Continuity
-  ↓
-macOS 26+ Phone.app
-  ├─ RX: Phone.app output capture
-  └─ TX: Virtual Audio Input → Phone.app microphone
-       ↓
-Jarvis Call Bridge
+TX
+Call Bridge
+→ Shared Memory
+→ Jarvis Virtual Mic
+→ Phone.app
 ```
 
-Phase 0의 목표는 특정 API 사용 여부가 아니라 **실제 양방향 통화 오디오 경로를 유지보수 가능한 방식으로 증명하는 것**으로 재정의한다.
+실기기 테스트 과정에서 다음 사실을 확인했다.
+
+1. iPhone의 Calls on Other Devices / Continuity를 통해 macOS Phone.app에서 실제 셀룰러 전화를 수신할 수 있다.
+2. macOS에서 직접 사용할 수 있는 native CallKit call-state API를 전제로 할 수 없다.
+3. Accessibility를 이용한 Phone.app 수신 UI 제어는 실사용 가능한 후보이다.
+4. v1의 `Start Test`를 착신 전에 활성화하면 Mac의 착신 표시 자체가 방해되는 문제가 발생했다.
+5. 따라서 **대기 상태에서 Phone.app의 audio route 또는 capture session을 건드리는 구조는 부적합하다.**
+6. AITakeCall 실기기 분석에서 통화 중 다음 두 CoreAudio virtual device가 실제 활성화되는 것을 확인했다.
+
+```text
+AI Take Call Capture
+- Default Output Device
+- Input 2ch
+- Output 2ch
+- 48kHz
+- Virtual
+
+AI Take Call Inject
+- Default Input Device
+- Input 2ch
+- Output 2ch
+- 48kHz
+- Virtual
+```
+
+7. AITakeCall은 자체 CoreAudio HAL AudioServerPlugIn을 사용하고, Accessibility로 착신 전화를 자동 수신하며, 통화 중 Capture/Inject 장치를 이용해 RX/TX를 처리하는 구조로 관찰됐다.
+8. AITakeCall 역시 iPhone Wi-Fi를 끄면 Mac에서 착신 연결이 되지 않았다.
+9. 따라서 **Continuity의 근접성/Wi-Fi 제약은 존재하지만, 본 프로젝트의 "업무 중 개인용 전화비서" 용도에서는 수용한다.**
+
+v2.0은 위 실기기 검증 결과를 기반으로 기존 오디오 구조를 폐기하고 다시 설계한다.
 
 ---
 
-# 3. 목표
+# 3. v2.0 핵심 결정
 
-Jarvis Call Bridge Client는 사용자의 Mac에 설치되는 macOS 애플리케이션이다.
+## 3.1 폐기하는 구조
 
-주요 목표:
+다음은 v2의 주력 구조에서 사용하지 않는다.
+
+```text
+ScreenCaptureKit 기반 Phone.app RX
+단일 Jarvis Virtual Mic
+POSIX shared memory 기반 PCM 전달
+/jarvis.cbridge.vmic
+Start Test 기반 전체 기능 일괄 활성화
+착신 대기 중 Phone.app audio capture 활성화
+```
+
+기존 코드는 Git history/tag에 보존하며 v2 production path에는 포함하지 않는다.
+
+## 3.2 신규 구조
+
+```text
+Accessibility Call Control
++
+Dual HAL Loopback Devices
+  - Jarvis Call Capture
+  - Jarvis Call Inject
++
+CoreAudio Direct I/O
++
+Realtime Voice
++
+Existing Jarvis API / Agent
+```
+
+## 3.3 가장 중요한 운영 원칙
+
+```text
+ARMED 상태에서는
+Phone.app의 오디오 라우팅을 변경하지 않는다.
+오디오 캡처를 시작하지 않는다.
+Realtime 세션을 유지하지 않는다.
+```
+
+즉 **업무 모드가 켜져 있어도 정상적인 macOS/iPhone 착신 동작을 방해하지 않아야 한다.**
+
+---
+
+# 4. 제품 목표
+
+Jarvis Call Bridge Client의 v2 목표는 다음과 같다.
 
 1. 사용자의 기존 iPhone 셀룰러 번호를 그대로 사용한다.
-2. iPhone의 Calls on Other Devices / Continuity 기능을 통해 Mac에서 셀룰러 통화를 처리한다.
-3. macOS 26+의 Phone.app을 기본 통화 Host로 사용한다.
-4. 실제 상대방 음성(RX)을 Call Bridge가 실시간으로 확보한다.
-5. Jarvis가 생성한 음성(TX)을 Phone.app의 microphone/input 경로를 통해 실제 상대방에게 전달한다.
-6. RX/TX를 가능한 한 독립적인 audio path로 유지한다.
-7. 실시간 AI Voice 모델과 양방향 음성 통화를 연결한다.
-8. 상대방이 AI 발화 중 말을 시작하면 AI 출력을 즉시 중단한다.
-9. 중단된 발화 내용과 상대방의 새 발화를 함께 고려해 다음 응답을 생성한다.
-10. RX/TX를 Mac에서 별도 녹음한다.
-11. 통화 종료 후 Mac에서 RX + TX를 `merged.m4a`로 생성한다.
-12. RX/TX/Merged 녹음 파일을 Cloudflare R2에 업로드한다.
-13. 통화 메타데이터, transcript, summary, R2 object key를 기존 Jarvis Agent의 SQLite에 저장한다.
-14. 최종적으로 `.app`을 만들고, 안정화 후 DMG로 패키징할 수 있어야 한다.
+2. 업무 모드 ON 상태에서 Mac의 Phone.app 착신을 감지한다.
+3. 설정된 지연시간 후 Jarvis가 전화를 자동 수신한다.
+4. 실제 Caller 음성(RX)을 별도 audio path로 확보한다.
+5. Jarvis AI 음성(TX)을 실제 Caller에게 전달한다.
+6. RX/TX를 논리적으로 분리한다.
+7. Realtime speech-to-speech 대화를 제공한다.
+8. Caller가 Jarvis 발화 중 말하면 Jarvis가 즉시 멈춘다.
+9. Jarvis의 기존 Memory / Tools / Approval / Scheduler를 재사용한다.
+10. 필요 시 사용자가 통화를 직접 takeover 할 수 있다.
+11. 통화 종료 후 모든 audio route를 원상복구한다.
+12. 후속 Phase에서 RX/TX/merged 녹음, transcript, summary를 저장한다.
+13. 최종적으로 서명/notarization 가능한 `.app`과 `.dmg` 배포 구조를 만든다.
 
 ---
 
-# 4. 가장 중요한 PoC 전제
+# 5. 사용자 시나리오
 
-이 프로젝트에서 가장 큰 기술 리스크는 AI 모델이 아니라 **macOS Phone.app을 중심으로 실제 셀룰러 통화의 RX와 TX를 Jarvis가 안정적으로 연결할 수 있는가**이다.
-
-Phase 0에서는 다음 두 경로가 가장 중요하다.
-
-## 4.1 RX 경로
+## 5.1 업무 모드 OFF
 
 ```text
 Caller
-  ↓
-iPhone Cellular
-  ↓
-Continuity / Calls on Other Devices
-  ↓
-macOS Phone.app
-  ↓
-Phone.app Process Output
-  ↓
-Call Bridge RX Buffer
+→ iPhone
+→ iPhone / Mac 정상 착신
+→ 사용자가 직접 수신
 ```
 
-후보 기술:
+Jarvis Call Bridge는 전화에 개입하지 않는다.
 
-- ScreenCaptureKit application audio capture
-- Core Audio process tap
-- 기타 Apple 공개 audio capture API
-
-단순 microphone capture 또는 전체 system audio capture만으로 성공 처리하지 않는다.
-
-실제 caller voice가 RX buffer에 포함되는 것을 실제 통화로 검증해야 한다.
-
-## 4.2 TX 경로
-
-직접 Continuity TX API를 전제로 하지 않는다.
-
-우선 검증할 구조:
+## 5.2 업무 모드 ON
 
 ```text
-Jarvis/Test Audio
-  ↓
+Caller
+→ iPhone Cellular
+→ Apple Continuity
+→ macOS Phone.app
+→ Jarvis Call Bridge가 Ringing 감지
+→ Jarvis 자동 수신
+→ AI가 Caller와 대화
+→ 용건 파악 / 필요한 Tool 사용
+→ 통화 종료
+→ 상태 및 오디오 route 원상복구
+```
+
+## 5.3 Human Takeover
+
+Human Takeover는 두 가지 모드로 구분한다.
+
+### A. Mac Takeover — 녹음 계속
+
+```text
+AI 통화 중
+→ 사용자가 "Mac에서 내가 통화하기" 선택
+→ AI TX 즉시 중단
+→ 미재생 AI TX buffer clear
+→ Realtime session pause/end
+→ Capture / Inject audio path 유지
+→ Recording 유지
+→ Caller RX를 사용자 Mac 출력 장치로 전달
+→ 사용자 Mac 입력 장치를 Inject TX source로 전환
+→ 사용자가 동일 통화를 직접 이어감
+→ 실제 통화 종료 시 Recording finalize + route restore
+```
+
+이 모드에서는 **AI만 통화에서 빠지고 Bridge와 녹음은 계속 유지**한다.
+
+통화 전체의 논리적 stream은 다음과 같다.
+
+```text
+RX
+= 통화 전체 Caller 음성
+
+TX
+= AI 구간에서는 Jarvis AI 음성
++ Human Takeover 이후에는 사용자 음성
+```
+
+### B. iPhone Takeover — Apple Handoff
+
+```text
+AI 통화 중
+→ 사용자가 iPhone에서 현재 통화를 이어받음
+→ Apple Continuity / Handoff로 통화 endpoint가 Mac → iPhone으로 이동
+→ AI TX 즉시 중단
+→ Realtime session 종료
+→ Mac Bridge recording finalize
+→ Bridge audio route restore
+→ 사용자가 iPhone으로 직접 통화 계속
+```
+
+iPhone Takeover는 Apple이 제공하는 사용자 주도 Handoff 동작을 사용한다.
+
+초기 버전에서는 Bridge가 private API나 UI automation으로 iPhone Handoff를 강제하지 않는다.
+
+통화가 iPhone으로 넘어간 이후에는 Mac이 더 이상 통화 audio endpoint가 아닐 수 있으므로 **Bridge의 녹음 지속을 보장하지 않는다.**
+
+따라서:
+
+```text
+Mac Takeover
+→ AI 종료
+→ Bridge 유지
+→ Recording 계속
+
+iPhone Takeover
+→ AI 종료
+→ Bridge 통화 media 종료
+→ Recording finalize
+→ iPhone에서 통화 계속
+```
+
+---
+
+# 6. 시스템 아키텍처
+
+```text
+                         Cellular
+Caller  ←────────────────────────────────→  iPhone
+                                                │
+                                                │
+                                      Calls on Other Devices
+                                           / Continuity
+                                                │
+                                                ▼
+                                      macOS 26+ Phone.app
+                                         │            ▲
+                                      RX │            │ TX
+                                         │            │
+                           ┌─────────────▼──┐      ┌──▼──────────────┐
+                           │ Jarvis Call    │      │ Jarvis Call     │
+                           │ Capture        │      │ Inject          │
+                           │ HAL Device     │      │ HAL Device      │
+                           └──────┬─────────┘      └────────▲────────┘
+                                  │                         │
+                                  ▼                         │
+                         ┌────────────────────────────────────────┐
+                         │       Jarvis Call Bridge.app           │
+                         │                                        │
+                         │  Call Lifecycle / Accessibility        │
+                         │  CoreAudio RX/TX                       │
+                         │  Audio Conversion / Buffering          │
+                         │  Barge-in                              │
+                         │  Realtime Voice Adapter                │
+                         │  Jarvis API Adapter                    │
+                         └──────────────────┬─────────────────────┘
+                                            │
+                           ┌────────────────┴───────────────┐
+                           │                                │
+                           ▼                                ▼
+                  Realtime Voice Layer               Jarvis API / Agent
+                                                      - Memory
+                                                      - Tools
+                                                      - Approval
+                                                      - Scheduler
+                                                      - Agent State
+```
+
+통화 종료 후 후속 Phase:
+
+```text
 Call Bridge
-  ↓
-Virtual Audio Input Device
-  ↓
-Phone.app Microphone/Input
-  ↓
-Continuity
-  ↓
-iPhone Cellular
-  ↓
-Caller
-```
-
-후보 기술:
-
-- AudioDriverKit 기반 virtual audio device
-- Apple이 지원하는 Core Audio audio-driver / virtual-device 방식
-- 유지보수 가능한 기타 공개 audio routing 방식
-
-Phase 0에서는 수동으로 Phone.app의 input device를 선택해야 해도 허용한다.
-
-자동 장치 선택/복구는 후속 Phase에서 개선할 수 있다.
-
----
-
-# 5. Phase 0 판정 원칙
-
-직접 CallKit 또는 직접 Continuity TX API가 없다는 사실만으로 Phase 0을 FAIL 처리하지 않는다.
-
-판정 기준은 다음이다.
-
-```text
-특정 API 존재 여부
-≠
-Call Bridge 가능 여부
-
-실제 Caller RX 확보
-+
-실제 Caller에게 TX 전달
-+
-RX/TX를 실사용 가능한 형태로 유지
-=
-Call Bridge 핵심 가능성
-```
-
-Call-state detection은 중요하지만 Phase 0의 최우선 blocker는 아니다.
-
-양방향 오디오가 성공하고 call-state 자동 감지만 미해결인 경우:
-
-```text
-CB Phase 0 = CONDITIONAL PASS
-```
-
-를 허용한다.
-
-PoC에서는 사용자가 Call Bridge의 Start/Stop을 수동으로 제어하는 방식으로 Phase 1을 진행할 수 있다.
-
-단, 최종 제품 단계에서는 자동 call-state detection 또는 이에 준하는 안정적인 lifecycle 관리가 필요하다.
-
----
-
-# 6. 시스템 구조
-
-```text
-Caller
-  │
-  │ PSTN / Cellular
-  ▼
-User iPhone
-  │
-  │ Calls on Other Devices / Continuity
-  ▼
-macOS 26+ Phone.app
-  │
-  ├──────────── RX ───────────────┐
-  │                               │
-  │        Process Audio Capture  │
-  │        - ScreenCaptureKit     │
-  │        - Core Audio Tap       │
-  │                               ▼
-  │                      Jarvis Call Bridge
-  │                               │
-  │                         Realtime Voice
-  │                               │
-  │                               ▼
-  └──── TX ◀── Virtual Input ◀── AI Audio
-```
-
-Jarvis 연동:
-
-```text
-Jarvis Call Bridge
-       │
-       ├─ Realtime Audio Session
-       │
-       └─ Jarvis API / Agent
-              ├─ Memory
-              ├─ Tools
-              ├─ Approval
-              ├─ Scheduler
-              └─ Agent State
-```
-
-통화 종료 후:
-
-```text
-Call Bridge (Mac)
-  │
-  ├─ rx.m4a
-  ├─ tx.m4a
-  └─ merged.m4a
-  │
-  ├──────────────→ Cloudflare R2
-  │
-  └──────────────→ Jarvis Call API
-                         │
-                         ▼
-               Durable Object SQLite
+├─ rx.m4a
+├─ tx.m4a
+└─ merged.m4a
+      │
+      ├─→ Cloudflare R2
+      └─→ Jarvis Call API
+             ↓
+      Durable Object SQLite
 ```
 
 ---
 
 # 7. 기본 원칙
 
-## 7.1 Mac은 Call/Audio Bridge
+## 7.1 Mac은 Bridge
 
-Mac에서는 가능한 한 AI inference를 수행하지 않는다.
+Mac에서 Local LLM을 실행하지 않는다.
 
 ```text
 Mac
-= Phone.app integration
-+ Audio Bridge
+= Call control
++ Audio routing
++ Audio conversion
 + Recording
-+ Local Merge
-+ Cloud connectivity
++ Realtime transport
++ Jarvis connectivity
 
 Cloud / Realtime Provider
-= AI
+= Voice AI inference
 ```
-
-초기 PoC에서 Local LLM을 사용하지 않는다.
 
 ## 7.2 1 User = 1 Mac = 1 Bridge
 
-PoC에서는 다음만 지원한다.
+v2 초기 범위:
 
 ```text
 사용자 1명
-+
 iPhone 1대
-+
 Mac 1대
-+
-Call Bridge Client 1개
+Call Bridge 1개
 ```
 
 지원하지 않음:
 
-- Mac 1대에서 여러 Call Bridge 동시 실행
 - 여러 사용자 동시 처리
-- 여러 Apple Account 동시 처리
-- Multi-tenant macOS host
+- 여러 Apple Account
+- 여러 iPhone 동시 처리
+- Mac 한 대에서 여러 Bridge instance
+- Multi-tenant host
 
 ## 7.3 기존 번호 유지
 
-다음은 사용하지 않는다.
+사용자의 현재 iPhone 셀룰러 번호를 그대로 사용한다.
 
-- Twilio 번호
-- 번호이동
+초기 범위에서 사용하지 않음:
+
+- Twilio
 - SIP
 - BYOC
-- 별도 070/VoIP 번호
+- 070 번호
+- 별도 VoIP 번호
 
-사용자의 기존 iPhone 셀룰러 번호를 그대로 사용한다.
+## 7.4 Continuity 제약 수용
 
-## 7.4 Phone.app 우선
+본 v2는 개인 업무용으로 다음 조건을 수용한다.
 
-macOS 26+에서는 Phone.app을 기본 통화 Host로 사용한다.
+```text
+iPhone과 Mac이 Continuity 통화를 사용할 수 있는 상태
++
+iPhone Wi-Fi 활성화
++
+Apple의 Calls on Other Devices 조건 충족
+```
 
-FaceTime 기반 경로는 필요할 경우 fallback/비교 검증 용도로만 사용할 수 있다.
+사용자가 iPhone을 들고 외출한 상태에서 집의 Mac이 always-on 전화비서가 되는 것은 v2 목표가 아니다.
 
 ## 7.5 Public / Maintainable Path 우선
 
-다음을 우선한다.
+우선 사용:
 
-- Apple Public API
-- AudioDriverKit
 - Core Audio
-- ScreenCaptureKit
-- Accessibility 등 Apple 공개 프레임워크
-- 사용자가 명시적으로 승인한 macOS 권한
+- AudioServerPlugIn
+- Accessibility API
+- AVFoundation / AVAudioEngine
+- Swift / SwiftUI
+- URLSession / WebSocket
+- Keychain
 
-다음을 제품 기본 구조로 사용하지 않는다.
+기본 구조에서 사용하지 않음:
 
 - binary hooking
 - process injection
-- 임의 patch
-- undocumented private framework에 강하게 의존하는 구조
+- private framework 강제 의존
+- 임의 binary patching
 
 ---
 
-# 8. 기술 스택
+# 8. Call Lifecycle 상태 머신
 
-## 8.1 macOS Client
+v2는 명시적인 상태 머신으로 동작한다.
 
-- Swift
-- SwiftUI
-- AVFoundation
-- AVAudioEngine
-- AudioToolbox
-- Core Audio
-- ScreenCaptureKit
-- AudioDriverKit 검토
-- Accessibility API 검토
-- URLSession
-- WebSocket
-- Keychain
-
-## 8.2 Realtime Voice
-
-기본 후보:
-
-- OpenAI Realtime API
-- speech-to-speech realtime model
-- VAD / turn detection
-- interruption / barge-in
-- response cancellation
-
-모델 이름을 코드에 강하게 고정하지 않는다.
-
-Realtime Voice Provider는 향후 교체 가능하도록 최소 추상화를 둔다.
-
-## 8.3 Backend
-
-기존 Jarvis 사용:
-
-- Cloudflare Workers
-- Cloudflare Agents SDK
-- Durable Objects
-- SQLite
-- R2
-
----
-
-# 9. Phone.app / Continuity 요구사항
-
-Call Bridge가 동작하려면 사용자의 Apple 환경에서 iPhone cellular calls가 Mac으로 relay 가능한 상태여야 한다.
-
-PoC 기준:
-
-- macOS 26 이상
-- iPhone과 Mac이 동일 Apple Account 기반으로 연동
-- iPhone에서 Calls on Other Devices 활성화
-- Mac에서 iPhone cellular calls 사용 가능
-- Phone.app에서 실제 수신/발신 통화가 가능한 상태
-
-Call Bridge는 통신사 회선을 직접 제어하지 않는다.
+AI participation lifecycle, call lifecycle, recording lifecycle을 서로 분리한다.
 
 ```text
-Carrier
-↔
-iPhone
-↔
-Apple Continuity
-↔
-Phone.app
-↔
-Call Bridge
+DISABLED
+    │
+    │ Work Mode ON
+    ▼
+ARMED
+    │
+    │ Incoming call detected
+    ▼
+RINGING
+    │
+    ▼
+PREPARING
+    │
+    ├─ Original audio route snapshot
+    ├─ Realtime prewarm
+    ├─ Audio devices prepare
+    └─ Required validation
+    │
+    ▼
+ANSWERING
+    │
+    ▼
+ACTIVE_AI
+    │
+    ├──────── Mac Takeover ────────→ ACTIVE_HUMAN_MAC
+    │                                  │
+    │                                  └── Call End → RESTORING
+    │
+    ├──────── iPhone Handoff ──────→ HANDOFF_TO_IPHONE
+    │                                  │
+    │                                  ├─ Recording finalize
+    │                                  └─ Bridge media release
+    │                                           │
+    │                                           ▼
+    │                                       RESTORING
+    │
+    └──────── Call End ────────────→ RESTORING
+                                         │
+                                         ▼
+                                       ARMED
 ```
+
+상태 의미:
+
+```text
+ACTIVE_AI
+- Capture active
+- Inject active
+- Recording active (Recording 기능이 활성화된 Phase 이후)
+- Realtime active
+- TX source = AI
+
+ACTIVE_HUMAN_MAC
+- Capture active
+- Inject active
+- Recording active
+- Realtime inactive
+- RX sink = 사용자 Mac 출력 장치
+- TX source = 사용자 Mac 입력 장치
+
+HANDOFF_TO_IPHONE
+- AI inactive
+- Realtime inactive
+- Mac recording finalize
+- Mac call media 종료 감지
+- iPhone에서 통화 계속
+```
+
+오류 시:
+
+```text
+ANY STATE
+→ ERROR
+→ RESTORING
+→ ARMED 또는 DISABLED
+```
+
+`RESTORING`은 반드시 idempotent하게 구현한다.
 
 ---
 
-# 10. Call State
+# 9. ARMED 상태 요구사항
 
-네이티브 macOS에서 iPhone cellular call state를 제공하는 직접 CallKit API를 전제로 하지 않는다.
+ARMED는 v2의 가장 중요한 상태이다.
 
-## 10.1 목표 상태
+다음만 활성화한다.
 
-가능하면 다음 상태를 자동 감지한다.
+```text
+Phone.app 존재 확인
+Accessibility authorization 상태 확인
+Incoming-call UI observation
+필요 최소 lifecycle observer
+Jarvis API connectivity health
+```
+
+다음은 활성화하지 않는다.
+
+```text
+Audio Capture
+Default Input 변경
+Default Output 변경
+Virtual Device active routing
+Realtime audio session
+Recording
+ScreenCaptureKit
+```
+
+### Acceptance
+
+Bridge가 ARMED 상태인 채로 최소 10회 연속 실제 착신 테스트를 수행했을 때:
+
+- Phone.app 수신 알림이 모두 정상 표시되어야 한다.
+- Bridge 때문에 착신이 사라지거나 지연되는 현상이 없어야 한다.
+- Work Mode OFF와 비교해 native incoming behavior가 망가지지 않아야 한다.
+
+---
+
+# 10. Call Detection / Control
+
+## 10.1 기본 방식
+
+native macOS CallKit call-state API를 전제로 하지 않는다.
+
+Primary:
+
+```text
+Accessibility API
+→ Phone.app / incoming call notification UI observation
+```
+
+목표 상태:
 
 ```text
 Idle
 Ringing
+Answering
 Active
 Ended
+Unknown
 ```
 
-## 10.2 후보 접근
+## 10.2 자동 수신
 
-유지보수 가능한 공개 방식만 검토한다.
-
-예:
-
-- Phone.app의 공개 observable state
-- Accessibility API를 통한 Phone.app UI state
-- 공개 notification/event
-- window/session 상태
-- audio stream lifecycle
-- 기타 공개 macOS mechanism
-
-각 후보는 실제 call-state 의미를 제대로 나타내는지 검증해야 한다.
-
-단순히 Phone.app 프로세스가 실행 중이라는 이유로 `Active Call`로 판정하지 않는다.
-
-## 10.3 PoC fallback
-
-자동 Call State가 확보되지 않아도 양방향 오디오가 성공하면 Phase 0은 `CONDITIONAL PASS`가 가능하다.
-
-그 경우 초기 UI는:
+Ringing이 확인되면 사용자 설정에 따라:
 
 ```text
-[Start Bridge]
-[Stop Bridge]
+즉시
+1초 후
+3초 후
+5초 후
 ```
 
-를 제공해 사용자가 실제 통화 시작/종료 시점에 수동으로 bridge session을 관리할 수 있다.
+등의 delay를 적용할 수 있다.
+
+자동 수신은 Accessibility를 이용해 실제 수신 UI의 `Answer` 동작을 수행한다.
+
+## 10.3 안전 원칙
+
+- Accessibility anchor가 명확하지 않으면 자동 클릭하지 않는다.
+- 전화번호/Caller 정보가 불명확해도 임의의 다른 UI element를 누르지 않는다.
+- auto-answer 실패 시 native call UI를 그대로 유지한다.
+- Bridge 오류가 native Phone.app 수신 자체를 종료시키면 안 된다.
+
+## 10.4 Fallback
+
+Accessibility 기반 자동 수신이 실패하면:
+
+```text
+Manual Answer Mode
+```
+
+로 전환할 수 있다.
+
+사용자가 Phone.app에서 직접 받은 뒤 Bridge가 ACTIVE path를 연결할 수 있어야 한다.
 
 ---
 
-# 11. RX Audio Capture
+# 11. JarvisCallAudio HAL Driver
 
-RX는 실제 상대방 음성을 의미한다.
+기존 `JarvisVirtualMic.driver`는 폐기한다.
 
-```text
-RX = Caller → Phone.app → Call Bridge
-```
-
-우선 검증 순서:
-
-1. Phone.app process identification
-2. ScreenCaptureKit application audio
-3. Core Audio process tap
-4. 실제 caller voice 포함 여부
-5. sample format / latency 확인
-6. 통화 중 지속성 확인
-
-로그 가능한 정보:
-
-- source process
-- sample rate
-- channels
-- PCM format
-- frames
-- callback interval
-- PTS
-- buffer count
-- amplitude/level
-
-RX 성공 조건:
+신규 드라이버:
 
 ```text
-실제 외부 Caller가 발화
-↓
-Call Bridge RX buffer에서 해당 음성이 확인됨
+JarvisCallAudio.driver
 ```
 
-벨소리나 Phone.app UI sound만 잡히는 것은 성공이 아니다.
-
----
-
-# 12. TX Audio Routing
-
-TX는 Jarvis가 실제 전화 상대방에게 보내는 음성이다.
+## 11.1 Device Model
 
 ```text
-TX = Call Bridge → Phone.app input → Caller
+JarvisCallAudio.driver
+
+├─ Jarvis Call Capture
+│  ├─ Input Stream
+│  ├─ Output Stream
+│  └─ Internal Loopback
+│
+└─ Jarvis Call Inject
+   ├─ Input Stream
+   ├─ Output Stream
+   └─ Internal Loopback
 ```
 
-직접 Continuity PCM injection API를 요구하지 않는다.
-
-## 12.1 Phase 0 기본 전략
-
-Virtual Audio Input Device를 우선 검증한다.
+초기 목표 포맷:
 
 ```text
-Test/AI PCM
-↓
-Virtual Audio Device
-↓
-Phone.app input device
-↓
-Caller
+Sample Rate : 48000 Hz
+Channels    : 2
+Format      : Float32 PCM
+Transport   : Virtual
 ```
 
-Phase 0에서는:
+전화 AI processing 내부에서는 필요 시 mono로 downmix한다.
 
-- 수동 device selection 허용
-- test tone 또는 local audio 사용
-- AI 연결 불필요
+## 11.2 Capture Device
 
-TX 성공 조건:
+목표 경로:
 
 ```text
-Mac speaker acoustic leakage가 아닌 상태에서
-Call Bridge에서 생성한 test audio를
-실제 전화 상대방이 명확히 들음
+Phone.app
+→ macOS Default Output
+→ Jarvis Call Capture OUTPUT
+→ internal loopback
+→ Jarvis Call Capture INPUT
+→ Bridge
 ```
 
-Mac speaker를 통해 물리적으로 microphone에 다시 들어간 음성은 TX 성공으로 간주하지 않는다.
+Bridge는 Capture Device의 input stream을 CoreAudio로 직접 읽는다.
 
----
+## 11.3 Inject Device
 
-# 13. RX/TX Separation
-
-최종 목표:
+목표 경로:
 
 ```text
-RX stream
-= Phone.app → Call Bridge
-
-TX stream
-= Call Bridge → Virtual Input → Phone.app
+Realtime AI TX
+→ Bridge
+→ Jarvis Call Inject OUTPUT
+→ internal loopback
+→ Jarvis Call Inject INPUT
+→ macOS Default Input
+→ Phone.app
+→ Caller
 ```
 
-검증:
+Bridge는 Inject Device의 output stream에 CoreAudio로 직접 쓴다.
 
-- RX와 TX가 서로 다른 logical stream인지
-- TX가 RX capture에 어느 정도 포함되는지
-- Caller와 Jarvis가 동시에 말할 때 양쪽 오디오를 보존 가능한지
-- echo/feedback 수준
-- 별도 recording 가능 여부
-- barge-in에 사용할 수 있는 latency인지
+## 11.4 PCM IPC
 
-필요 시 echo cancellation을 후속 Phase에서 추가한다.
-
-Phase 0에서는 우선 separation capability와 feedback level을 측정한다.
-
----
-
-# 14. Call Bridge Client 상태 UI
-
-최종 PoC UI의 기본 상태:
+v1에서 사용한 별도 POSIX shared memory는 기본 구조에서 사용하지 않는다.
 
 ```text
-Jarvis Call Bridge
-
-Phone.app             Available / Not Available
-iPhone Calls          Ready / Unknown
-Call State            Idle / Ringing / Active / Manual
-RX Audio              Active / Inactive
-TX Audio              Active / Inactive
-RX/TX Separation      Pass / Conditional / Fail
-
-Jarvis Cloud          Connected / Disconnected
-Realtime Voice        Connected / Disconnected
-
-AI Bridge             ON / OFF
-Recording             ON / OFF
+Bridge ↔ Driver PCM
+= CoreAudio Device I/O
 ```
 
-Phase 0에서는 Feasibility UI를 간소화할 수 있다.
+driver control이 필요한 경우 CoreAudio property 또는 maintainable control mechanism을 사용한다.
 
----
+## 11.5 Device Visibility / Lifecycle
 
-# 15. 수신 통화
-
-목표 흐름:
-
-```text
-Caller
-↓
-사용자 기존 iPhone 번호
-↓
-iPhone
-↓
-Continuity
-↓
-macOS Phone.app
-↓
-Call Bridge
-↓
-Jarvis AI
-```
-
-PoC 최소 요구:
-
-- Mac Phone.app에서 실제 수신 통화 가능
-- RX caller audio 확보
-- TX test/AI audio 전달
-- bridge session 시작/종료
-- 자동 call-state가 불가능하면 manual start/stop 허용
-
----
-
-# 16. 발신 통화
+설치된 driver는 유지되더라도 사용자가 평상시 Sound 설정에서 불필요한 Jarvis device를 보지 않도록 한다.
 
 목표:
 
 ```text
-Phone.app / Call Bridge
-↓
-Continuity
-↓
-iPhone cellular line
-↓
-Caller
+Idle / ARMED
+→ Capture / Inject inactive 또는 non-visible
+
+Call preparation / Active
+→ 필요한 device 활성화
+
+Call end
+→ device 비활성화 또는 제거
 ```
 
-초기 우선순위는 수신이다.
+구체적인 구현 방식은 다음 후보 중 Phase 1 실험으로 결정한다.
 
-수신 양방향 오디오가 검증된 후 발신에도 동일 RX/TX bridge가 적용되는지 확인한다.
+- dynamic device create/destroy
+- alive/hidden property
+- equivalent CoreAudio lifecycle
 
-Call Bridge가 직접 carrier dialing API를 구현할 필요는 없다.
-
-PoC에서는 Phone.app에서 사용자가 직접 발신해도 된다.
+특정 방식은 검증 전 PRD에서 강제하지 않는다.
 
 ---
 
-# 17. Realtime Conversation
+# 12. Audio Route Transaction
 
-단순한:
+모든 route 변경은 하나의 transaction으로 취급한다.
+
+## 12.1 Snapshot
+
+전화 개입 직전 다음을 저장한다.
+
+```text
+Original Default Input Device
+Original Default Output Device
+Original Default System Output Device
+필요한 추가 CoreAudio route state
+```
+
+## 12.2 Active Route
+
+기본 목표:
+
+```text
+Default Output
+→ Jarvis Call Capture
+
+Default Input
+→ Jarvis Call Inject
+
+Default System Output
+→ 변경하지 않음
+```
+
+System Output을 바꾸지 않아 macOS system alert까지 Capture path로 들어가지 않도록 한다.
+
+## 12.3 Routing Timing
+
+v1에서 착신 대기 중 audio path 개입이 문제를 일으켰으므로 route 변경은 **Ringing 이후**에만 허용한다.
+
+정확한 순서:
+
+```text
+route before answer
+vs
+answer then immediate route
+```
+
+는 실제 통화 검증으로 결정한다.
+
+Phase 2/3에서 두 순서를 비교하고 더 안정적인 ordering을 확정한다.
+
+## 12.4 Restore
+
+통화 종료, 오류, 앱 종료, takeover 등 모든 path에서:
+
+```text
+Default Input 복원
+Default Output 복원
+System Output 확인
+Capture/Inject stop
+Audio device lifecycle 정리
+```
+
+를 수행한다.
+
+복원 실패는 critical error로 기록한다.
+
+---
+
+# 13. RX Audio
+
+정의:
+
+```text
+RX = 실제 Caller가 말한 음성
+```
+
+RX 성공 조건:
+
+```text
+Caller가 실제 전화에서 발화
+→ Capture input으로 동일 음성이 들어옴
+→ Bridge가 재생/분석 가능한 PCM 확보
+```
+
+단순 tone, ringtone, system audio는 성공으로 간주하지 않는다.
+
+관찰 항목:
+
+- sample rate
+- channel count
+- buffer size
+- callback interval
+- RMS / peak
+- dropout
+- latency
+- caller intelligibility
+
+---
+
+# 14. TX Audio
+
+정의:
+
+```text
+TX = Jarvis가 실제 Caller에게 보내는 음성
+```
+
+TX 성공 조건:
+
+```text
+Bridge가 생성한 test speech
+→ Inject output
+→ Phone.app input
+→ 실제 전화 상대방이 명확히 청취
+```
+
+Mac speaker를 통한 acoustic leakage는 성공이 아니다.
+
+Phase 3에서는 AI 연결 전 먼저 deterministic test tone / speech sample로 검증한다.
+
+---
+
+# 15. RX/TX Separation
+
+필수 요구사항:
+
+```text
+RX와 TX는 서로 독립적인 logical audio stream이어야 한다.
+```
+
+검증 항목:
+
+- RX에 TX가 얼마나 재유입되는지
+- 동시에 말할 때 두 stream 유지
+- feedback 발생 여부
+- end-to-end latency
+- stream restart 가능 여부
+- 두 번째/세 번째 통화에서 재사용 가능 여부
+
+Echo cancellation은 필요성이 실측된 뒤 추가한다.
+
+---
+
+# 16. Realtime Voice
+
+기본 방향:
+
+```text
+Caller RX
+↕
+Realtime speech-to-speech
+↕
+Jarvis TX
+```
+
+단순:
 
 ```text
 STT → LLM → TTS
@@ -638,33 +827,52 @@ STT → LLM → TTS
 
 직렬 파이프라인을 기본 방식으로 사용하지 않는다.
 
-목표:
+Realtime provider는 adapter interface를 둬 향후 교체 가능하도록 한다.
+
+PoC 1차 provider:
 
 ```text
-Caller RX
-   ↕
-Realtime Voice Model
-   ↕
-Jarvis TX
+OpenAI Realtime
 ```
 
-실시간 speech-to-speech conversation을 우선한다.
+모델명은 코드 전체에 하드코딩하지 않고 configuration으로 관리한다.
+
+---
+
+# 17. Audio Conversion Pipeline
+
+HAL side:
+
+```text
+48kHz / Float32 / Stereo
+```
+
+Realtime provider 요구에 따라 Bridge 내부에서 변환한다.
+
+RX:
+
+```text
+Capture 48k stereo
+→ downmix
+→ resample if required
+→ realtime input
+```
+
+TX:
+
+```text
+realtime output
+→ decode/convert
+→ resample 48k
+→ stereo conversion
+→ Inject output
+```
+
+Realtime audio callback에서 file/network blocking 작업을 수행하지 않는다.
 
 ---
 
 # 18. Interruption / Barge-in
-
-Jarvis가 말하는 중 Caller가 발화를 시작하면:
-
-1. Caller speech 시작 감지
-2. TX playback 즉시 중단
-3. 아직 재생되지 않은 local output buffer 폐기
-4. Realtime response cancel
-5. 필요하면 미청취 assistant context truncate
-6. Caller 발화 수신 완료
-7. 새로운 Caller input 반영
-8. 아직 전달되지 않은 기존 핵심 정보 재계산
-9. 새 응답 생성
 
 강한 UX 원칙:
 
@@ -673,169 +881,322 @@ Caller가 말하기 시작하면
 Jarvis는 즉시 말을 멈춘다.
 ```
 
+처리 순서:
+
+1. Caller speech start 감지
+2. local TX playback 즉시 stop
+3. 미재생 TX buffer clear
+4. 현재 Realtime response cancel
+5. 필요한 경우 assistant output context truncate
+6. Caller 발화 계속 수신
+7. Caller turn 완료
+8. 새 context로 response 생성
+
+서버 cancel 응답을 기다린 뒤 local audio를 멈추지 않는다.
+
+```text
+Local TX Stop
+→ Server Cancel
+```
+
+순서가 우선이다.
+
 ---
 
 # 19. Pending Speech Intent
 
-응답 cancellation만으로는 충분하지 않다.
-
-Jarvis가 아직 Caller에게 전달하지 못한 핵심 내용을 별도로 관리할 수 있어야 한다.
+중단된 응답에서 Caller에게 전달되지 못한 정보는 별도 semantic state로 관리할 수 있어야 한다.
 
 예:
 
 ```text
-Pending
-- 병원 예약
-- 저녁 약속
-- 준비물
+Pending:
+- 오늘 오후 회의
+- 택배 도착
+- 내일 병원 예약
 ```
 
-Caller:
+Caller가:
 
 ```text
-"병원 예약은 취소했어요."
+"병원 예약은 취소됐어요."
 ```
 
-재계산:
+라고 하면:
 
 ```text
-Pending
-- 병원 예약 → 제거
-- 저녁 약속
-- 준비물
+Pending:
+- 오늘 오후 회의
+- 택배 도착
 ```
 
-이 상태는 Realtime 모델에만 의존하지 않고 Jarvis Agent 쪽에서 관리 가능한 구조를 고려한다.
+로 재계산할 수 있어야 한다.
+
+이 기능은 Realtime provider 단독 memory에만 의존하지 않고 Jarvis Agent와 연계 가능한 구조로 설계한다.
 
 ---
 
-# 20. Echo / Feedback 방지
+# 20. Jarvis Agent Integration
 
-Virtual Audio TX와 Phone.app RX capture 조합에서 다음을 측정한다.
+Call Bridge는 기존 Jarvis의 business logic을 복제하지 않는다.
 
-- TX → RX loopback 발생 여부
-- level
-- delay
-- simultaneous speech 상태
-- feedback 가능성
+```text
+Realtime Voice
+→ Tool request
+→ Bridge / API adapter
+→ Existing Jarvis Agent
+→ Result
+→ Realtime Voice
+```
 
-우선순위:
+재사용 대상:
 
-1. RX/TX logical path 분리
-2. process-specific RX capture
-3. virtual input routing
-4. 필요 시 echo cancellation
-5. TX playback timestamp 관리
+- Memory
+- Gmail
+- Google Calendar
+- Approval
+- Scheduler
+- Web / 기타 Tool
+- Agent State
+
+전화라는 이유로 기존 approval policy를 우회하지 않는다.
 
 ---
 
-# 21. 녹음
+# 21. Realtime Authentication
 
-모든 Jarvis 개입 통화는 Mac에서 녹음 가능하도록 한다.
+원칙:
 
-실시간 processing은 PCM을 사용할 수 있다.
+- permanent provider secret을 source code에 하드코딩하지 않는다.
+- Bridge의 Jarvis credential은 Keychain에 저장한다.
+- 가능하면 Realtime 연결용 short-lived / ephemeral credential을 Jarvis API에서 발급한다.
 
-장기 저장 포맷은 WAV를 기본으로 사용하지 않는다.
-
-최종 파일:
-
-```text
-AAC + M4A
-```
-
-## 21.1 RX
+개념 흐름:
 
 ```text
-rx.m4a
+Bridge
+→ authenticated Jarvis API
+→ ephemeral Realtime credential
+→ Realtime provider
 ```
-
-실제 Caller audio.
-
-## 21.2 TX
-
-```text
-tx.m4a
-```
-
-Jarvis가 생성한 audio 중 실제 TX path에 전달한 stream.
-
-TX audio는 Call Bridge가 자체 생성/수신하므로 별도 녹음이 가능해야 한다.
 
 ---
 
-# 22. Merged Recording
+# 22. Human Takeover
 
-통화 종료 후 Mac에서:
+Human Takeover는 **AI가 빠지는 것**과 **Bridge가 빠지는 것**을 구분한다.
 
-```text
-rx.m4a
-+
-tx.m4a
-↓
-merged.m4a
-```
+## 22.1 Mac Takeover
 
-를 생성한다.
-
-Merge는 Cloudflare Worker에서 수행하지 않는다.
-
-이유:
-
-- Worker CPU 사용 불필요
-- Mac native audio framework 사용 가능
-- RX/TX timing 정보 활용 가능
-- 서버 비용/복잡도 감소
-
----
-
-# 23. Transcript
-
-Mixed recording에 diarization을 기본 적용하지 않는다.
-
-RX/TX가 분리되므로:
+ACTIVE_AI 상태에서 사용자는:
 
 ```text
-RX = Caller
-TX = Jarvis
+[Mac에서 내가 통화하기]
 ```
 
-로 화자를 결정한다.
+를 선택할 수 있다.
+
+동작:
+
+```text
+1. AI TX 즉시 stop
+2. 미재생 AI TX buffer clear
+3. 현재 Realtime response cancel
+4. Realtime session pause/end
+5. Capture / Inject 유지
+6. Recording 유지
+7. RX sink를 사용자 Mac 출력 장치로 전환
+8. TX source를 AI → 사용자 Mac 입력 장치로 전환
+9. Phone.app 통화 유지
+10. 사용자가 동일 통화를 직접 이어감
+```
+
+중요:
+
+**Mac Takeover에서는 Original Default Input/Output을 즉시 복원하지 않는다.**
+
+Phone.app의 통화 audio path는 Capture / Inject를 계속 통과하도록 유지하고, Bridge가 사용자의 실제 physical input/output device를 별도 AudioDeviceID로 직접 사용한다.
+
+권장 경로:
+
+```text
+Caller
+→ Jarvis Call Capture
+→ Bridge
+├─→ RX Recording
+└─→ User Output Device
+
+User Input Device
+→ Bridge
+├─→ TX Recording
+└─→ Jarvis Call Inject
+→ Phone.app
+→ Caller
+```
+
+사용자 출력 장치는 원래 사용하던 Mac speaker/headset을 사용할 수 있고, 입력 장치는 원래 사용하던 microphone/headset을 사용할 수 있다.
+
+speaker + microphone 조합에서는 acoustic echo 가능성이 있으므로 headset을 우선 권장하며, 필요 시 후속으로 AEC를 추가한다.
+
+실제 통화 종료 시에만:
+
+```text
+Recording finalize
+→ Capture/Inject stop
+→ Original Input/Output restore
+```
+
+한다.
+
+## 22.2 iPhone Takeover
+
+사용자는 통화 중 iPhone에서 현재 통화를 이어받을 수 있다.
+
+초기 UX:
+
+```text
+Jarvis AI 통화
+→ 사용자가 iPhone의 현재 통화 표시 / Apple 제공 Handoff UX 사용
+→ 통화 endpoint가 Mac → iPhone으로 이동
+```
+
+Bridge는 iPhone Handoff를 programmatic public API로 직접 수행할 수 있다고 전제하지 않는다.
+
+Handoff가 감지되면:
+
+```text
+AI TX stop
+→ Realtime session close
+→ Mac recording finalize
+→ Capture/Inject processing stop
+→ Original Mac audio route restore
+→ session metadata에 handoff 기록
+```
+
+Mac Bridge는 iPhone으로 넘어간 이후의 통화 음성을 녹음한다고 가정하지 않는다.
+
+## 22.3 Takeover Metadata
+
+통화 기록에는 takeover 정보를 남긴다.
 
 예:
 
 ```json
-[
-  {
-    "speaker": "caller",
-    "startMs": 1200,
-    "endMs": 3400,
-    "text": "내일 오후에는 어려울 것 같습니다."
-  },
-  {
-    "speaker": "jarvis",
-    "startMs": 3700,
-    "endMs": 5200,
-    "text": "그러면 수요일 오후는 어떠신가요?"
-  }
-]
+{
+  "takeoverType": "mac",
+  "takeoverAtMs": 42700,
+  "segments": [
+    {
+      "type": "ai",
+      "startMs": 0,
+      "endMs": 42700
+    },
+    {
+      "type": "human",
+      "startMs": 42700,
+      "endMs": 185300
+    }
+  ]
+}
 ```
 
-Caller transcript:
+iPhone Handoff 예:
 
-- Realtime input transcription 또는 별도 STT
-
-Jarvis transcript:
-
-- 생성 text
-- 실제 playback 완료 구간 기준
-
-Mixed audio diarization은 fallback일 뿐 기본 구조가 아니다.
+```json
+{
+  "takeoverType": "iphone_handoff",
+  "takeoverAtMs": 42700,
+  "recordingEndReason": "device_handoff"
+}
+```
 
 ---
 
-# 24. Local Recording Storage
+# 23. Call End / Cleanup
 
-PoC local directory:
+통화 종료 시 반드시:
+
+```text
+1. 남아 있는 AI TX 또는 Human TX stop
+2. Realtime session이 존재하면 close
+3. Recording이 활성화되어 있으면 finalize
+4. Capture input stop
+5. Inject output stop
+6. Human Takeover용 physical input/output stream stop
+7. Original Default Input restore
+8. Original Default Output restore
+9. System Output invariant 확인
+10. Capture/Inject lifecycle 정리
+11. Call / AI / Recording session state reset
+12. ARMED 복귀
+```
+
+iPhone Handoff에서는 Mac 통화 media가 종료되는 시점에 recording을 먼저 finalize한 뒤 restore한다.
+
+cleanup은 중간 단계 실패에도 반복 실행 가능해야 한다.
+
+---
+
+# 24. Recording
+
+초기 v2 개발의 blocker가 아니다.
+
+Phase 7에서 추가한다.
+
+저장 파일:
+
+```text
+rx.m4a
+tx.m4a
+merged.m4a
+```
+
+원칙:
+
+- realtime processing은 PCM
+- 장기 저장은 AAC/M4A
+- RX/TX는 별도 보존
+- merged는 Mac에서 생성
+- Worker에서 audio merge하지 않음
+- Recording lifecycle은 AI lifecycle과 분리한다.
+- Mac Takeover 시 AI가 종료되어도 recording은 실제 통화 종료까지 계속한다.
+- iPhone Handoff 시 Mac에서 더 이상 통화 media를 확보할 수 없으면 handoff 시점에 recording을 finalize한다.
+
+stream 정의:
+
+```text
+rx.m4a
+= Bridge가 통화에 참여한 전체 구간의 Caller 음성
+
+tx.m4a
+= ACTIVE_AI 구간의 AI 음성
++ ACTIVE_HUMAN_MAC 구간의 사용자 음성
+
+merged.m4a
+= RX/TX를 시간축 기준으로 합성한 통화 재생본
+```
+
+Mac Takeover 예:
+
+```text
+00:00 ───────────── 00:42 ───────────────────── 03:05
+       AI 응대             사용자 직접 통화
+
+RX : Caller ───────────────────────────────────────
+TX : AI ───────────┊ User ─────────────────────────
+REC: ──────────────────────────────────────────────
+```
+
+iPhone Handoff 예:
+
+```text
+00:00 ───────────── 00:42                    03:05
+       AI 응대       │ iPhone 직접 통화
+                     │
+Mac Recording ───────┘
+```
+
+저장 예:
 
 ```text
 ~/Library/Application Support/JarvisCallBridge/
@@ -847,148 +1208,61 @@ PoC local directory:
       └─ metadata.json
 ```
 
-R2 upload 성공 후에도 PoC에서는 즉시 삭제하지 않는다.
-
-자동 삭제/retention 정책은 후속 범위다.
-
 ---
 
-# 25. R2 Upload
+# 25. Cloud Persistence
 
-권장 흐름:
+기존 Jarvis backend를 사용한다.
 
 ```text
-1. 통화/Bridge Session 시작
-   Call Bridge → Jarvis API
-
-2. call_id 생성
-
-3. 통화 진행
-
-4. 통화 종료
-
-5. Mac에서 RX/TX M4A finalize
-
-6. Mac에서 merged.m4a 생성
-
-7. RX/TX/Merged → R2 직접 업로드
-
-8. Call Bridge → Jarvis complete API
-
-9. SQLite metadata 저장
+Cloudflare Workers
+Cloudflare Agents
+Durable Objects
+SQLite
+R2
 ```
 
-큰 바이너리를 Worker가 중계하는 구조를 기본으로 하지 않는다.
-
-Call Bridge에는 permanent R2 secret을 하드코딩하지 않는다.
-
-Jarvis API가 안전한 upload authorization 또는 signed upload 정보를 발급하는 구조를 사용한다.
-
----
-
-# 26. Jarvis Call API
-
-기존 `api/`에 Call 관련 endpoint를 추가한다.
-
-## 26.1 Call/Bridge Session 시작
+권장 flow:
 
 ```text
 POST /api/calls
+→ callId
+
+통화
+
+→ recording finalize
+→ merged.m4a 생성
+
+→ R2 direct upload
+→ POST /api/calls/{callId}/complete
 ```
 
-목적:
+SQLite에는 대형 audio binary를 저장하지 않는다.
 
-- call_id 생성
-- Agent/User context 확인
-- metadata 초기화
-- R2 object path 결정
-- upload authorization 준비
+저장 대상:
 
-예:
-
-```json
-{
-  "callId": "call_xxx",
-  "recordingKeys": {
-    "rx": "calls/call_xxx/rx.m4a",
-    "tx": "calls/call_xxx/tx.m4a",
-    "merged": "calls/call_xxx/merged.m4a"
-  }
-}
-```
-
-## 26.2 Call 완료
-
-```text
-POST /api/calls/{callId}/complete
-```
-
-예:
-
-```json
-{
-  "direction": "inbound",
-  "phoneNumber": "01012345678",
-  "startedAt": "2026-08-15T12:00:00Z",
-  "endedAt": "2026-08-15T12:05:12Z",
-  "durationSeconds": 312,
-  "recordings": {
-    "rx": "calls/call_xxx/rx.m4a",
-    "tx": "calls/call_xxx/tx.m4a",
-    "merged": "calls/call_xxx/merged.m4a"
-  },
-  "transcript": []
-}
-```
+- callId
+- caller metadata
+- startedAt
+- endedAt
+- duration
+- transcript
+- summary
+- action result
+- RX R2 key
+- TX R2 key
+- merged R2 key
+- failure state
+- takeover type
+- takeover timestamp
+- AI/Human segment metadata
+- recording end reason
 
 ---
 
-# 27. SQLite Call Metadata
+# 26. Call Summary
 
-녹음 파일 자체를 SQLite에 저장하지 않는다.
-
-SQLite에는 기능 수행에 필요한 metadata만 저장한다.
-
-예:
-
-```text
-calls
-------------------------------------------------
-id
-direction
-phone_number
-started_at
-ended_at
-duration_seconds
-status
-
-rx_r2_key
-tx_r2_key
-merged_r2_key
-
-transcript
-summary
-
-created_at
-updated_at
-```
-
-현재 개인용 PoC이므로 다음 서비스 운영 데이터는 추가하지 않는다.
-
-- 요금제
-- billing
-- 월별 quota
-- 사용자별 과금 집계
-- 결제 이력
-- SaaS usage analytics
-
-기존 Jarvis SQLite convention을 우선한다.
-
----
-
-# 28. Call Summary
-
-통화 종료 후 Call Bridge가 직접 LLM summary를 만들지 않는다.
+Call Bridge가 독립적으로 summary business logic을 만들지 않는다.
 
 ```text
 Call Bridge
@@ -1002,167 +1276,238 @@ Call Bridge
 
 ```text
 상대방:
-ABC 병원
+거래처 담당자
 
-내용:
-내일 오후 2시 예약 확인 전화.
+용건:
+금요일 회의 시간을 오후 4시로 변경 요청.
+
+Jarvis 처리:
+Calendar 조회.
 
 결과:
-예약 변경 없음.
+오후 4시 가능.
 
-Action:
-없음.
+후속 조치:
+사용자 승인 필요.
 ```
 
 ---
 
-# 29. Jarvis Tool 연동
+# 27. 업무 모드 정책
 
-Call Bridge에서 Gmail/Calendar 등의 business tool을 다시 구현하지 않는다.
+초기 정책:
 
-전화 중 필요한 Tool은 기존 Jarvis Agent를 이용한다.
+```text
+Work Mode OFF
+→ Bridge no intervention
+
+Work Mode ON
+→ incoming detection
+→ configured delay
+→ auto answer
+```
+
+후속 설정 후보:
+
+- 업무시간 자동 ON/OFF
+- 특정 연락처 예외
+- 가족/긴급 연락처 직접 수신
+- unknown caller only AI
+- 특정 시간대 AI 우선
+
+v2 초기 PoC에서는 복잡한 routing rule을 넣지 않는다.
+
+---
+
+# 28. UI
+
+최종 기본 UI:
+
+```text
+Jarvis Call Bridge
+
+Work Mode                    [ ON ]
+
+Status
+● Waiting for calls
+
+iPhone Continuity             Ready / Unknown
+Phone.app                     Ready / Not Available
+Accessibility                 Granted / Required
+Audio Driver                  Ready / Error
+Jarvis Cloud                  Connected / Disconnected
+Realtime                      Idle / Connected
+
+Auto Answer
+3 seconds after ringing
+
+Current Call
+Idle
+
+[Mac에서 내가 통화하기]   # ACTIVE_AI일 때
+[iPhone에서 계속하기 안내] # ACTIVE_AI일 때
+
+Recording
+● Recording / Finalized / Disabled
+
+Recent Call
+11:32
+2m 14s
+"프로젝트 일정 문의"
+```
+
+개발 진단 UI는 production UI와 분리할 수 있다.
+
+---
+
+# 29. 권한
+
+필요 권한 후보:
+
+- Accessibility
+- Microphone: 실제 구현 필요 여부에 따라
+- Contacts: Caller 표시가 필요할 때 후속
+- Network
+
+v2 primary RX는 ScreenCaptureKit을 사용하지 않으므로 Screen/System Audio Recording 권한을 기본 요구사항으로 두지 않는다.
+
+권한을 요구하는 이유를 UI에서 명확히 설명한다.
+
+---
+
+# 30. Local Logging
+
+구조화된 이벤트 로그를 제공한다.
 
 예:
 
 ```text
-Caller:
-"수요일 오후 3시 가능하세요?"
-
-Jarvis
-→ Calendar Tool
-→ 일정 확인
-→ Realtime response
-→ Caller
-```
-
-기존 기능:
-
-- Memory
-- Gmail
-- Google Calendar
-- Web Search
-- Approval
-- Scheduler
-
----
-
-# 30. Approval
-
-기존 Jarvis Approval 정책을 유지한다.
-
-전화라는 이유로 write Tool approval을 우회하지 않는다.
-
-PoC에서는:
-
-- read Tool 우선
-- write Tool은 pending approval 생성
-- Admin에서 승인
-
-정도로 제한할 수 있다.
-
----
-
-# 31. 인증
-
-Call Bridge는 Jarvis API와 인증된 연결을 사용한다.
-
-```text
-Call Bridge
-↓
-Authentication Token
-↓
-Jarvis API
-↓
-User Agent Instance
-↓
-User SQLite
-```
-
-Mac credential:
-
-- Keychain 저장
-- source code 하드코딩 금지
-
-Realtime provider secret:
-
-- 가능하면 Mac에 permanent secret 저장 금지
-- server-issued ephemeral credential 또는 안전한 server-side proxy/token flow 우선
-
----
-
-# 32. 장애 처리
-
-## 32.1 Realtime/Cloud 실패
-
-AI 개입만 중단한다.
-
-가능하면 일반 Phone.app/iPhone 통화 자체에는 영향을 주지 않는다.
-
-## 32.2 Virtual Audio Device 실패
-
-- AI TX 중단
-- 일반 microphone로 자동 복구 가능한지 후속 검토
-- PoC에서는 사용자에게 명확한 오류 표시
-
-## 32.3 RX Capture 실패
-
-AI 자동 응답을 중단한다.
-
-상대방 음성을 확보하지 못한 상태에서 임의 응답하지 않는다.
-
-## 32.4 R2 Upload 실패
-
-local recording을 유지한다.
-
-재업로드 가능 상태로 표시한다.
-
-## 32.5 Merge 실패
-
-RX/TX 원본을 유지한다.
-
-Merged 파일만 재생성한다.
-
-## 32.6 Call-state 감지 실패
-
-PoC에서는 Manual Bridge Mode로 전환할 수 있다.
-
----
-
-# 33. Local Logging
-
-기록 대상 예:
-
-```text
-[PHONE] process found
-[CALL] state=manual/idle/ringing/active
-[RX] source=Phone.app
-[RX] capture method=ScreenCaptureKit/CoreAudioTap
-[RX] stream started
-[RX] first caller buffer received
-[RX] format=...
-[TX] virtual device ready
-[TX] Phone.app input selected/manual
-[TX] test audio started
-[TX] test audio completed
-[AUDIO] separation test...
-[AUDIO] feedback level...
+[BRIDGE] mode=armed
+[PHONE] incoming detected
+[CALL] state=ringing
+[CALL] caller=...
+[AUDIO] snapshot input=...
+[AUDIO] snapshot output=...
+[AUDIO] capture device ready
+[AUDIO] inject device ready
+[AUDIO] route switched
+[CALL] answer requested
+[CALL] state=active
+[RX] started
+[TX] started
 [REALTIME] connected
 [REALTIME] speech_started
-[REALTIME] response cancelled
-[RECORD] started
-[RECORD] finalized
-[MERGE] completed
-[R2] upload success/failure
-[API] complete success/failure
+[REALTIME] response_started
+[REALTIME] response_cancelled
+[TAKEOVER] requested
+[CALL] ended
+[AUDIO] restoring
+[AUDIO] restored
+[BRIDGE] mode=armed
 ```
 
-Secret과 원문 audio data를 일반 로그에 출력하지 않는다.
+기록 금지:
+
+- API Secret
+- permanent credential
+- raw PCM dump의 무조건적 로그
+- 민감한 tool payload 전체
+
+Diagnostic audio dump는 명시적인 개발 모드에서만 허용한다.
 
 ---
 
-# 34. 개발 위치
+# 31. 장애 처리
 
-현재 Jarvis repository의 최상위 구조는 다음으로 고정한다.
+## 31.1 Incoming detection 실패
+
+- native Phone.app 착신을 방해하지 않는다.
+- 자동 수신을 수행하지 않는다.
+- 사용자가 직접 전화를 받을 수 있어야 한다.
+
+## 31.2 Audio driver 실패
+
+- auto-answer 전에 실패를 알 수 있으면 자동 수신을 취소한다.
+- 이미 통화 중이면 restore/takeover path를 우선한다.
+
+## 31.3 RX 실패
+
+- 임의의 AI 응답을 계속하지 않는다.
+- 사용자 takeover 또는 graceful termination으로 전환한다.
+
+## 31.4 TX 실패
+
+- AI 출력 중단
+- 가능한 경우 human takeover 제공
+
+## 31.5 Realtime 실패
+
+- audio route를 정상 복구한다.
+- native 통화를 가능한 한 유지한다.
+- human takeover 우선
+
+## 31.6 App crash
+
+다음 실행 시 stale audio route를 감지해 복구할 수 있는 startup recovery를 구현한다.
+
+## 31.7 Route restore 실패
+
+critical error.
+
+사용자에게 명확히 표시하고 원래 device를 선택할 수 있는 recovery UI 또는 명령을 제공한다.
+
+---
+
+# 32. Startup Recovery
+
+Bridge 시작 시:
+
+```text
+Current default input/output 확인
+Jarvis Call Capture/Inject가 비정상 default로 남았는지 확인
+이전 session marker 확인
+```
+
+stale state라면:
+
+```text
+safe restore
+→ device cleanup
+→ ARMED
+```
+
+로 복구한다.
+
+복구 가능한 원본 device 정보는 call session 시작 시 안전하게 저장한다.
+
+---
+
+# 33. 성능 요구사항
+
+- realtime audio callback에 blocking network/file I/O 금지
+- audio buffer underrun 최소화
+- call answer 후 AI 첫 발화 latency 최소화
+- barge-in local stop은 server round-trip과 독립적으로 즉시 수행
+- driver와 Bridge CPU 사용량을 개인 Mac 환경에서 상시 사용 가능한 수준으로 유지
+- ARMED 상태 CPU 사용량은 매우 낮아야 한다
+
+---
+
+# 34. 보안 요구사항
+
+- Jarvis token: Keychain
+- provider secret source code 저장 금지
+- R2 permanent credential 앱 내 하드코딩 금지
+- 최소 권한
+- logs에 secret 출력 금지
+- driver control endpoint가 있다면 local unauthorized process의 오용 방지 고려
+- 개인용 PoC라도 world-writable shared memory 방식은 v2에서 사용하지 않는다
+
+---
+
+# 35. 개발 위치
+
+Repository 최상위 구조는 유지한다.
 
 ```text
 jarvis/
@@ -1173,9 +1518,9 @@ jarvis/
 └─ web/
 ```
 
-Call Bridge Client 코드는 **`bridge/`에 직접 작성한다.**
+Call Bridge 코드는 **`bridge/`에 직접 작성한다.**
 
-다음 경로를 새로 만들지 않는다.
+다음 폴더는 만들지 않는다.
 
 ```text
 bridge/call-bridge/
@@ -1185,492 +1530,592 @@ desktop/
 callbridge/
 ```
 
-`bridge/`는 macOS Call Bridge app project 전체 소스의 root다.
+권장 v2 내부 구조:
+
+```text
+bridge/
+├─ Package.swift
+├─ Info.plist
+│
+├─ Sources/
+│  └─ JarvisCallBridge/
+│     ├─ App/
+│     ├─ Call/
+│     ├─ Audio/
+│     ├─ Realtime/
+│     ├─ Jarvis/
+│     ├─ Storage/
+│     └─ UI/
+│
+├─ AudioDriver/
+│  ├─ Plugin/
+│  ├─ Devices/
+│  ├─ Shared/
+│  └─ Tests/
+│
+├─ Scripts/
+│  ├─ build-app.sh
+│  ├─ build-driver.sh
+│  ├─ install-driver.sh
+│  └─ uninstall-driver.sh
+│
+└─ Tests/
+```
+
+구체적인 폴더는 구현 필요에 따라 단순화할 수 있지만 top-level `bridge/` 원칙은 고정한다.
 
 ---
 
-# 35. 개발 Phase
+# 36. v1 Legacy 처리
 
-## CB Phase 0 — macOS 26 Phone.app Feasibility
+v1.x 구현은 이미 Git history/tag로 보존한다.
 
-목적:
+v2에서 다음을 재사용하지 않는다.
 
-**실제 iPhone 셀룰러 통화에서 Phone.app 기반 RX/TX audio bridge가 성립하는지 증명한다.**
+```text
+v1 ScreenCaptureKit RX production path
+JarvisVirtualMic.driver
+POSIX shared memory ring
+Start Test orchestration
+```
 
-기존 Phase 0의 direct API 조사 결과는 참고자료로 유지한다.
+다만 다음 조사 결과는 지식으로 유지한다.
 
-### CB Phase 0-A — Phone.app RX Spike
+- macOS native CallKit 제한
+- Phone.app bundle / Accessibility 조사
+- Continuity 실기기 조건
+- 기존 build/package 경험
+- HAL AudioServerPlugIn 구현 경험
+- real-device validation 절차
 
-검증:
+기존 Phase 0 보고서는 삭제하지 않는다.
 
-- 실제 Phone.app 수신 통화
-- Phone.app process identification
-- ScreenCaptureKit app audio
-- Core Audio process tap
-- 실제 Caller voice buffer 수신
-- latency / format
-- 반복 통화 안정성
+---
+
+# 37. 개발 Phase
+
+## CB v2 Phase 0 — Clean Slate & Architecture Skeleton
+
+목표:
+
+- v1 의존성 제거 확인
+- v2 project skeleton 구성
+- 상태 머신 구현
+- Work Mode OFF/ON
+- ARMED 상태 구현
+- Phone.app discovery
+- Accessibility permission/status
+- audio route snapshot/restore abstraction
+- 아직 actual HAL route switch 금지
 
 완료 기준:
 
 ```text
-실제 Caller speech
-↓
-Phone.app
-↓
-Call Bridge RX buffer
+Work Mode ON 상태에서
+실제 Phone.app 착신이 정상 동작한다.
 ```
 
-가 실제 기기에서 확인된다.
+최소 10회 연속 착신 확인.
 
-### CB Phase 0-B — Virtual Audio TX Spike
+---
+
+## CB v2 Phase 1 — Dual Loopback Audio Driver
+
+목표:
+
+```text
+Jarvis Call Capture
+Jarvis Call Inject
+```
+
+두 device 구현.
 
 검증:
 
-- virtual audio input device 가능성
-- AudioDriverKit / 공식 Core Audio driver 방식
-- Call Bridge test PCM 전달
-- Phone.app microphone/input으로 선택
-- 실제 Caller가 test audio 청취
-- Mac speaker acoustic leakage가 아닌지 검증
+```text
+Local audio
+→ Capture output
+→ Capture input
+→ 동일 audio 확인
+
+Bridge test audio
+→ Inject output
+→ Inject input
+→ 동일 audio 확인
+```
+
+실제 전화 연결은 아직 하지 않는다.
+
+완료 기준:
+
+- 48k Float32 stereo loopback
+- 안정적인 create/destroy 또는 activate/deactivate
+- 반복 start/stop
+- no crash
+- route restore primitive 검증
+
+---
+
+## CB v2 Phase 2 — Incoming Call Lifecycle
+
+목표:
+
+- ARMED
+- Ringing 감지
+- Accessibility auto answer
+- End 감지
+- restore
+
+중요:
+
+**audio route를 바꾸지 않은 상태의 auto-answer lifecycle부터 검증한다.**
 
 완료 기준:
 
 ```text
-Call Bridge Test Audio
-↓
-Virtual Input
-↓
-Phone.app
-↓
-iPhone
-↓
-실제 Caller
+ARMED
+→ 실제 착신
+→ 자동 수신
+→ 통화 유지
+→ 종료
+→ ARMED
 ```
 
-가 실제 통화에서 확인된다.
-
-### CB Phase 0-C — Separation / Lifecycle Spike
-
-검증:
-
-- RX/TX 동시 동작
-- TX → RX feedback
-- simultaneous speech
-- basic latency
-- call-state detection 후보
-- manual start/stop fallback
-- cleanup / second-call repeat
-
-### Phase 0 Gate
-
-#### PASS
-
-다음이 모두 실제 통화에서 확인:
-
-- RX Caller audio 확보
-- TX audio 실제 Caller 전달
-- RX/TX 동시 사용 가능
-- 후속 실시간 AI 구현에 사용할 수 있는 latency/안정성
-
-자동 Call State가 미완성이어도 manual lifecycle이 안정적이면 조건부 판단 가능하다.
-
-#### CONDITIONAL PASS
-
-핵심 RX/TX 양방향 audio bridge는 성공했지만:
-
-- 자동 call detection이 없음
-- input device 수동 선택 필요
-- 설치/권한 단계가 필요
-- 일부 echo 처리 필요
-
-등의 제약이 존재한다.
-
-이 경우 Phase 1 진행 가능하되 제약을 문서화한다.
-
-#### FAIL
-
-다음 중 하나면 실패:
-
-- 실제 Caller RX를 확보할 유지보수 가능한 방법이 없음
-- Jarvis/Test TX를 실제 Caller에게 전달할 유지보수 가능한 방법이 없음
-- RX/TX 동시 사용이 불가능
-- virtual audio path가 실사용 불가능한 수준으로 불안정
-- private/undocumented mechanism 없이는 핵심 audio path를 구성할 수 없음
-
-Direct Continuity API가 없다는 이유만으로 FAIL 처리하지 않는다.
+최소 여러 회 반복 성공.
 
 ---
 
-## CB Phase 1 — Local Audio Bridge
+## CB v2 Phase 3 — Real Call Audio
 
-Phase 0에서 검증된 방식을 정식 local bridge component로 만든다.
+목표:
 
-구현:
+- 실제 caller RX
+- 실제 caller TX
+- dual device routing
+- route ordering 확정
 
-- RX abstraction
-- TX abstraction
-- Virtual Audio Device integration
-- Audio Router
-- lifecycle
-- manual/automatic call state
-- cleanup
-- minimal SwiftUI
-- local logs
+검증 순서:
+
+1. RX only
+2. TX only
+3. simultaneous RX/TX
+4. second call reuse
+5. route restore
+6. crash/error restore
 
 완료 기준:
 
-실제 통화에서 반복적으로:
-
 ```text
-Caller RX
-↔
-Call Bridge
-↔
-Test TX
+Caller 실제 음성 → Bridge RX
+Bridge test speech → 실제 Caller
 ```
 
-가 안정적으로 동작한다.
+둘 다 human-verifiable하게 성공.
 
 ---
 
-## CB Phase 2 — Realtime AI / Barge-in
+## CB v2 Phase 4 — Realtime Voice
 
-구현:
+목표:
 
-- Realtime Voice connection
-- RX streaming
-- AI TX streaming
+- Realtime provider 연결
+- speech-to-speech
 - VAD
-- turn detection
-- speech_started
 - barge-in
+- local TX clear
 - response cancel
-- TX buffer clear
-- context truncate
-- pending speech intent
 
 완료 기준:
 
-Caller가 Jarvis 발화 중 말을 시작하면:
-
-```text
-Jarvis 즉시 STOP
-↓
-Caller 발화 수신
-↓
-새 context 반영
-↓
-자연스럽게 재응답
-```
-
-이 실제 전화에서 동작한다.
+실제 전화 상대방과 AI가 자연스럽게 여러 turn 대화하고, Caller interruption 시 AI가 즉시 멈춘다.
 
 ---
 
-## CB Phase 3 — Jarvis Agent Integration
+## CB v2 Phase 5 — Jarvis Agent Integration
 
-구현:
+목표:
 
 - Jarvis authentication
-- existing Agent 연결
 - Memory
-- Tool Calling
-- Calendar read 등 기존 Tool
-- call session context
-- Approval 연계
+- Tool call
+- Approval
+- Scheduler
+- existing Agent state
 
 완료 기준:
 
-실제 전화 중 기존 Jarvis Memory 및 최소 1개 Tool을 사용할 수 있다.
+전화 중 Jarvis가 기존 Agent 기능을 실제로 사용할 수 있다.
 
 ---
 
-## CB Phase 4 — Recording
+## CB v2 Phase 6 — Work Assistant UX
 
-구현:
+목표:
 
-- RX recording
-- TX recording
-- AAC/M4A
-- timestamp/timeline sync
-- local merge
+- Work Mode UI
+- Auto Answer delay
+- Mac Human Takeover
+- iPhone Handoff 안내/감지
+- AI lifecycle과 call lifecycle 분리
+- failure UX
+- recent call basic view
+- startup recovery
+
+완료 기준:
+
+개발용 버튼 없이 일반 앱 흐름으로 업무 중 반복 사용할 수 있다.
+
+---
+
+## CB v2 Phase 7 — Recording & History
+
+목표:
+
+- rx.m4a
+- tx.m4a
 - merged.m4a
-- local metadata
-
-완료 기준:
-
-```text
-rx.m4a
-tx.m4a
-merged.m4a
-metadata.json
-```
-
-이 실제 통화 후 정상 생성되고 재생 가능하다.
-
----
-
-## CB Phase 5 — R2 / Call API / SQLite
-
-구현:
-
-- `POST /api/calls`
-- secure R2 upload flow
-- RX/TX/Merged upload
-- `POST /api/calls/{id}/complete`
-- SQLite call metadata
+- AI → Mac Human Takeover 이후에도 recording 지속
+- iPhone Handoff 시 recording finalize
+- AI/Human segment metadata
 - transcript
 - summary
-- Admin에서 최소 Call History 조회/재생
-
-완료 기준:
-
-통화가 종료되면 local → R2 → SQLite metadata까지 end-to-end 저장된다.
-
----
-
-## CB Phase 6 — App Hardening / DMG
-
-구현:
-
-- signed macOS `.app`
-- permission onboarding
-- Virtual Audio Device installation/onboarding
-- error recovery
-- app launch/relaunch
-- login/startup 옵션 검토
-- Developer ID signing
-- notarization
-- DMG packaging
-
-최종 배포 형태:
-
-```text
-Jarvis Call Bridge.app
-↓
-Signed / Notarized
-↓
-Jarvis-Call-Bridge.dmg
-```
-
-PoC 기능 검증이 완료되기 전에는 Phase 6을 선행하지 않는다.
-
----
-
-# 36. 1차 PoC 제외 범위
-
-- Twilio
-- SIP
-- BYOC
-- 별도 전화번호
-- Android
-- iPhone Jarvis App
-- Apple Watch
-- Multi-user SaaS
-- Mac 1대에서 여러 사용자
-- 멀티 Call Bridge
-- Vector DB
-- RAG
-- Local LLM
-- Billing
-- 요금제
-- 사용량 제한
-- 결제
-- 통신사 API
-- 자동 recording retention
-- DTMF / IVR
-- 고급 call transfer
-- production-grade auto updater
-
----
-
-# 37. 비기능 요구사항
-
-## 37.1 성능
-
-- audio realtime thread에서 blocking I/O 금지
-- RX → Realtime latency 최소화
-- Realtime → TX latency 최소화
-- recording encode는 realtime routing과 분리
-- R2 upload는 통화 종료 후 background 처리
-
-## 37.2 Mac 부하
-
-Mac 부하를 최소화한다.
-
-- Local LLM 사용 금지
-- Apple native audio framework 우선
-- AAC/M4A native encoder 우선
-- audio merge는 Mac local
-- Worker에서 merge하지 않음
-- 필요 이상의 audio re-encoding 최소화
-
-## 37.3 안정성
-
-- AI 실패가 기본 전화 통화를 종료시키지 않아야 함
-- recording 실패가 통화를 종료시키지 않아야 함
-- R2 실패 시 local copy 유지
-- Virtual Input 실패 시 명확한 상태 표시
-- 다음 통화에서 resource 재사용 가능
-
-## 37.4 보안
-
-- Jarvis token → Keychain
-- R2 permanent credential → 앱 하드코딩 금지
-- Realtime permanent API secret → 앱 하드코딩 금지
-- macOS permission은 목적을 명확히 표시
-- 사용하지 않는 권한 요구 금지
-
----
-
-# 38. 성공 기준
-
-## Continuity / Phone.app
-
-- 기존 iPhone 셀룰러 번호 유지
-- Phone.app에서 실제 수신/발신 가능
-- Caller RX 확보
-- Jarvis/Test TX 실제 전달
-- RX/TX 동시 동작
-
-## Realtime AI
-
-- Caller speech realtime processing
-- AI realtime TX
-- barge-in
-- 즉시 output stop
-- 자연스러운 turn-taking
-
-## Jarvis
-
-- 기존 Memory 사용
-- 기존 Tool 최소 1개 사용
-- existing Agent state 이용
-
-## Recording
-
-- RX M4A
-- TX M4A
-- Merged M4A
-- transcript
-- playback
-
-## Cloud
-
 - R2 upload
 - SQLite metadata
-- recording object key
-- transcript
-- summary
 
-## App
+완료 기준:
 
-- stable `.app`
-- 최종 DMG 생성 가능
+통화 종료 후 Admin/API에서 통화 기록과 녹음 위치를 확인할 수 있다.
 
 ---
 
-# 39. PoC 중단 조건
+## CB v2 Phase 8 — Distribution & Hardening
 
-다음 조건에서는 후속 Phase를 억지로 진행하지 않는다.
+목표:
 
-1. Phone.app 실제 Caller RX를 안정적으로 확보할 방법이 없음
-2. Virtual Audio Input 또는 이에 준하는 공개/유지보수 가능한 TX path가 실제 통화에서 동작하지 않음
-3. RX/TX 동시 사용이 불가능함
-4. latency 또는 feedback이 Realtime conversation에 사용할 수 없는 수준
-5. 핵심 기능이 private/undocumented API에 과도하게 의존해야 함
+- production `.app`
+- Developer ID signing
+- notarization
+- `.dmg`
+- permissions onboarding
+- update strategy
+- uninstall/recovery documentation
 
-다만 다음만으로 중단하지 않는다.
+완료 기준:
+
+개발 환경이 아닌 Mac에서도 반복 설치/실행/삭제 가능한 배포 artifact를 만든다.
+
+---
+
+# 38. Phase Gate 원칙
+
+다음 Phase로 자동 진행하지 않는다.
+
+각 Phase는 다음 중 하나로 판정한다.
 
 ```text
-CXCallObserver가 macOS에서 unavailable
-Direct Continuity TX API가 없음
-자동 call state callback이 없음
+PASS
+CONDITIONAL PASS
+FAIL
 ```
 
-핵심 양방향 audio path가 다른 유지보수 가능한 공개 방식으로 구현 가능하면 계속 진행한다.
+FAIL 또는 unresolved critical issue가 있으면 다음 Phase로 진행하지 않는다.
+
+특히 다음은 blocker이다.
+
+- ARMED가 native incoming call을 방해함
+- audio route restore 실패
+- actual Caller RX 미확보
+- actual Caller TX 미전달
+- repeat call에서 route/device가 깨짐
 
 ---
 
-# 40. Phase 0 조사 결과 보존
+# 39. 실제 통화 Acceptance Test
 
-기존 `Call_Bridge_Phase_0_Feasibility_Report.md`는 삭제하지 않는다.
+최소 시나리오:
 
-해당 문서는 다음 사실을 증명한 1차 조사 결과로 유지한다.
-
-- direct native macOS CallKit path의 한계
-- FaceTime/ScreenCaptureKit RX 후보
-- direct TX injection public API 부재
-- Virtual Audio Device 미검증 상태
-
-v1.1의 Phase 0 재검증 결과는 별도 보고서로 작성한다.
-
-권장 파일명:
+## Scenario A — Work Mode OFF
 
 ```text
-Call_Bridge_Phase_0_PhoneApp_Feasibility_Report.md
+Bridge 실행
+Work Mode OFF
+외부 전화
+→ 정상 native 착신
 ```
 
----
+PASS 필수.
 
-# 41. 개발 우선순위
+## Scenario B — Work Mode ON / No Intervention Before Ring
 
 ```text
-CB Phase 0-A
-Phone.app RX Spike
-        ↓
-CB Phase 0-B
-Virtual Audio TX Spike
-        ↓
-CB Phase 0-C
-RX/TX Separation + Lifecycle
-        ↓
-Phase 0 PASS / CONDITIONAL PASS / FAIL
-        ↓
-CB Phase 1
-Local Audio Bridge
-        ↓
-CB Phase 2
-Realtime AI / Barge-in
-        ↓
-CB Phase 3
-Jarvis Agent Integration
-        ↓
-CB Phase 4
-RX/TX/Merged Recording
-        ↓
-CB Phase 5
-R2 + Call API + SQLite
-        ↓
-CB Phase 6
-App Hardening + DMG
+Work Mode ON
+ARMED
+외부 전화
+→ 정상 native 착신
 ```
 
-가장 중요한 원칙:
+PASS 필수.
 
-**직접 Continuity API의 존재 여부가 아니라, macOS 26+ Phone.app을 중심으로 실제 Caller RX와 Jarvis TX를 유지보수 가능한 방식으로 양방향 연결할 수 있는지가 Call Bridge의 핵심 성공 기준이다.**
+## Scenario C — Auto Answer
+
+```text
+Ringing
+→ configured delay
+→ Jarvis auto answer
+→ 통화 Active
+```
+
+PASS 필수.
+
+## Scenario D — RX
+
+Caller:
+
+```text
+"하나 둘 셋 넷 다섯.
+지금 Jarvis RX 테스트 중입니다."
+```
+
+Bridge에서 동일 음성을 확인해야 한다.
+
+## Scenario E — TX
+
+Bridge test speech가 실제 상대방 전화에서 명확하게 들려야 한다.
+
+## Scenario F — Simultaneous
+
+Caller와 Jarvis TX가 동시에 활성화돼도 두 stream이 유지되어야 한다.
+
+## Scenario G — Restore
+
+통화 종료 후 기존 Mac Default Input/Output이 정확히 복원되어야 한다.
+
+## Scenario H — Second Call
+
+앱 재시작 없이 두 번째 실제 통화를 정상 처리해야 한다.
+
+## Scenario I — Mac Human Takeover + Continuous Recording
+
+```text
+ACTIVE_AI
+→ 사용자가 Mac Takeover
+→ AI 즉시 종료
+→ 동일 전화 통화 유지
+→ 사용자가 Mac Mic/Headset으로 직접 대화
+→ RX/TX recording 계속
+→ 실제 통화 종료
+→ recording finalize
+→ route restore
+```
+
+PASS 조건:
+
+- Takeover 때문에 전화가 끊기지 않는다.
+- Takeover 이후 Caller와 사용자가 양방향 대화할 수 있다.
+- AI 음성은 더 이상 Caller에게 전달되지 않는다.
+- `rx.m4a`에는 takeover 전후 Caller 음성이 연속적으로 존재한다.
+- `tx.m4a`에는 AI 구간과 사용자 구간이 동일 timeline에 기록된다.
+- 통화 종료 후 route가 정확히 복원된다.
+
+## Scenario J — iPhone Handoff
+
+```text
+ACTIVE_AI
+→ 사용자가 Apple 제공 UX로 iPhone에서 통화 이어받기
+→ AI 종료
+→ Mac recording finalize
+→ Mac route restore
+→ iPhone 통화는 계속
+```
+
+PASS 조건:
+
+- Handoff 때문에 상대방과의 전화 자체가 끊기지 않는다.
+- Mac의 AI output이 Handoff 이후 전달되지 않는다.
+- Mac recording이 handoff 시점까지 정상 finalize된다.
+- metadata에 `iphone_handoff`와 takeover timestamp가 기록된다.
+- Bridge는 iPhone Handoff 이후 구간의 녹음을 보장한다고 표시하지 않는다.
 
 ---
 
-# 42. 참고 근거
+# 40. v2 초기 제외 범위
 
-## 프로젝트 내부
+- Android
+- iPhone Jarvis app
+- Apple Watch
+- SIP
+- 070
+- Twilio
+- BYOC
+- carrier API
+- 외출 중 always-on remote answering
+- multi-user SaaS
+- billing
+- plan
+- usage limit
+- Local LLM
+- Vector DB
+- RAG
+- DTMF / IVR
+- advanced call transfer
+- multi-call concurrency
+- multi-iPhone
+- custom voice cloning
+- programmatic / automatic iPhone Handoff triggering (사용자 주도 Apple Handoff는 지원)
 
-- `Call_Bridge_Phase_0_Feasibility_Report.md`
-  - direct CallKit / TX path 조사 결과
-  - ScreenCaptureKit RX 후보
-  - Virtual Audio Device 후속 검증 필요성
+---
 
-## Apple 공식 문서
+# 41. 성공 기준
 
-- Make and receive phone calls on Mac, iPad, and Apple Vision Pro
-  - https://support.apple.com/en-us/102405
-- ScreenCaptureKit
-  - https://developer.apple.com/documentation/screencapturekit/
-- Capturing system audio with Core Audio taps
-  - https://developer.apple.com/documentation/coreaudio/capturing-system-audio-with-core-audio-taps
-- AudioDriverKit
-  - https://developer.apple.com/documentation/audiodriverkit/
-- Creating an Audio Server Driver Plug-in
-  - https://developer.apple.com/documentation/coreaudio/creating-an-audio-server-driver-plug-in
+v2의 최종 성공 조건:
+
+```text
+업무 모드 ON
+↓
+기존 iPhone 번호로 전화 수신
+↓
+Mac Phone.app 정상 착신
+↓
+Jarvis 자동 수신
+↓
+Caller RX 확보
+↓
+Realtime AI 대화
+↓
+Jarvis TX 실제 전달
+↓
+Caller interruption 즉시 처리
+↓
+필요 시 Jarvis Tool 사용
+↓
+필요 시 Mac Human Takeover 또는 iPhone Handoff
+↓
+Mac Takeover라면 녹음 계속
+↓
+통화 종료 또는 iPhone Handoff
+↓
+오디오 route 완전 복구
+↓
+다음 전화 대기
+```
+
+그리고 가장 중요한 비기능 성공 기준:
+
+```text
+Jarvis Call Bridge가 고장 나더라도
+기본 iPhone / Phone.app 통화 기능을 가능한 한 망가뜨리지 않는다.
+```
+
+---
+
+# 42. 기술 결정 요약
+
+| 영역 | v1.x | v2.0 |
+|---|---|---|
+| RX | ScreenCaptureKit | **Dual HAL Capture loopback** |
+| TX | Virtual Mic + shared memory | **Dual HAL Inject loopback** |
+| PCM 전달 | POSIX shared memory | **CoreAudio direct I/O** |
+| 착신 대기 | Start Test 기반 | **ARMED 상태, audio untouched** |
+| 자동 수신 | 실험적 AX state | **Accessibility primary** |
+| CallKit | direct API 탐색 | **의존하지 않음** |
+| Audio device | 단일 input | **Capture + Inject** |
+| Route | 수동/실험적 | **transactional snapshot/restore** |
+| AI | Realtime 예정 | **Realtime speech-to-speech** |
+| Jarvis | 후속 연결 | **기존 Agent/Tools 재사용** |
+| Human Takeover | 단순 직접 통화 전환 | **Mac Takeover(녹음 지속) + iPhone Handoff(녹음 finalize)** |
+| 목적 | 기술 PoC | **개인 업무용 실사용 Bridge** |
+
+---
+
+# 43. 실기기 검증에서 얻은 근거
+
+v2는 추측만으로 설계하지 않는다.
+
+현재까지 실제 환경에서 확인한 사실:
+
+1. Mac Studio의 Phone.app에서 iPhone 셀룰러 회선을 이용한 발신이 가능하다.
+2. iPhone Continuity 설정을 정상화한 뒤 Mac Studio에서 실제 착신 전화가 표시된다.
+3. AITakeCall은 macOS 착신 전화를 Accessibility 기반으로 자동 수신한다.
+4. AITakeCall 통화 중 `AI Take Call Capture`가 Default Output Device가 된다.
+5. AITakeCall 통화 중 `AI Take Call Inject`가 Default Input Device가 된다.
+6. 두 장치는 48kHz, 2 input / 2 output channel을 가진 virtual CoreAudio device로 관찰됐다.
+7. 해당 reference driver binary에는 `LoopbackHandler`가 존재한다.
+8. AITakeCall에서 실제 AI 통화가 시작되는 것을 확인했다.
+9. iPhone Wi-Fi를 끄면 AITakeCall도 Mac에서 착신 연결되지 않았다.
+10. v1 Bridge의 Start Test 활성화 상태에서는 Mac 착신이 나타나지 않는 문제가 관찰됐다.
+
+이 결과를 기반으로 v2는 **착신 전 대기 상태와 실제 통화 오디오 상태를 완전히 분리**한다.
+
+---
+
+# 44. 문서/보고서 보존 정책
+
+기존 문서는 역사적 조사 결과로 유지한다.
+
+예:
+
+```text
+docs/
+├─ Jarvis_Call_Bridge_Client_PRD.md        # 항상 최신 PRD
+├─ Call_Bridge_Phase_0_Feasibility_Report.md
+└─ Call_Bridge_Phase_0_PhoneApp_Feasibility_Report.md
+```
+
+PRD filename에는 version을 붙이지 않는다.
+
+```text
+Jarvis_Call_Bridge_Client_PRD.md
+```
+
+문서 내부의 `문서 버전`으로 버전을 관리한다.
+
+---
+
+# 45. v2.1 기능 추가
+
+v2.1에서 Human Takeover와 Recording lifecycle을 구체화했다.
+
+핵심 변경:
+
+```text
+AI lifecycle ≠ Call lifecycle ≠ Recording lifecycle
+```
+
+- **Mac Takeover:** AI만 종료하고 Bridge/Capture/Inject/Recording은 통화 종료까지 유지
+- **iPhone Takeover:** Apple 사용자 주도 Handoff를 허용하고 Mac recording은 handoff 시점에 finalize
+- `ACTIVE_AI`, `ACTIVE_HUMAN_MAC`, `HANDOFF_TO_IPHONE` 상태를 명시
+- RX/TX recording에 AI/Human segment metadata 추가
+- programmatic/private iPhone Handoff는 전제하지 않음
+
+---
+
+# 46. 다음 개발 시작점
+
+v2의 첫 구현 작업은:
+
+```text
+CB v2 Phase 0
+Clean Slate & Architecture Skeleton
+```
+
+이다.
+
+Phase 0에서 HAL driver나 Realtime AI를 먼저 구현하지 않는다.
+
+가장 먼저 증명할 것은:
+
+```text
+Bridge 실행
++
+Work Mode ON
++
+ARMED
++
+실제 iPhone 착신
+
+→ 아무 문제 없이 Mac Phone.app에 정상 표시
+```
+
+이다.
+
+**착신 대기 안정성이 확보된 뒤에만 v2의 오디오 기능을 단계적으로 추가한다.**
