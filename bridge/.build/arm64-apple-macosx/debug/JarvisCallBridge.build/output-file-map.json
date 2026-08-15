@@ -58,6 +58,20 @@
     "swift-dependencies": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/BridgeStateMachine.swiftdeps",
     "diagnostics": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/BridgeStateMachine.dia"
   },
+  "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/System/AudioDriverActivating.swift": {
+    "dependencies": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AudioDriverActivating.d",
+    "object": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AudioDriverActivating.swift.o",
+    "swiftmodule": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AudioDriverActivating~partial.swiftmodule",
+    "swift-dependencies": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AudioDriverActivating.swiftdeps",
+    "diagnostics": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AudioDriverActivating.dia"
+  },
+  "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/System/AudioDriverStatus.swift": {
+    "dependencies": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AudioDriverStatus.d",
+    "object": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AudioDriverStatus.swift.o",
+    "swiftmodule": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AudioDriverStatus~partial.swiftmodule",
+    "swift-dependencies": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AudioDriverStatus.swiftdeps",
+    "diagnostics": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AudioDriverStatus.dia"
+  },
   "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/System/AudioRouteManager.swift": {
     "dependencies": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AudioRouteManager.d",
     "object": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AudioRouteManager.swift.o",

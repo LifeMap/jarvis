@@ -9,19 +9,22 @@ final class BridgeViewModel: ObservableObject {
     let stateMachine: BridgeStateMachine
     let phoneApp: PhoneAppDiscovery
     let accessibility: AccessibilityStatus
+    let audioDriver: AudioDriverStatus
 
     private let routeReader: AudioRouteReading
     @Published private(set) var routeSnapshot: AudioRouteSnapshot?
 
     init(
         routeReader: AudioRouteReading = CoreAudioRouteReader(),
-        routeMutator: AudioRouteMutating? = nil
+        routeMutator: AudioRouteMutating? = nil,
+        driverActivator: AudioDriverActivating? = nil
     ) {
         let logger = BridgeLogger()
         self.logger = logger
-        self.stateMachine = BridgeStateMachine(routeMutator: routeMutator, logger: logger)
+        self.stateMachine = BridgeStateMachine(routeMutator: routeMutator, driverActivator: driverActivator, logger: logger)
         self.phoneApp = PhoneAppDiscovery(logger: logger)
         self.accessibility = AccessibilityStatus(logger: logger)
+        self.audioDriver = AudioDriverStatus()
         self.routeReader = routeReader
     }
 
@@ -30,6 +33,7 @@ final class BridgeViewModel: ObservableObject {
         logger.log("[BRIDGE] state=disabled")
         phoneApp.start()
         accessibility.refresh()
+        audioDriver.start()
         refreshRouteSnapshot()
     }
 

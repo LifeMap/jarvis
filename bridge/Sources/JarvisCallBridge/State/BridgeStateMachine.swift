@@ -17,10 +17,12 @@ final class BridgeStateMachine: ObservableObject {
     ]
 
     private let routeMutator: AudioRouteMutating?
+    private let driverActivator: AudioDriverActivating?
     private let logger: BridgeLogger
 
-    init(routeMutator: AudioRouteMutating? = nil, logger: BridgeLogger) {
+    init(routeMutator: AudioRouteMutating? = nil, driverActivator: AudioDriverActivating? = nil, logger: BridgeLogger) {
         self.routeMutator = routeMutator
+        self.driverActivator = driverActivator
         self.logger = logger
     }
 
@@ -29,8 +31,11 @@ final class BridgeStateMachine: ObservableObject {
         let target: BridgeState = enabled ? .armed : .disabled
         logger.log("[BRIDGE] workMode=\(enabled)")
         _ = requestTransition(to: target)
-        // Deliberately does not call routeMutator here or anywhere else in Phase 0 — Work Mode
-        // ARMED must never create, read-modify, or change any audio route (PRD §9, §12).
+        // Deliberately does not call routeMutator or driverActivator here or anywhere else in
+        // Phase 0/1 — ARMED must never create/change any audio route, and ARMED != Audio Driver
+        // Active (PRD §9, §12, §23). When Capture/Inject do need to activate for a real call
+        // (Phase 2/3), that decision goes through a dedicated call-lifecycle transition, not
+        // Work Mode.
     }
 
     /// Returns false and leaves `state` unchanged if the transition isn't one of the Phase-0

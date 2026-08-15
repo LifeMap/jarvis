@@ -5,7 +5,8 @@ let package = Package(
     name: "JarvisCallBridge",
     platforms: [.macOS(.v14)],
     products: [
-        .executable(name: "JarvisCallBridge", targets: ["JarvisCallBridge"])
+        .executable(name: "JarvisCallBridge", targets: ["JarvisCallBridge"]),
+        .executable(name: "JarvisAudioDriverTool", targets: ["JarvisAudioDriverTool"])
     ],
     targets: [
         .executableTarget(
@@ -16,6 +17,22 @@ let package = Package(
             name: "JarvisCallBridgeTests",
             dependencies: ["JarvisCallBridge"],
             path: "Tests/JarvisCallBridgeTests"
+        ),
+
+        // CB v2 Phase 1 — Dual Loopback Audio Driver
+        .target(
+            name: "JarvisLoopbackBuffer",
+            path: "AudioDriver/Shared",
+            publicHeadersPath: "include"
+        ),
+        .executableTarget(
+            name: "JarvisAudioDriverTool",
+            path: "Sources/JarvisAudioDriverTool"
+        ),
+        .testTarget(
+            name: "JarvisAudioDriverTests",
+            dependencies: ["JarvisLoopbackBuffer"],
+            path: "AudioDriver/Tests"
         )
     ]
 )

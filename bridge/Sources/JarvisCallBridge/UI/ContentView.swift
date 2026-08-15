@@ -53,7 +53,7 @@ struct ContentView: View {
                 }
                 GridRow {
                     Text("Call Audio Driver").foregroundStyle(.secondary)
-                    Text("Not installed — Phase 1").font(.system(.body, design: .monospaced)).foregroundStyle(.secondary)
+                    Text(model.audioDriver.state.rawValue).font(.system(.body, design: .monospaced))
                 }
                 GridRow {
                     Text("Realtime").foregroundStyle(.secondary)

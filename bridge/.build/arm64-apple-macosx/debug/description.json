@@ -21,6 +21,249 @@
 
   ],
   "swiftCommands" : {
+    "C.JarvisAudioDriverTests-arm64-apple-macosx-debug.module" : {
+      "executable" : "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "fileList" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTests.build/sources",
+      "importPath" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/AudioDriver/Tests/LoopbackBufferTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisLoopbackBuffer.build/JarvisLoopbackBuffer.c.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTests.build/sources"
+        }
+      ],
+      "isLibrary" : true,
+      "moduleName" : "JarvisAudioDriverTests",
+      "moduleOutputPath" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/Modules/JarvisAudioDriverTests.swiftmodule",
+      "objects" : [
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTests.build/LoopbackBufferTests.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "arm64-apple-macosx14.0",
+        "-incremental",
+        "-enable-batch-mode",
+        "-serialize-diagnostics",
+        "-index-store-path",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/index/store",
+        "-Onone",
+        "-enable-testing",
+        "-Xfrontend",
+        "-enable-cross-import-overlays",
+        "-j10",
+        "-DSWIFT_PACKAGE",
+        "-DDEBUG",
+        "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+        "-Xcc",
+        "-fmodule-map-file=/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisLoopbackBuffer.build/module.modulemap",
+        "-Xcc",
+        "-I",
+        "-Xcc",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/AudioDriver/Shared/include",
+        "-module-cache-path",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/ModuleCache",
+        "-parseable-output",
+        "-parse-as-library",
+        "-color-diagnostics",
+        "-swift-version",
+        "6",
+        "-plugin-path",
+        "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+        "-sdk",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+        "-F",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-I",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-L",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+        "-Xcc",
+        "-F",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "bridge"
+      ],
+      "outputFileMapPath" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTests.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTests.build/LoopbackBufferTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/Modules/JarvisAudioDriverTests.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/AudioDriver/Tests/LoopbackBufferTests.swift"
+      ],
+      "tempsPath" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTests.build",
+      "wholeModuleOptimization" : false
+    },
+    "C.JarvisAudioDriverTool-arm64-apple-macosx-debug.module" : {
+      "executable" : "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "fileList" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.build/sources",
+      "importPath" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisAudioDriverTool/Commands.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisAudioDriverTool/CoreAudioHelpers.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisAudioDriverTool/DeviceIOSession.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisAudioDriverTool/DriverIdentifiers.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisAudioDriverTool/ToneAnalysis.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisAudioDriverTool/main.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.build/sources"
+        }
+      ],
+      "isLibrary" : false,
+      "moduleName" : "JarvisAudioDriverTool",
+      "moduleOutputPath" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/Modules/JarvisAudioDriverTool.swiftmodule",
+      "objects" : [
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.build/Commands.swift.o",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.build/CoreAudioHelpers.swift.o",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.build/DeviceIOSession.swift.o",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.build/DriverIdentifiers.swift.o",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.build/ToneAnalysis.swift.o",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.build/main.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "arm64-apple-macosx14.0",
+        "-incremental",
+        "-enable-batch-mode",
+        "-serialize-diagnostics",
+        "-index-store-path",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/index/store",
+        "-Onone",
+        "-enable-testing",
+        "-j10",
+        "-DSWIFT_PACKAGE",
+        "-DDEBUG",
+        "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+        "-module-cache-path",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/ModuleCache",
+        "-parseable-output",
+        "-Xfrontend",
+        "-entry-point-function-name",
+        "-Xfrontend",
+        "JarvisAudioDriverTool_main",
+        "-color-diagnostics",
+        "-swift-version",
+        "6",
+        "-plugin-path",
+        "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+        "-sdk",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+        "-F",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-I",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-L",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+        "-Xcc",
+        "-F",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "bridge"
+      ],
+      "outputFileMapPath" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.build/Commands.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.build/CoreAudioHelpers.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.build/DeviceIOSession.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.build/DriverIdentifiers.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.build/ToneAnalysis.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.build/main.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/Modules/JarvisAudioDriverTool.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisAudioDriverTool/Commands.swift",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisAudioDriverTool/CoreAudioHelpers.swift",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisAudioDriverTool/DeviceIOSession.swift",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisAudioDriverTool/DriverIdentifiers.swift",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisAudioDriverTool/ToneAnalysis.swift",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisAudioDriverTool/main.swift"
+      ],
+      "tempsPath" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.build",
+      "wholeModuleOptimization" : false
+    },
     "C.JarvisCallBridge-arm64-apple-macosx-debug.module" : {
       "executable" : "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
       "fileList" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/sources",
@@ -60,6 +303,14 @@
         },
         {
           "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/System/AudioDriverActivating.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/System/AudioDriverStatus.swift"
+        },
+        {
+          "kind" : "file",
           "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/System/AudioRouteManager.swift"
         },
         {
@@ -87,6 +338,8 @@
         "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/BridgeLogger.swift.o",
         "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/BridgeState.swift.o",
         "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/BridgeStateMachine.swift.o",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AudioDriverActivating.swift.o",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AudioDriverStatus.swift.o",
         "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AudioRouteManager.swift.o",
         "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/ContentView.swift.o"
       ],
@@ -176,6 +429,14 @@
         },
         {
           "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AudioDriverActivating.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AudioDriverStatus.swift.o"
+        },
+        {
+          "kind" : "file",
           "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AudioRouteManager.swift.o"
         },
         {
@@ -197,6 +458,8 @@
         "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Logging/BridgeLogger.swift",
         "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/State/BridgeState.swift",
         "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/State/BridgeStateMachine.swift",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/System/AudioDriverActivating.swift",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/System/AudioDriverStatus.swift",
         "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/System/AudioRouteManager.swift",
         "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/UI/ContentView.swift"
       ],
@@ -219,6 +482,10 @@
         {
           "kind" : "file",
           "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/Modules/JarvisCallBridgeTests.swiftmodule"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/Modules/JarvisAudioDriverTests.swiftmodule"
         },
         {
           "kind" : "file",
@@ -247,6 +514,12 @@
         "-DSWIFT_PACKAGE",
         "-DDEBUG",
         "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+        "-Xcc",
+        "-fmodule-map-file=/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisLoopbackBuffer.build/module.modulemap",
+        "-Xcc",
+        "-I",
+        "-Xcc",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/AudioDriver/Shared/include",
         "-module-cache-path",
         "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/ModuleCache",
         "-parseable-output",
@@ -419,6 +692,138 @@
 
   },
   "swiftTargetScanArgs" : {
+    "JarvisAudioDriverTests" : [
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "-module-name",
+      "JarvisAudioDriverTests",
+      "-package-name",
+      "bridge",
+      "-c",
+      "/Volumes/Dev/workspaces/twms/jarvis/bridge/AudioDriver/Tests/LoopbackBufferTests.swift",
+      "-I",
+      "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/Modules",
+      "-target",
+      "arm64-apple-macosx14.0",
+      "-incremental",
+      "-enable-batch-mode",
+      "-serialize-diagnostics",
+      "-index-store-path",
+      "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/index/store",
+      "-Onone",
+      "-enable-testing",
+      "-Xfrontend",
+      "-enable-cross-import-overlays",
+      "-j10",
+      "-DSWIFT_PACKAGE",
+      "-DDEBUG",
+      "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+      "-Xcc",
+      "-fmodule-map-file=/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisLoopbackBuffer.build/module.modulemap",
+      "-Xcc",
+      "-I",
+      "-Xcc",
+      "/Volumes/Dev/workspaces/twms/jarvis/bridge/AudioDriver/Shared/include",
+      "-module-cache-path",
+      "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/ModuleCache",
+      "-parseable-output",
+      "-parse-as-library",
+      "-color-diagnostics",
+      "-swift-version",
+      "6",
+      "-plugin-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+      "-sdk",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+      "-F",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-I",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-L",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+      "-Xcc",
+      "-F",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "bridge",
+      "-driver-use-frontend-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"
+    ],
+    "JarvisAudioDriverTool" : [
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "-module-name",
+      "JarvisAudioDriverTool",
+      "-package-name",
+      "bridge",
+      "-c",
+      "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisAudioDriverTool/Commands.swift",
+      "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisAudioDriverTool/CoreAudioHelpers.swift",
+      "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisAudioDriverTool/DeviceIOSession.swift",
+      "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisAudioDriverTool/DriverIdentifiers.swift",
+      "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisAudioDriverTool/ToneAnalysis.swift",
+      "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisAudioDriverTool/main.swift",
+      "-I",
+      "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/Modules",
+      "-target",
+      "arm64-apple-macosx14.0",
+      "-incremental",
+      "-enable-batch-mode",
+      "-serialize-diagnostics",
+      "-index-store-path",
+      "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/index/store",
+      "-Onone",
+      "-enable-testing",
+      "-j10",
+      "-DSWIFT_PACKAGE",
+      "-DDEBUG",
+      "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+      "-module-cache-path",
+      "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/ModuleCache",
+      "-parseable-output",
+      "-Xfrontend",
+      "-entry-point-function-name",
+      "-Xfrontend",
+      "JarvisAudioDriverTool_main",
+      "-color-diagnostics",
+      "-swift-version",
+      "6",
+      "-plugin-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+      "-sdk",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+      "-F",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-I",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-L",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+      "-Xcc",
+      "-F",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "bridge",
+      "-driver-use-frontend-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"
+    ],
     "JarvisCallBridge" : [
       "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
       "-module-name",
@@ -434,6 +839,8 @@
       "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Logging/BridgeLogger.swift",
       "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/State/BridgeState.swift",
       "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/State/BridgeStateMachine.swift",
+      "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/System/AudioDriverActivating.swift",
+      "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/System/AudioDriverStatus.swift",
       "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/System/AudioRouteManager.swift",
       "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/UI/ContentView.swift",
       "-I",
@@ -514,6 +921,12 @@
       "-DSWIFT_PACKAGE",
       "-DDEBUG",
       "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+      "-Xcc",
+      "-fmodule-map-file=/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisLoopbackBuffer.build/module.modulemap",
+      "-Xcc",
+      "-I",
+      "-Xcc",
+      "/Volumes/Dev/workspaces/twms/jarvis/bridge/AudioDriver/Shared/include",
       "-module-cache-path",
       "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/ModuleCache",
       "-parseable-output",
@@ -614,15 +1027,26 @@
     ]
   },
   "targetDependencyMap" : {
+    "JarvisAudioDriverTests" : [
+      "JarvisLoopbackBuffer"
+    ],
+    "JarvisAudioDriverTool" : [
+
+    ],
     "JarvisCallBridge" : [
 
     ],
     "JarvisCallBridgePackageTests" : [
+      "JarvisAudioDriverTests",
+      "JarvisLoopbackBuffer",
       "JarvisCallBridgeTests",
       "JarvisCallBridge"
     ],
     "JarvisCallBridgeTests" : [
       "JarvisCallBridge"
+    ],
+    "JarvisLoopbackBuffer" : [
+
     ]
   },
   "testDiscoveryCommands" : {
@@ -647,6 +1071,102 @@
     }
   },
   "writeCommands" : {
+    "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTests.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/AudioDriver/Tests/LoopbackBufferTests.swift"
+        }
+      ],
+      "outputFilePath" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTests.build/sources"
+    },
+    "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool-entitlement.plist" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<entitlement-plist>"
+        },
+        {
+          "kind" : "virtual",
+          "name" : "<com.apple.security.get-task-allow>"
+        }
+      ],
+      "outputFilePath" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool-entitlement.plist"
+    },
+    "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisAudioDriverTool/Commands.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisAudioDriverTool/CoreAudioHelpers.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisAudioDriverTool/DeviceIOSession.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisAudioDriverTool/DriverIdentifiers.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisAudioDriverTool/ToneAnalysis.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisAudioDriverTool/main.swift"
+        }
+      ],
+      "outputFilePath" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.build/sources"
+    },
+    "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.product/Objects.LinkFileList" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<link-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.build/Commands.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.build/CoreAudioHelpers.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.build/DeviceIOSession.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.build/DriverIdentifiers.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.build/ToneAnalysis.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.build/main.swift.o"
+        }
+      ],
+      "outputFilePath" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.product/Objects.LinkFileList"
+    },
     "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge-entitlement.plist" : {
       "alwaysOutOfDate" : false,
       "inputs" : [
@@ -702,6 +1222,14 @@
         },
         {
           "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/System/AudioDriverActivating.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/System/AudioDriverStatus.swift"
+        },
+        {
+          "kind" : "file",
           "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/System/AudioRouteManager.swift"
         },
         {
@@ -721,6 +1249,14 @@
         {
           "kind" : "file",
           "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AccessibilityStatus.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AudioDriverActivating.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AudioDriverStatus.swift.o"
         },
         {
           "kind" : "file",
@@ -784,7 +1320,19 @@
         },
         {
           "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTests.build/LoopbackBufferTests.swift.o"
+        },
+        {
+          "kind" : "file",
           "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AccessibilityStatus.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AudioDriverActivating.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AudioDriverStatus.swift.o"
         },
         {
           "kind" : "file",
@@ -837,6 +1385,10 @@
         {
           "kind" : "file",
           "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/PhoneAppDiscoveryTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisLoopbackBuffer.build/JarvisLoopbackBuffer.c.o"
         }
       ],
       "outputFilePath" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgePackageTests.product/Objects.LinkFileList"

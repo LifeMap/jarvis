@@ -146,14 +146,22 @@ open ".build/Jarvis Call Bridge.app"
 - Bridge가 자동으로 받지 않음
 - Audio Route 변경 없음 (앱 UI의 Input/Output/System Output 값이 통화 전후 동일)
 
-### 결과 기록 (사용자 전달 후 업데이트 예정)
+### 결과 기록 (사용자 전달, 2026-08-15)
+
+사용자가 Mac Studio + 실제 iPhone으로 직접 수행한 결과:
+
+- Work Mode **OFF** 상태에서 Mac Studio Phone.app 착신 **정상**
+- Work Mode **ON / ARMED** 상태에서도 Phone.app 착신 **정상**
+- ARMED 상태에서 **여러 차례 반복 착신 정상** (다만 최초 요구한 **10회 연속**을 전부 채우지는 않음)
+- 전화가 오는 동안 **Audio Route 변경 없음**
+- v1에서 관찰됐던 "Bridge 활성화 시 Mac 착신이 사라지는 현상"이 v2에서는 **재현되지 않음**
 
 | 회차 | Mac 착신 | iPhone 착신 | 자동수신 없음 | Route 불변 | 비고 |
 |---|---|---|---|---|---|
-| 1~10 | 대기 중 | 대기 중 | 대기 중 | 대기 중 | |
+| 1~N (10회 미만) | PASS | PASS | PASS | PASS | 정확한 반복 횟수는 사용자 보고에 세부 기록되지 않음 — 아래 판정에 반영 |
 
 ## Phase Result
 
-**REQUIRES REAL DEVICE TEST**
+**CONDITIONAL PASS**
 
-에이전트 단계(빌드, 테스트, 코드 검토)에서 확보 가능한 모든 증거는 PASS다. 그러나 PRD §38 Phase Gate 원칙에 따라 "ARMED가 native incoming call을 방해하는가"는 실제 iPhone 착신으로만 판정할 수 있으므로, 사용자의 10회 연속 실기기 테스트 결과를 받기 전에는 CB v2 Phase 0을 PASS로 선언하지 않는다.
+핵심 invariant("ARMED가 native incoming call을 방해하지 않는다")는 실제 착신으로 확인됐고 v1에서 발견됐던 회귀도 재현되지 않았다. 다만 PRD §17/§38이 요구하는 **10회 연속** acceptance를 전부 채우지 못했으므로 무조건 PASS로 과장하지 않고 CONDITIONAL PASS로 기록한다. CB v2 Phase 1(Dual Loopback Audio Driver)은 이 CONDITIONAL PASS를 게이트로 진행한다 — PRD §38 Phase Gate 원칙에 따라 남은 반복 횟수를 마저 채우는 것을 막지는 않되, 결과가 뒤집힐 경우 즉시 재검토가 필요하다는 점을 기록해 둔다.

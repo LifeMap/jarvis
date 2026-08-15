@@ -6,5 +6,7 @@
 /Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Logging/BridgeLogger.swift
 /Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/State/BridgeState.swift
 /Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/State/BridgeStateMachine.swift
+/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/System/AudioDriverActivating.swift
+/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/System/AudioDriverStatus.swift
 /Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/System/AudioRouteManager.swift
 /Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/UI/ContentView.swift

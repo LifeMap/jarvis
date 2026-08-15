@@ -1,0 +1,4 @@
+module JarvisLoopbackBuffer {
+    umbrella header "/Volumes/Dev/workspaces/twms/jarvis/bridge/AudioDriver/Shared/include/JarvisLoopbackBuffer.h"
+    export *
+}

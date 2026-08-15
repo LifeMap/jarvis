@@ -4,20 +4,35 @@
 <dict>
 	<key>SchemeUserState</key>
 	<dict>
-		<key>JarvisCallBridge.xcscheme_^#shared#^_</key>
+		<key>JarvisAudioDriverTool.xcscheme_^#shared#^_</key>
+		<dict>
+			<key>orderHint</key>
+			<integer>1</integer>
+		</dict>
+		<key>JarvisCallBridge-Package.xcscheme_^#shared#^_</key>
 		<dict>
 			<key>orderHint</key>
 			<integer>0</integer>
 		</dict>
+		<key>JarvisCallBridge.xcscheme_^#shared#^_</key>
+		<dict>
+			<key>orderHint</key>
+			<integer>2</integer>
+		</dict>
 		<key>JarvisCallBridgeFeasibility.xcscheme_^#shared#^_</key>
 		<dict>
 			<key>orderHint</key>
-			<integer>1</integer>
+			<integer>3</integer>
 		</dict>
 	</dict>
 	<key>SuppressBuildableAutocreation</key>
 	<dict>
 		<key>JarvisCallBridge</key>
+		<dict>
+			<key>primary</key>
+			<true/>
+		</dict>
+		<key>JarvisCallBridgeTests</key>
 		<dict>
 			<key>primary</key>
 			<true/>

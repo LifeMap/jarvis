@@ -1,0 +1,47 @@
+{
+  "": {
+    "swift-dependencies": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.build/primary.swiftdeps"
+  },
+  "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisAudioDriverTool/Commands.swift": {
+    "dependencies": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.build/Commands.d",
+    "object": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.build/Commands.swift.o",
+    "swiftmodule": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.build/Commands~partial.swiftmodule",
+    "swift-dependencies": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.build/Commands.swiftdeps",
+    "diagnostics": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.build/Commands.dia"
+  },
+  "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisAudioDriverTool/CoreAudioHelpers.swift": {
+    "dependencies": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.build/CoreAudioHelpers.d",
+    "object": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.build/CoreAudioHelpers.swift.o",
+    "swiftmodule": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.build/CoreAudioHelpers~partial.swiftmodule",
+    "swift-dependencies": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.build/CoreAudioHelpers.swiftdeps",
+    "diagnostics": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.build/CoreAudioHelpers.dia"
+  },
+  "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisAudioDriverTool/DeviceIOSession.swift": {
+    "dependencies": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.build/DeviceIOSession.d",
+    "object": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.build/DeviceIOSession.swift.o",
+    "swiftmodule": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.build/DeviceIOSession~partial.swiftmodule",
+    "swift-dependencies": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.build/DeviceIOSession.swiftdeps",
+    "diagnostics": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.build/DeviceIOSession.dia"
+  },
+  "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisAudioDriverTool/DriverIdentifiers.swift": {
+    "dependencies": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.build/DriverIdentifiers.d",
+    "object": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.build/DriverIdentifiers.swift.o",
+    "swiftmodule": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.build/DriverIdentifiers~partial.swiftmodule",
+    "swift-dependencies": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.build/DriverIdentifiers.swiftdeps",
+    "diagnostics": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.build/DriverIdentifiers.dia"
+  },
+  "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisAudioDriverTool/ToneAnalysis.swift": {
+    "dependencies": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.build/ToneAnalysis.d",
+    "object": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.build/ToneAnalysis.swift.o",
+    "swiftmodule": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.build/ToneAnalysis~partial.swiftmodule",
+    "swift-dependencies": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.build/ToneAnalysis.swiftdeps",
+    "diagnostics": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.build/ToneAnalysis.dia"
+  },
+  "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisAudioDriverTool/main.swift": {
+    "dependencies": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.build/main.d",
+    "object": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.build/main.swift.o",
+    "swiftmodule": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.build/main~partial.swiftmodule",
+    "swift-dependencies": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.build/main.swiftdeps",
+    "diagnostics": "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisAudioDriverTool.build/main.dia"
+  }
+}
