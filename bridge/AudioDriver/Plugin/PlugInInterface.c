@@ -15,6 +15,20 @@ static const CFStringRef kCapture_DeviceName = CFSTR("Jarvis Call Capture");
 static const CFStringRef kInject_DeviceUID = CFSTR("com.jarvis.callbridge.audio.inject");
 static const CFStringRef kInject_DeviceName = CFSTR("Jarvis Call Inject");
 
+/*
+ * Per AudioServerPlugIn.h's own documentation: "kAudioServerPlugInCustomPropertyDataTypeNone /
+ * CFString / CFPropertyList ... These are the only types supported for custom properties." A
+ * raw UInt32 is NOT one of them — the host's cross-process property marshaling silently rejects
+ * it with kAudioHardwareUnknownPropertyError even though HasProperty/GetPropertyData answer
+ * correctly in-process (which is why the original UInt32-based selftest passed locally but the
+ * real installed driver failed the same call via coreaudiod). Both custom properties are
+ * declared here and marshaled as CFBooleanRef (a valid CFPropertyList leaf type) instead.
+ */
+static const AudioServerPlugInCustomPropertyInfo kCustomPropertyInfo[2] = {
+    { kJarvisDevicePropertyActive, kAudioServerPlugInCustomPropertyDataTypeCFPropertyList, kAudioServerPlugInCustomPropertyDataTypeNone },
+    { kJarvisDevicePropertyClearBuffers, kAudioServerPlugInCustomPropertyDataTypeCFPropertyList, kAudioServerPlugInCustomPropertyDataTypeNone }
+};
+
 #pragma mark - Object/interface plumbing
 
 typedef struct {
@@ -114,6 +128,22 @@ static JarvisCallAudioDeviceState *ResolveObject(AudioObjectID objectID, Boolean
         }
     }
     return NULL;
+}
+
+/* Accepts CFBoolean (expected) or CFNumber (defensive, in case a client marshals a plain number
+   instead of a boolean) when interpreting a Set on kJarvisDevicePropertyActive. */
+static bool CFTypeRefIsTruthy(CFTypeRef value) {
+    if (value == NULL) return false;
+    CFTypeID typeID = CFGetTypeID(value);
+    if (typeID == CFBooleanGetTypeID()) {
+        return CFBooleanGetValue((CFBooleanRef)value);
+    }
+    if (typeID == CFNumberGetTypeID()) {
+        int intValue = 0;
+        CFNumberGetValue((CFNumberRef)value, kCFNumberIntType, &intValue);
+        return intValue != 0;
+    }
+    return false;
 }
 
 static void FillStreamFormat(AudioStreamBasicDescription *format) {
@@ -253,9 +283,14 @@ static Boolean Driver_HasProperty(AudioServerPlugInDriverRef inDriver, AudioObje
             case kAudioDevicePropertyAvailableNominalSampleRates:
             case kAudioDevicePropertyIsHidden:
             case kAudioDevicePropertyZeroTimeStampPeriod:
+            case kAudioObjectPropertyCustomPropertyInfoList:
+                return true;
             case kJarvisDevicePropertyActive:
             case kJarvisDevicePropertyClearBuffers:
-                return true;
+                // Device-scope custom control — only answer for the scope it was designed for;
+                // any other scope is a genuinely unknown property for this selector, not a
+                // silent alias (see GetPropertyDataSize/GetPropertyData for the matching check).
+                return inAddress->mScope == kAudioObjectPropertyScopeGlobal;
             default: return false;
         }
     } else {
@@ -280,7 +315,7 @@ static OSStatus Driver_IsPropertySettable(AudioServerPlugInDriverRef inDriver, A
 
     Boolean isStream = false;
     JarvisCallAudioDeviceState *device = ResolveObject(inObjectID, &isStream, NULL);
-    if (device != NULL && !isStream &&
+    if (device != NULL && !isStream && inAddress->mScope == kAudioObjectPropertyScopeGlobal &&
         (inAddress->mSelector == kJarvisDevicePropertyActive || inAddress->mSelector == kJarvisDevicePropertyClearBuffers)) {
         *outIsSettable = true;
         return kAudioHardwareNoError;
@@ -342,9 +377,13 @@ static OSStatus Driver_GetPropertyDataSize(AudioServerPlugInDriverRef inDriver, 
             case kAudioDevicePropertySafetyOffset:
             case kAudioDevicePropertyIsHidden:
             case kAudioDevicePropertyZeroTimeStampPeriod:
+                *outDataSize = sizeof(UInt32); return kAudioHardwareNoError;
             case kJarvisDevicePropertyActive:
             case kJarvisDevicePropertyClearBuffers:
-                *outDataSize = sizeof(UInt32); return kAudioHardwareNoError;
+                if (inAddress->mScope != kAudioObjectPropertyScopeGlobal) return kAudioHardwareUnknownPropertyError;
+                *outDataSize = sizeof(CFTypeRef); return kAudioHardwareNoError;
+            case kAudioObjectPropertyCustomPropertyInfoList:
+                *outDataSize = sizeof(kCustomPropertyInfo); return kAudioHardwareNoError;
             case kAudioDevicePropertyRelatedDevices:
                 *outDataSize = sizeof(AudioObjectID); return kAudioHardwareNoError;
             case kAudioDevicePropertyStreams:
@@ -502,11 +541,19 @@ static OSStatus Driver_GetPropertyData(AudioServerPlugInDriverRef inDriver, Audi
                 if (inDataSize < sizeof(UInt32)) return kAudioHardwareBadPropertySizeError;
                 *(UInt32 *)outData = atomic_load(&device->isHidden) ? 1 : 0; *outDataSize = sizeof(UInt32); return kAudioHardwareNoError;
             case kJarvisDevicePropertyActive:
-                if (inDataSize < sizeof(UInt32)) return kAudioHardwareBadPropertySizeError;
-                *(UInt32 *)outData = atomic_load(&device->isActive) ? 1 : 0; *outDataSize = sizeof(UInt32); return kAudioHardwareNoError;
+                if (inAddress->mScope != kAudioObjectPropertyScopeGlobal) return kAudioHardwareUnknownPropertyError;
+                if (inDataSize < sizeof(CFTypeRef)) return kAudioHardwareBadPropertySizeError;
+                *(CFTypeRef *)outData = atomic_load(&device->isActive) ? kCFBooleanTrue : kCFBooleanFalse;
+                *outDataSize = sizeof(CFTypeRef); return kAudioHardwareNoError;
             case kJarvisDevicePropertyClearBuffers:
-                if (inDataSize < sizeof(UInt32)) return kAudioHardwareBadPropertySizeError;
-                *(UInt32 *)outData = 0; *outDataSize = sizeof(UInt32); return kAudioHardwareNoError;
+                if (inAddress->mScope != kAudioObjectPropertyScopeGlobal) return kAudioHardwareUnknownPropertyError;
+                if (inDataSize < sizeof(CFTypeRef)) return kAudioHardwareBadPropertySizeError;
+                *(CFTypeRef *)outData = kCFBooleanFalse; // write-only trigger; nothing meaningful to read back
+                *outDataSize = sizeof(CFTypeRef); return kAudioHardwareNoError;
+            case kAudioObjectPropertyCustomPropertyInfoList:
+                if (inDataSize < sizeof(kCustomPropertyInfo)) return kAudioHardwareBadPropertySizeError;
+                memcpy(outData, kCustomPropertyInfo, sizeof(kCustomPropertyInfo));
+                *outDataSize = sizeof(kCustomPropertyInfo); return kAudioHardwareNoError;
             case kAudioDevicePropertyRelatedDevices:
                 if (inDataSize < sizeof(AudioObjectID)) return kAudioHardwareBadPropertySizeError;
                 ((AudioObjectID *)outData)[0] = device->deviceObjectID; *outDataSize = sizeof(AudioObjectID); return kAudioHardwareNoError;
@@ -583,14 +630,17 @@ static OSStatus Driver_SetPropertyData(AudioServerPlugInDriverRef inDriver, Audi
 
     switch (inAddress->mSelector) {
         case kJarvisDevicePropertyActive: {
-            if (inDataSize < sizeof(UInt32) || inData == NULL) return kAudioHardwareBadPropertySizeError;
-            bool active = (*(const UInt32 *)inData) != 0;
+            if (inAddress->mScope != kAudioObjectPropertyScopeGlobal) return kAudioHardwareUnknownPropertyError;
+            if (inDataSize < sizeof(CFTypeRef) || inData == NULL) return kAudioHardwareBadPropertySizeError;
+            bool active = CFTypeRefIsTruthy(*(const CFTypeRef *)inData);
             atomic_store(&device->isActive, active);
             atomic_store(&device->isHidden, !active);
             JarvisLoopbackBufferReset(&device->loopback);
             return kAudioHardwareNoError;
         }
         case kJarvisDevicePropertyClearBuffers:
+            if (inAddress->mScope != kAudioObjectPropertyScopeGlobal) return kAudioHardwareUnknownPropertyError;
+            // Value is ignored on purpose — any Set (even CFBooleanFalse) triggers a reset.
             JarvisLoopbackBufferReset(&device->loopback);
             return kAudioHardwareNoError;
         default:

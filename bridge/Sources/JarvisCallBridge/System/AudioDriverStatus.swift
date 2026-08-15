@@ -52,8 +52,8 @@ final class AudioDriverStatus: ObservableObject {
             return
         }
 
-        guard let captureActive = Self.getBool(captureID, Self.activeSelector),
-              let injectActive = Self.getBool(injectID, Self.activeSelector) else {
+        guard let captureActive = Self.getCustomBool(captureID, Self.activeSelector),
+              let injectActive = Self.getCustomBool(injectID, Self.activeSelector) else {
             state = .error
             return
         }
@@ -77,12 +77,16 @@ final class AudioDriverStatus: ObservableObject {
         return deviceID
     }
 
-    private static func getBool(_ deviceID: AudioObjectID, _ selector: AudioObjectPropertySelector) -> Bool? {
+    /// `kJarvisDevicePropertyActive` is a custom property, and AudioServerPlugIn.h documents
+    /// CFString/CFPropertyList/None as the only marshalable types for custom (non-Apple-defined)
+    /// properties — a raw UInt32 is silently rejected with kAudioHardwareUnknownPropertyError
+    /// across the real coreaudiod IPC boundary, so this reads a CFBooleanRef instead.
+    private static func getCustomBool(_ deviceID: AudioObjectID, _ selector: AudioObjectPropertySelector) -> Bool? {
         var address = AudioObjectPropertyAddress(mSelector: selector, mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
-        var value: UInt32 = 0
-        var size = UInt32(MemoryLayout<UInt32>.size)
+        var value: Unmanaged<CFBoolean>?
+        var size = UInt32(MemoryLayout<Unmanaged<CFBoolean>?>.size)
         let status = AudioObjectGetPropertyData(deviceID, &address, 0, nil, &size, &value)
-        guard status == noErr else { return nil }
-        return value != 0
+        guard status == noErr, let value else { return nil }
+        return CFBooleanGetValue(value.takeRetainedValue())
     }
 }

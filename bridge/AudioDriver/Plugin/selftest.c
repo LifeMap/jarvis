@@ -92,17 +92,57 @@ static void CheckDevice(AudioServerPlugInDriverInterface *interface, AudioServer
     status = interface->GetPropertyData(driverRef, deviceID, 0, &bogusAddress, 0, NULL, sizeof(bogusOut), &outSize, &bogusOut);
     Check("unknown property returns kAudioHardwareUnknownPropertyError, not success", status == kAudioHardwareUnknownPropertyError);
 
-    // Custom Active control property round-trip.
+    // Custom Active control property. Marshaled as CFBoolean (CFPropertyList leaf type) — a raw
+    // UInt32 is NOT one of AudioServerPlugIn.h's documented custom-property marshaling types
+    // (None/CFString/CFPropertyList) and gets silently rejected by real cross-process property
+    // dispatch even though it can appear to work when this driver is exercised in-process
+    // (exactly how this bug was found: CHECKPOINT 2 failed against the real installed driver
+    // while the old UInt32-based version of this very selftest kept passing).
     AudioObjectPropertyAddress activeAddress = { kJarvisDevicePropertyActive, kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMain };
-    UInt32 activeValue = 1;
+    Boolean hasActive = interface->HasProperty(driverRef, deviceID, 0, &activeAddress);
+    Check("HasProperty(Active) == true", hasActive);
+
+    UInt32 activeSize = 0;
+    status = interface->GetPropertyDataSize(driverRef, deviceID, 0, &activeAddress, 0, NULL, &activeSize);
+    Check("GetPropertyDataSize(Active) succeeds", status == kAudioHardwareNoError && activeSize == sizeof(CFTypeRef));
+
+    CFTypeRef activeValue = kCFBooleanTrue;
     status = interface->SetPropertyData(driverRef, deviceID, 0, &activeAddress, 0, NULL, sizeof(activeValue), &activeValue);
-    Check("SetPropertyData(Active=1) succeeds", status == kAudioHardwareNoError);
-    UInt32 readActive = 0;
-    interface->GetPropertyData(driverRef, deviceID, 0, &activeAddress, 0, NULL, sizeof(readActive), &outSize, &readActive);
-    Check("Active reads back as 1 after Set", readActive == 1);
+    Check("SetPropertyData(Active=true) succeeds", status == kAudioHardwareNoError);
+
+    CFTypeRef readActive = NULL;
+    status = interface->GetPropertyData(driverRef, deviceID, 0, &activeAddress, 0, NULL, sizeof(readActive), &outSize, &readActive);
+    Check("GetPropertyData(Active) succeeds after Set", status == kAudioHardwareNoError);
+    Check("Active reads back as true after Set", readActive == kCFBooleanTrue);
+
     UInt32 readHiddenAfterActivate = 1;
     interface->GetPropertyData(driverRef, deviceID, 0, &hiddenAddress, 0, NULL, sizeof(readHiddenAfterActivate), &outSize, &readHiddenAfterActivate);
-    Check("IsHidden flips to 0 when Active=1", readHiddenAfterActivate == 0);
+    Check("IsHidden flips to 0 when Active=true", readHiddenAfterActivate == 0);
+
+    // Scope mismatch: Active is a device-Global-scope-only control; querying it in Input/Output
+    // scope must return a clear, documented error, never a fabricated success.
+    AudioObjectPropertyAddress activeWrongScope = { kJarvisDevicePropertyActive, kAudioObjectPropertyScopeInput, kAudioObjectPropertyElementMain };
+    CFTypeRef wrongScopeOut = NULL;
+    status = interface->GetPropertyData(driverRef, deviceID, 0, &activeWrongScope, 0, NULL, sizeof(wrongScopeOut), &outSize, &wrongScopeOut);
+    Check("Active with wrong scope returns kAudioHardwareUnknownPropertyError", status == kAudioHardwareUnknownPropertyError);
+
+    // Reset back to inactive so CheckDevice leaves the device in its expected starting state for
+    // any test that runs after it (notably the cross-device independence check in main()).
+    CFTypeRef inactiveValue = kCFBooleanFalse;
+    interface->SetPropertyData(driverRef, deviceID, 0, &activeAddress, 0, NULL, sizeof(inactiveValue), &inactiveValue);
+
+    // kAudioObjectPropertyCustomPropertyInfoList: the documented discovery mechanism a generic
+    // client can use to learn our custom properties' marshaling types without hardcoding them.
+    AudioObjectPropertyAddress customListAddress = { kAudioObjectPropertyCustomPropertyInfoList, kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMain };
+    AudioServerPlugInCustomPropertyInfo customInfo[2];
+    status = interface->GetPropertyData(driverRef, deviceID, 0, &customListAddress, 0, NULL, sizeof(customInfo), &outSize, customInfo);
+    Check("GetPropertyData(CustomPropertyInfoList) succeeds", status == kAudioHardwareNoError);
+    Check("CustomPropertyInfoList reports 2 entries", outSize == sizeof(customInfo));
+    if (status == kAudioHardwareNoError) {
+        Check("CustomPropertyInfoList[0] is Active/CFPropertyList",
+              customInfo[0].mSelector == kJarvisDevicePropertyActive &&
+              customInfo[0].mPropertyDataType == kAudioServerPlugInCustomPropertyDataTypeCFPropertyList);
+    }
 }
 
 int main(int argc, char **argv) {
@@ -152,6 +192,35 @@ int main(int argc, char **argv) {
 
     printf("\n--- Jarvis Call Inject ---\n");
     CheckDevice(interface, driverRef, kJarvisCallAudio_Inject_Device, kJarvisCallAudio_Inject_OutputStream, kJarvisCallAudio_Inject_InputStream, "com.jarvis.callbridge.audio.inject");
+
+    printf("\n--- Cross-device independence (Active state) ---\n");
+    {
+        AudioObjectPropertyAddress activeAddress = { kJarvisDevicePropertyActive, kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMain };
+        CFTypeRef trueValue = kCFBooleanTrue;
+        CFTypeRef falseValue = kCFBooleanFalse;
+
+        // Both start inactive (CheckDevice resets each device back to inactive before returning).
+        CFTypeRef captureBefore = NULL, injectBefore = NULL;
+        interface->GetPropertyData(driverRef, kJarvisCallAudio_Capture_Device, 0, &activeAddress, 0, NULL, sizeof(captureBefore), &outSize, &captureBefore);
+        interface->GetPropertyData(driverRef, kJarvisCallAudio_Inject_Device, 0, &activeAddress, 0, NULL, sizeof(injectBefore), &outSize, &injectBefore);
+        Check("both devices inactive before independence check", captureBefore == kCFBooleanFalse && injectBefore == kCFBooleanFalse);
+
+        // Activate ONLY Capture; Inject must be unaffected.
+        interface->SetPropertyData(driverRef, kJarvisCallAudio_Capture_Device, 0, &activeAddress, 0, NULL, sizeof(trueValue), &trueValue);
+        CFTypeRef captureAfter = NULL, injectAfter = NULL;
+        interface->GetPropertyData(driverRef, kJarvisCallAudio_Capture_Device, 0, &activeAddress, 0, NULL, sizeof(captureAfter), &outSize, &captureAfter);
+        interface->GetPropertyData(driverRef, kJarvisCallAudio_Inject_Device, 0, &activeAddress, 0, NULL, sizeof(injectAfter), &outSize, &injectAfter);
+        Check("Capture independent state: activating Capture only affects Capture", captureAfter == kCFBooleanTrue && injectAfter == kCFBooleanFalse);
+
+        // Clean up, then activate ONLY Inject; Capture must be unaffected.
+        interface->SetPropertyData(driverRef, kJarvisCallAudio_Capture_Device, 0, &activeAddress, 0, NULL, sizeof(falseValue), &falseValue);
+        interface->SetPropertyData(driverRef, kJarvisCallAudio_Inject_Device, 0, &activeAddress, 0, NULL, sizeof(trueValue), &trueValue);
+        interface->GetPropertyData(driverRef, kJarvisCallAudio_Capture_Device, 0, &activeAddress, 0, NULL, sizeof(captureAfter), &outSize, &captureAfter);
+        interface->GetPropertyData(driverRef, kJarvisCallAudio_Inject_Device, 0, &activeAddress, 0, NULL, sizeof(injectAfter), &outSize, &injectAfter);
+        Check("Inject independent state: activating Inject only affects Inject", captureAfter == kCFBooleanFalse && injectAfter == kCFBooleanTrue);
+
+        interface->SetPropertyData(driverRef, kJarvisCallAudio_Inject_Device, 0, &activeAddress, 0, NULL, sizeof(falseValue), &falseValue);
+    }
 
     printf("\n%d failure(s).\n", gFailures);
     printf("This proves the vtable links and both devices answer property queries correctly —\n");

@@ -153,8 +153,85 @@ sudo ./Scripts/uninstall-driver.sh
 4. 각 명령의 "RESULT: PASS/FAIL"과 route unchanged 여부를 이 문서에 기록
 5. `sudo ./Scripts/uninstall-driver.sh`로 정리(선택)
 
+## CHECKPOINT 2 — 1차 시도 결과 및 수정 (2026-08-15, 이어지는 세션)
+
+### 사용자가 실제로 설치/검증한 결과
+
+- `/Library/Audio/Plug-Ins/HAL/JarvisCallAudio.driver` 정상 설치, `coreaudiod` 정상 재시작
+- 다른 HAL driver(AITakeCallAudioDriver, JumpAudio, JumpAudioMic, ParrotAudioPlugin, TVRemoteAudio) 영향 없음 확인
+- Default Input/Output/System Output 기존 값 그대로 유지 확인
+- `system_profiler SPAudioDataType`에는 두 디바이스가 보이지 않음 — hidden 디자인 의도와 일치, 정상
+- `swift run JarvisAudioDriverTool status` 실행 결과 **`Ract`(Active) 커스텀 property 조회가 `kAudioHardwareUnknownPropertyError`('who?')로 실패** — CHECKPOINT 2 BLOCKED
+
+### Root Cause
+
+`AudioServerPlugIn.h`가 명시적으로 문서화하는 제약을 놓쳤다:
+
+> `kAudioServerPlugInCustomPropertyDataTypeNone` / `CFString` / `CFPropertyList` ... "These are the only types supported for custom properties."
+
+`kJarvisDevicePropertyActive`('Ract')/`kJarvisDevicePropertyClearBuffers`('Rclr')를 원시 `UInt32`로 marshaling하도록 구현했는데, **raw UInt32는 custom property에 대해 host가 지원하는 marshaling 타입이 아니다.** 이 때문에:
+
+- **in-process self-test** (같은 프로세스에서 함수 포인터를 직접 호출, 실제 marshaling/IPC 경로를 타지 않음) — 문제없이 PASS
+- **실제 coreaudiod를 통한 cross-process 호출** — host의 property marshaling 레이어가 커스텀 property의 타입을 검증하면서 UInt32를 거부, `GetPropertyData`가 우리 드라이버 코드에 도달하기도 전에 `kAudioHardwareUnknownPropertyError`로 실패
+
+이것이 정확히 CHECKPOINT 1의 self-test가 전부 PASS했음에도 실제 설치된 드라이버에서 실패한 이유다 — self-test는 marshaling 경로 자체를 검증하지 못하는 구조적 한계가 있었다.
+
+추가로, 개선된 진단 코드(§아래 Changed 참고)로 재확인하는 과정에서 **두 번째, 관련은 없지만 유사한 증상의 문제**도 발견했다: `kAudioDevicePropertyDeviceCanBeDefaultDevice`를 `kAudioObjectPropertyScopeGlobal`로 조회하면 마찬가지로 실패한다. 이는 원래 CHECKPOINT 1의 진단 코드가 하나의 `do/catch` 블록에서 여러 property를 순차 조회하다가 `Ract` 실패 시점에 예외가 발생해 이후 코드가 아예 실행되지 않아 가려져 있던 기존 문제였다. Apple 관례상 `CanBeDefaultDevice`는 Global이 아니라 Input/Output scope별로 조회해야 하는 property이며, Global scope 조회 자체를 host가 우리 driver에 전달하기 전에 거부하는 것으로 보인다 — Input/Output scope로 조회하도록 client 코드를 수정하니 (여전히 구버전이 설치된 상태에서) 즉시 해결되는 것을 직접 확인했다(driver 쪽 코드는 애초에 scope를 구분하지 않고 항상 0을 반환하므로 변경 불필요).
+
+### Changed
+
+- `AudioDriver/Plugin/PlugInTypes.h`, `PlugInInterface.c`:
+  - `kAudioObjectPropertyCustomPropertyInfoList`('cust')를 두 Device 객체에 구현 — `Ract`/`Rclr`를 `kAudioServerPlugInCustomPropertyDataTypeCFPropertyList`로 선언
+  - `kJarvisDevicePropertyActive`/`kJarvisDevicePropertyClearBuffers`의 `GetPropertyDataSize`/`GetPropertyData`/`SetPropertyData`를 `UInt32` → `CFTypeRef`(`CFBooleanRef`, `kCFBooleanTrue`/`kCFBooleanFalse`) marshaling으로 변경
+  - 두 property 모두 `kAudioObjectPropertyScopeGlobal` 이외의 scope 요청 시 `kAudioHardwareUnknownPropertyError`를 명확히 반환하도록 scope 검증 추가 (`HasProperty`/`IsPropertySettable`/`GetPropertyDataSize`/`GetPropertyData`/`SetPropertyData` 전부)
+  - `SetPropertyData`가 `CFBooleanRef`뿐 아니라 `CFNumberRef`도 관대하게 허용하는 `CFTypeRefIsTruthy()` 헬퍼 추가(방어적)
+- `AudioDriver/Plugin/selftest.c`: `HasProperty('Ract')`, `GetPropertyDataSize('Ract')`, CFBoolean 기반 Get/Set 왕복, scope mismatch 오류, `kAudioObjectPropertyCustomPropertyInfoList` 조회, **Capture/Inject 각각 독립된 active state**(한쪽만 activate했을 때 반대쪽이 영향받지 않음)까지 검증하는 케이스 추가
+- `Sources/JarvisAudioDriverTool/CoreAudioHelpers.swift`: `getBoolProperty`/`setBoolProperty`/`triggerProperty`(CFBoolean marshaling) 추가, 더 이상 쓰이지 않는 `setUInt32` 제거
+- `Sources/JarvisAudioDriverTool/Commands.swift`: `printDeviceStatus`가 found/deviceID/UID를 항상 먼저 출력하고, 이후 각 property를 **개별 `do/catch`**로 분리해 "하나가 실패해도 나머지는 계속 진단"하도록 개선(이번에 `CanBeDefaultDevice` 문제를 실제로 찾아낸 방식). `CanBeDefaultDevice`를 Output/Input scope로 각각 조회하도록 수정. `activate`/`deactivate`/`clear`/loopback 테스트들도 새 CFBoolean 헬퍼 사용하도록 갱신
+- `Sources/JarvisCallBridge/System/AudioDriverStatus.swift`: 앱 UI의 "Call Audio Driver" 상태 표시도 동일하게 CFBoolean marshaling(`getCustomBool`)으로 수정
+
+### Build
+
+- swift build: **PASS**, warnings: **0**
+- driver build (`Scripts/build-driver.sh`): **PASS**, warnings: **0**
+
+### Tests
+
+- **14 passed**, 0 failed (Phase 0/1 기존 스위트 전체 재확인, 신규 추가 없음 — 이번 수정은 driver/CLI 레이어라 Swift 유닛테스트 대상 밖)
+
+### Custom Property Self-Test
+
+- HasProperty Ract: **PASS**
+- GetPropertyDataSize Ract: **PASS**
+- GetPropertyData Ract: **PASS**
+- SetPropertyData Ract: **PASS**
+- Capture independent state: **PASS**
+- Inject independent state: **PASS**
+- (추가) Scope mismatch(Input/Output로 Ract 조회) → `kAudioHardwareUnknownPropertyError`: **PASS**
+- (추가) `kAudioObjectPropertyCustomPropertyInfoList` 조회 및 내용 검증: **PASS**
+
+전부 in-process self-test 기준이며, **실제 coreaudiod를 통한 marshaling까지 검증하려면 재설치가 필요하다** — 정확히 이번 버그가 self-test만으로는 잡히지 않았던 이유이므로, 재설치 전에는 "고쳤다"고 선언하지 않는다.
+
+### Safety
+
+- sudo not executed
+- installed driver not modified (현재 `/Library/Audio/Plug-Ins/HAL/JarvisCallAudio.driver`는 여전히 버그가 있는 구버전 그대로임 — 이번 세션은 로컬 소스/빌드만 수정)
+- default route not changed
+- hidden 정책을 우회하거나 없애지 않음 — `IsHidden` 관련 코드는 이번 수정에서 건드리지 않음
+
+### Next
+
+**MANUAL DRIVER REINSTALL REQUIRED**
+
+```sh
+cd bridge
+sudo ./Scripts/uninstall-driver.sh   # 기존 구버전 제거 (선택이지만 권장 — 깨끗한 재설치)
+sudo ./Scripts/install-driver.sh     # 수정된 새 빌드 설치
+swift run JarvisAudioDriverTool status
+```
+
 ## Phase Result
 
 에이전트 단계(빌드/자동테스트/self-test)에서 확보 가능한 모든 증거는 PASS다. PRD §35/§36 Phase Gate 원칙에 따라, 실제 coreaudiod 로드와 실제 loopback audio 검증 없이는 PASS/CONDITIONAL PASS/FAIL을 확정하지 않는다.
 
-**CB v2 Phase 1 = WAITING FOR MANUAL DRIVER INSTALL**
+**CB v2 Phase 1 = WAITING FOR MANUAL DRIVER REINSTALL (fix applied, not yet verified on real hardware)**

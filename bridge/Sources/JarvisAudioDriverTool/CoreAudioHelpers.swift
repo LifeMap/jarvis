@@ -44,11 +44,34 @@ enum CoreAudioHelpers {
         return value
     }
 
-    static func setUInt32(_ deviceID: AudioObjectID, _ selector: AudioObjectPropertySelector, _ value: UInt32, scope: AudioObjectPropertyScope = kAudioObjectPropertyScopeGlobal) throws {
-        var address = AudioObjectPropertyAddress(mSelector: selector, mScope: scope, mElement: kAudioObjectPropertyElementMain)
-        var mutableValue = value
-        let status = AudioObjectSetPropertyData(deviceID, &address, 0, nil, UInt32(MemoryLayout<UInt32>.size), &mutableValue)
+    /// For custom properties only (`JarvisCallAudio.propertyActive` / `.propertyClearBuffers`).
+    /// AudioServerPlugIn.h documents CFString/CFPropertyList/None as the only types the host will
+    /// marshal for a plugin's *custom* (non-Apple-defined) properties — a raw UInt32 gets
+    /// silently rejected with kAudioHardwareUnknownPropertyError across the real coreaudiod IPC
+    /// boundary even though it can appear to work against an in-process test double. The driver
+    /// answers these two with `CFBooleanRef` (a valid CFPropertyList leaf type).
+    static func getBoolProperty(_ deviceID: AudioObjectID, _ selector: AudioObjectPropertySelector) throws -> Bool {
+        var address = AudioObjectPropertyAddress(mSelector: selector, mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
+        var value: Unmanaged<CFBoolean>?
+        var size = UInt32(MemoryLayout<Unmanaged<CFBoolean>?>.size)
+        let status = AudioObjectGetPropertyData(deviceID, &address, 0, nil, &size, &value)
+        guard status == noErr, let value else { throw CoreAudioError.osStatus("GetPropertyData(\(selector))", status) }
+        return CFBooleanGetValue(value.takeRetainedValue())
+    }
+
+    static func setBoolProperty(_ deviceID: AudioObjectID, _ selector: AudioObjectPropertySelector, _ value: Bool) throws {
+        var address = AudioObjectPropertyAddress(mSelector: selector, mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
+        var cfValue: CFBoolean = value ? kCFBooleanTrue : kCFBooleanFalse
+        let status = withUnsafeMutablePointer(to: &cfValue) { pointer -> OSStatus in
+            AudioObjectSetPropertyData(deviceID, &address, 0, nil, UInt32(MemoryLayout<CFBoolean>.size), pointer)
+        }
         guard status == noErr else { throw CoreAudioError.osStatus("SetPropertyData(\(selector))", status) }
+    }
+
+    /// Write-only trigger (`propertyClearBuffers`) — the value is ignored by the driver, any Set
+    /// resets that device's loopback buffer.
+    static func triggerProperty(_ deviceID: AudioObjectID, _ selector: AudioObjectPropertySelector) throws {
+        try setBoolProperty(deviceID, selector, true)
     }
 
     static func getCFString(_ deviceID: AudioObjectID, _ selector: AudioObjectPropertySelector) throws -> String {

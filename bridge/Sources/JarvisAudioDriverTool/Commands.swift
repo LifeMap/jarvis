@@ -17,7 +17,7 @@ enum Commands {
     static func status() {
         print("=== JarvisCallAudio driver status ===")
         for (label, uid) in DriverTarget.all.deviceUIDs {
-            printDeviceStatus(label: label, uid: uid, verbose: false)
+            printDeviceStatus(label: label, uid: uid, verbose: true)
         }
         print("")
         print("Route (must stay unchanged across install/activate/deactivate): \(CoreAudioHelpers.currentRoute())")
@@ -29,33 +29,67 @@ enum Commands {
         }
     }
 
+    /// Per §12: reports found/AudioObjectID/UID/hidden/active/format explicitly, and — critically
+    /// — distinguishes "device not found at all" from "device found but a property read failed"
+    /// (the CHECKPOINT 2 bug looked identical to a routing problem until this distinction made it
+    /// obvious the failure was specifically on the custom Active property, not on the device
+    /// resolving to a wrong/broken AudioObjectID).
     private static func printDeviceStatus(label: String, uid: String, verbose: Bool) {
         guard let deviceID = CoreAudioHelpers.deviceID(forUID: uid) else {
             print("\(label): NOT FOUND (uid=\(uid)) — driver not installed/loaded?")
             return
         }
+        print("\(label): found deviceID=\(deviceID) uid=\(uid)")
+
         do {
             let hidden = try CoreAudioHelpers.getUInt32(deviceID, kAudioDevicePropertyIsHidden)
-            let active = try CoreAudioHelpers.getUInt32(deviceID, JarvisCallAudio.propertyActive)
+            print("  hidden: \(hidden == 1)")
+        } catch {
+            print("  hidden: ERROR — \(error)")
+        }
+
+        do {
+            let active = try CoreAudioHelpers.getBoolProperty(deviceID, JarvisCallAudio.propertyActive)
+            print("  active: \(active)")
+        } catch {
+            print("  active: ERROR — \(error)")
+        }
+
+        do {
             let alive = try CoreAudioHelpers.getUInt32(deviceID, kAudioDevicePropertyDeviceIsAlive)
             let running = try CoreAudioHelpers.getUInt32(deviceID, kAudioDevicePropertyDeviceIsRunning)
-            let canDefault = try CoreAudioHelpers.getUInt32(deviceID, kAudioDevicePropertyDeviceCanBeDefaultDevice)
-            print("\(label): deviceID=\(deviceID) uid=\(uid) hidden=\(hidden == 1) active=\(active == 1) alive=\(alive == 1) running=\(running == 1) canBeDefault=\(canDefault == 1)")
+            print("  alive=\(alive == 1) running=\(running == 1)")
+        } catch {
+            print("  alive/running: ERROR — \(error)")
+        }
 
-            if verbose {
-                let outputStreams = try CoreAudioHelpers.getStreams(deviceID, scope: kAudioObjectPropertyScopeOutput)
-                let inputStreams = try CoreAudioHelpers.getStreams(deviceID, scope: kAudioObjectPropertyScopeInput)
-                for streamID in outputStreams {
-                    let format = try CoreAudioHelpers.getFormat(streamID)
-                    print("  output stream \(streamID): \(Int(format.mSampleRate))Hz \(format.mChannelsPerFrame)ch")
-                }
-                for streamID in inputStreams {
-                    let format = try CoreAudioHelpers.getFormat(streamID)
-                    print("  input stream \(streamID): \(Int(format.mSampleRate))Hz \(format.mChannelsPerFrame)ch")
-                }
+        // Apple convention scopes CanBeDefaultDevice per direction (Input/Output), not Global —
+        // querying it at Global scope is itself the error on some hosts, independent of what the
+        // plugin would answer. Check both directions explicitly; this is the property backing our
+        // core safety invariant (PRD §10), so it's worth reading precisely rather than papering
+        // over a query-scope mismatch.
+        do {
+            let canDefaultOutput = try CoreAudioHelpers.getUInt32(deviceID, kAudioDevicePropertyDeviceCanBeDefaultDevice, scope: kAudioObjectPropertyScopeOutput)
+            let canDefaultInput = try CoreAudioHelpers.getUInt32(deviceID, kAudioDevicePropertyDeviceCanBeDefaultDevice, scope: kAudioObjectPropertyScopeInput)
+            print("  canBeDefaultDevice: output=\(canDefaultOutput == 1) input=\(canDefaultInput == 1)")
+        } catch {
+            print("  canBeDefaultDevice: ERROR — \(error)")
+        }
+
+        guard verbose else { return }
+        do {
+            let outputStreams = try CoreAudioHelpers.getStreams(deviceID, scope: kAudioObjectPropertyScopeOutput)
+            let inputStreams = try CoreAudioHelpers.getStreams(deviceID, scope: kAudioObjectPropertyScopeInput)
+            for streamID in outputStreams {
+                let format = try CoreAudioHelpers.getFormat(streamID)
+                print("  output stream \(streamID) format: \(Int(format.mSampleRate))Hz \(format.mChannelsPerFrame)ch")
+            }
+            for streamID in inputStreams {
+                let format = try CoreAudioHelpers.getFormat(streamID)
+                print("  input stream \(streamID) format: \(Int(format.mSampleRate))Hz \(format.mChannelsPerFrame)ch")
             }
         } catch {
-            print("\(label): error reading properties — \(error)")
+            print("  format: ERROR — \(error)")
         }
     }
 
@@ -66,7 +100,7 @@ enum Commands {
                 continue
             }
             do {
-                try CoreAudioHelpers.setUInt32(deviceID, JarvisCallAudio.propertyActive, active ? 1 : 0)
+                try CoreAudioHelpers.setBoolProperty(deviceID, JarvisCallAudio.propertyActive, active)
                 print("\(label): \(active ? "activated" : "deactivated")")
             } catch {
                 print("\(label): FAILED — \(error)")
@@ -81,7 +115,7 @@ enum Commands {
                 continue
             }
             do {
-                try CoreAudioHelpers.setUInt32(deviceID, JarvisCallAudio.propertyClearBuffers, 1)
+                try CoreAudioHelpers.triggerProperty(deviceID, JarvisCallAudio.propertyClearBuffers)
                 print("\(label): buffers cleared")
             } catch {
                 print("\(label): FAILED — \(error)")
@@ -101,7 +135,7 @@ enum Commands {
         }
 
         let before = CoreAudioHelpers.currentRoute()
-        do { try CoreAudioHelpers.setUInt32(deviceID, JarvisCallAudio.propertyActive, 1) }
+        do { try CoreAudioHelpers.setBoolProperty(deviceID, JarvisCallAudio.propertyActive, true) }
         catch { print("FAIL: could not activate device — \(error)"); return }
 
         let session = DeviceIOSession(deviceID: deviceID)
@@ -145,8 +179,8 @@ enum Commands {
         }
 
         do {
-            try CoreAudioHelpers.setUInt32(captureID, JarvisCallAudio.propertyActive, 1)
-            try CoreAudioHelpers.setUInt32(injectID, JarvisCallAudio.propertyActive, 1)
+            try CoreAudioHelpers.setBoolProperty(captureID, JarvisCallAudio.propertyActive, true)
+            try CoreAudioHelpers.setBoolProperty(injectID, JarvisCallAudio.propertyActive, true)
         } catch {
             print("FAIL: could not activate devices — \(error)"); return
         }
@@ -198,8 +232,8 @@ enum Commands {
             }
 
             do {
-                try CoreAudioHelpers.setUInt32(captureID, JarvisCallAudio.propertyActive, 1)
-                try CoreAudioHelpers.setUInt32(injectID, JarvisCallAudio.propertyActive, 1)
+                try CoreAudioHelpers.setBoolProperty(captureID, JarvisCallAudio.propertyActive, true)
+                try CoreAudioHelpers.setBoolProperty(injectID, JarvisCallAudio.propertyActive, true)
 
                 let captureSession = DeviceIOSession(deviceID: captureID)
                 let injectSession = DeviceIOSession(deviceID: injectID)
@@ -209,8 +243,8 @@ enum Commands {
                 captureSession.stop()
                 injectSession.stop()
 
-                try CoreAudioHelpers.setUInt32(captureID, JarvisCallAudio.propertyActive, 0)
-                try CoreAudioHelpers.setUInt32(injectID, JarvisCallAudio.propertyActive, 0)
+                try CoreAudioHelpers.setBoolProperty(captureID, JarvisCallAudio.propertyActive, false)
+                try CoreAudioHelpers.setBoolProperty(injectID, JarvisCallAudio.propertyActive, false)
 
                 print("iteration \(iteration): PASS")
             } catch {
