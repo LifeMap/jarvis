@@ -18,4 +18,12 @@ final class BridgeLogger: ObservableObject {
         if lines.count > 500 { lines.removeFirst(lines.count - 500) }
         print(line)
     }
+
+    /// CHECKPOINT 2 diagnostic UX: the entire current in-memory buffer as one newline-joined
+    /// plain-text string, for "Copy All Logs" / "Save Logs…". Format/content is untouched — this
+    /// only joins what `log(_:)` already produced.
+    func exportText() -> String {
+        lines.joined(separator: "\n")
+    }
 }
+

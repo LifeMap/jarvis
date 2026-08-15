@@ -17,6 +17,10 @@ final class AccessibilityStatus: ObservableObject {
 
     func refresh() {
         let trusted = AXIsProcessTrusted()
+        // Explicit [AX-AUTH] line every refresh (not just on change) — CHECKPOINT 2's diagnostic
+        // fix instructions want authorization state unambiguous in the log at the moment any
+        // scan is attempted, not inferred from an earlier state-change line.
+        logger.log("[AX-AUTH] trusted=\(trusted)")
         if trusted != isGranted {
             logger.log("[ACCESSIBILITY] granted=\(trusted)")
         }

@@ -75,7 +75,6 @@
         "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/ModuleCache",
         "-parseable-output",
         "-parse-as-library",
-        "-color-diagnostics",
         "-swift-version",
         "6",
         "-plugin-path",
@@ -192,7 +191,6 @@
         "-entry-point-function-name",
         "-Xfrontend",
         "JarvisAudioDriverTool_main",
-        "-color-diagnostics",
         "-swift-version",
         "6",
         "-plugin-path",
@@ -279,7 +277,35 @@
         },
         {
           "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/AXDiagnosticSnapshot.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/AXEventDiagnosticsSession.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/AXRawDiscovery.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/AccessibilityRawDiagnosticsProviding.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/AccessibilityScanning.swift"
+        },
+        {
+          "kind" : "file",
           "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/AccessibilityStatus.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/AnswerCandidate.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/AutoAnswerController.swift"
         },
         {
           "kind" : "file",
@@ -287,11 +313,51 @@
         },
         {
           "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/CallLifecycleState.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/CallLifecycleTracker.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/CallStateEvidenceExtractor.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/FaceTimeNotificationCallStateClassifier.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/FocusedCallAXSnapshot.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/IncomingAnswerControlMatcher.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/IncomingCallObserver.swift"
+        },
+        {
+          "kind" : "file",
           "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/PhoneAppDiscovery.swift"
         },
         {
           "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/SystemAccessibilityClient.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Logging/AXSnapshotExport.swift"
+        },
+        {
+          "kind" : "file",
           "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Logging/BridgeLogger.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Logging/LogExport.swift"
         },
         {
           "kind" : "file",
@@ -332,10 +398,27 @@
       "objects" : [
         "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/BridgeViewModel.swift.o",
         "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/JarvisCallBridgeApp.swift.o",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AXDiagnosticSnapshot.swift.o",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AXEventDiagnosticsSession.swift.o",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AXRawDiscovery.swift.o",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AccessibilityRawDiagnosticsProviding.swift.o",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AccessibilityScanning.swift.o",
         "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AccessibilityStatus.swift.o",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AnswerCandidate.swift.o",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AutoAnswerController.swift.o",
         "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/CallControlService.swift.o",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/CallLifecycleState.swift.o",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/CallLifecycleTracker.swift.o",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/CallStateEvidenceExtractor.swift.o",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/FaceTimeNotificationCallStateClassifier.swift.o",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/FocusedCallAXSnapshot.swift.o",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/IncomingAnswerControlMatcher.swift.o",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/IncomingCallObserver.swift.o",
         "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/PhoneAppDiscovery.swift.o",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/SystemAccessibilityClient.swift.o",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AXSnapshotExport.swift.o",
         "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/BridgeLogger.swift.o",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/LogExport.swift.o",
         "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/BridgeState.swift.o",
         "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/BridgeStateMachine.swift.o",
         "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AudioDriverActivating.swift.o",
@@ -364,7 +447,6 @@
         "-entry-point-function-name",
         "-Xfrontend",
         "JarvisCallBridge_main",
-        "-color-diagnostics",
         "-swift-version",
         "6",
         "-plugin-path",
@@ -405,7 +487,35 @@
         },
         {
           "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AXDiagnosticSnapshot.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AXEventDiagnosticsSession.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AXRawDiscovery.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AccessibilityRawDiagnosticsProviding.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AccessibilityScanning.swift.o"
+        },
+        {
+          "kind" : "file",
           "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AccessibilityStatus.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AnswerCandidate.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AutoAnswerController.swift.o"
         },
         {
           "kind" : "file",
@@ -413,11 +523,51 @@
         },
         {
           "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/CallLifecycleState.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/CallLifecycleTracker.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/CallStateEvidenceExtractor.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/FaceTimeNotificationCallStateClassifier.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/FocusedCallAXSnapshot.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/IncomingAnswerControlMatcher.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/IncomingCallObserver.swift.o"
+        },
+        {
+          "kind" : "file",
           "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/PhoneAppDiscovery.swift.o"
         },
         {
           "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/SystemAccessibilityClient.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AXSnapshotExport.swift.o"
+        },
+        {
+          "kind" : "file",
           "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/BridgeLogger.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/LogExport.swift.o"
         },
         {
           "kind" : "file",
@@ -452,10 +602,27 @@
       "sources" : [
         "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/App/BridgeViewModel.swift",
         "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/App/JarvisCallBridgeApp.swift",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/AXDiagnosticSnapshot.swift",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/AXEventDiagnosticsSession.swift",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/AXRawDiscovery.swift",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/AccessibilityRawDiagnosticsProviding.swift",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/AccessibilityScanning.swift",
         "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/AccessibilityStatus.swift",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/AnswerCandidate.swift",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/AutoAnswerController.swift",
         "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/CallControlService.swift",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/CallLifecycleState.swift",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/CallLifecycleTracker.swift",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/CallStateEvidenceExtractor.swift",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/FaceTimeNotificationCallStateClassifier.swift",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/FocusedCallAXSnapshot.swift",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/IncomingAnswerControlMatcher.swift",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/IncomingCallObserver.swift",
         "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/PhoneAppDiscovery.swift",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/SystemAccessibilityClient.swift",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Logging/AXSnapshotExport.swift",
         "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Logging/BridgeLogger.swift",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Logging/LogExport.swift",
         "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/State/BridgeState.swift",
         "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/State/BridgeStateMachine.swift",
         "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/System/AudioDriverActivating.swift",
@@ -527,7 +694,6 @@
         "-emit-objc-header",
         "-emit-objc-header-path",
         "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgePackageTests.build/include/JarvisCallBridgePackageTests-Swift.h",
-        "-color-diagnostics",
         "-plugin-path",
         "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
         "-sdk",
@@ -579,7 +745,39 @@
       "inputs" : [
         {
           "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/AXDiagnosticSnapshotTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/AXEventDiagnosticsSessionTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/AXRawDiscoveryTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/AnswerCandidateResolverTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/AnswerTransitionGraceTests.swift"
+        },
+        {
+          "kind" : "file",
           "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/AudioRouteManagerTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/AutoAnswerControllerTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/AutoAnswerGateBTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/AutoAnswerRevalidationTests.swift"
         },
         {
           "kind" : "file",
@@ -587,7 +785,51 @@
         },
         {
           "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/CallLifecycleActiveTransitionTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/CallLifecycleTrackerTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/FaceTimeNotificationCallStateClassifierTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/FalsePositiveRegressionTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/FocusedCallAXSnapshotTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/GateCSafetyRegressionTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/IncomingCallObserverTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/LogExportTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/MockAccessibilityClient.swift"
+        },
+        {
+          "kind" : "file",
           "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/PhoneAppDiscoveryTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/ProductionFocusedScanParityTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/SystemAccessibilityClientDiagnosticsTests.swift"
         },
         {
           "kind" : "file",
@@ -606,9 +848,28 @@
       "moduleName" : "JarvisCallBridgeTests",
       "moduleOutputPath" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/Modules/JarvisCallBridgeTests.swiftmodule",
       "objects" : [
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/AXDiagnosticSnapshotTests.swift.o",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/AXEventDiagnosticsSessionTests.swift.o",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/AXRawDiscoveryTests.swift.o",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/AnswerCandidateResolverTests.swift.o",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/AnswerTransitionGraceTests.swift.o",
         "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/AudioRouteManagerTests.swift.o",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/AutoAnswerControllerTests.swift.o",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/AutoAnswerGateBTests.swift.o",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/AutoAnswerRevalidationTests.swift.o",
         "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/BridgeStateMachineTests.swift.o",
-        "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/PhoneAppDiscoveryTests.swift.o"
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/CallLifecycleActiveTransitionTests.swift.o",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/CallLifecycleTrackerTests.swift.o",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/FaceTimeNotificationCallStateClassifierTests.swift.o",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/FalsePositiveRegressionTests.swift.o",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/FocusedCallAXSnapshotTests.swift.o",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/GateCSafetyRegressionTests.swift.o",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/IncomingCallObserverTests.swift.o",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/LogExportTests.swift.o",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/MockAccessibilityClient.swift.o",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/PhoneAppDiscoveryTests.swift.o",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/ProductionFocusedScanParityTests.swift.o",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/SystemAccessibilityClientDiagnosticsTests.swift.o"
       ],
       "otherArguments" : [
         "-target",
@@ -630,7 +891,6 @@
         "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/ModuleCache",
         "-parseable-output",
         "-parse-as-library",
-        "-color-diagnostics",
         "-swift-version",
         "6",
         "-plugin-path",
@@ -663,7 +923,39 @@
       "outputs" : [
         {
           "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/AXDiagnosticSnapshotTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/AXEventDiagnosticsSessionTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/AXRawDiscoveryTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/AnswerCandidateResolverTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/AnswerTransitionGraceTests.swift.o"
+        },
+        {
+          "kind" : "file",
           "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/AudioRouteManagerTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/AutoAnswerControllerTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/AutoAnswerGateBTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/AutoAnswerRevalidationTests.swift.o"
         },
         {
           "kind" : "file",
@@ -671,7 +963,51 @@
         },
         {
           "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/CallLifecycleActiveTransitionTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/CallLifecycleTrackerTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/FaceTimeNotificationCallStateClassifierTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/FalsePositiveRegressionTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/FocusedCallAXSnapshotTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/GateCSafetyRegressionTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/IncomingCallObserverTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/LogExportTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/MockAccessibilityClient.swift.o"
+        },
+        {
+          "kind" : "file",
           "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/PhoneAppDiscoveryTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/ProductionFocusedScanParityTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/SystemAccessibilityClientDiagnosticsTests.swift.o"
         },
         {
           "kind" : "file",
@@ -680,9 +1016,28 @@
       ],
       "prepareForIndexing" : false,
       "sources" : [
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/AXDiagnosticSnapshotTests.swift",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/AXEventDiagnosticsSessionTests.swift",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/AXRawDiscoveryTests.swift",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/AnswerCandidateResolverTests.swift",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/AnswerTransitionGraceTests.swift",
         "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/AudioRouteManagerTests.swift",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/AutoAnswerControllerTests.swift",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/AutoAnswerGateBTests.swift",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/AutoAnswerRevalidationTests.swift",
         "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/BridgeStateMachineTests.swift",
-        "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/PhoneAppDiscoveryTests.swift"
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/CallLifecycleActiveTransitionTests.swift",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/CallLifecycleTrackerTests.swift",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/FaceTimeNotificationCallStateClassifierTests.swift",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/FalsePositiveRegressionTests.swift",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/FocusedCallAXSnapshotTests.swift",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/GateCSafetyRegressionTests.swift",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/IncomingCallObserverTests.swift",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/LogExportTests.swift",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/MockAccessibilityClient.swift",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/PhoneAppDiscoveryTests.swift",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/ProductionFocusedScanParityTests.swift",
+        "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/SystemAccessibilityClientDiagnosticsTests.swift"
       ],
       "tempsPath" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build",
       "wholeModuleOptimization" : false
@@ -727,7 +1082,6 @@
       "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/ModuleCache",
       "-parseable-output",
       "-parse-as-library",
-      "-color-diagnostics",
       "-swift-version",
       "6",
       "-plugin-path",
@@ -793,7 +1147,6 @@
       "-entry-point-function-name",
       "-Xfrontend",
       "JarvisAudioDriverTool_main",
-      "-color-diagnostics",
       "-swift-version",
       "6",
       "-plugin-path",
@@ -833,10 +1186,27 @@
       "-c",
       "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/App/BridgeViewModel.swift",
       "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/App/JarvisCallBridgeApp.swift",
+      "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/AXDiagnosticSnapshot.swift",
+      "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/AXEventDiagnosticsSession.swift",
+      "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/AXRawDiscovery.swift",
+      "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/AccessibilityRawDiagnosticsProviding.swift",
+      "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/AccessibilityScanning.swift",
       "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/AccessibilityStatus.swift",
+      "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/AnswerCandidate.swift",
+      "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/AutoAnswerController.swift",
       "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/CallControlService.swift",
+      "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/CallLifecycleState.swift",
+      "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/CallLifecycleTracker.swift",
+      "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/CallStateEvidenceExtractor.swift",
+      "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/FaceTimeNotificationCallStateClassifier.swift",
+      "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/FocusedCallAXSnapshot.swift",
+      "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/IncomingAnswerControlMatcher.swift",
+      "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/IncomingCallObserver.swift",
       "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/PhoneAppDiscovery.swift",
+      "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/SystemAccessibilityClient.swift",
+      "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Logging/AXSnapshotExport.swift",
       "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Logging/BridgeLogger.swift",
+      "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Logging/LogExport.swift",
       "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/State/BridgeState.swift",
       "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/State/BridgeStateMachine.swift",
       "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/System/AudioDriverActivating.swift",
@@ -865,7 +1235,6 @@
       "-entry-point-function-name",
       "-Xfrontend",
       "JarvisCallBridge_main",
-      "-color-diagnostics",
       "-swift-version",
       "6",
       "-plugin-path",
@@ -934,7 +1303,6 @@
       "-emit-objc-header",
       "-emit-objc-header-path",
       "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgePackageTests.build/include/JarvisCallBridgePackageTests-Swift.h",
-      "-color-diagnostics",
       "-plugin-path",
       "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
       "-sdk",
@@ -970,9 +1338,28 @@
       "-package-name",
       "bridge",
       "-c",
+      "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/AXDiagnosticSnapshotTests.swift",
+      "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/AXEventDiagnosticsSessionTests.swift",
+      "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/AXRawDiscoveryTests.swift",
+      "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/AnswerCandidateResolverTests.swift",
+      "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/AnswerTransitionGraceTests.swift",
       "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/AudioRouteManagerTests.swift",
+      "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/AutoAnswerControllerTests.swift",
+      "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/AutoAnswerGateBTests.swift",
+      "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/AutoAnswerRevalidationTests.swift",
       "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/BridgeStateMachineTests.swift",
+      "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/CallLifecycleActiveTransitionTests.swift",
+      "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/CallLifecycleTrackerTests.swift",
+      "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/FaceTimeNotificationCallStateClassifierTests.swift",
+      "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/FalsePositiveRegressionTests.swift",
+      "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/FocusedCallAXSnapshotTests.swift",
+      "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/GateCSafetyRegressionTests.swift",
+      "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/IncomingCallObserverTests.swift",
+      "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/LogExportTests.swift",
+      "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/MockAccessibilityClient.swift",
       "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/PhoneAppDiscoveryTests.swift",
+      "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/ProductionFocusedScanParityTests.swift",
+      "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/SystemAccessibilityClientDiagnosticsTests.swift",
       "-I",
       "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/Modules",
       "-target",
@@ -994,7 +1381,6 @@
       "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/ModuleCache",
       "-parseable-output",
       "-parse-as-library",
-      "-color-diagnostics",
       "-swift-version",
       "6",
       "-plugin-path",
@@ -1198,7 +1584,35 @@
         },
         {
           "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/AXDiagnosticSnapshot.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/AXEventDiagnosticsSession.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/AXRawDiscovery.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/AccessibilityRawDiagnosticsProviding.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/AccessibilityScanning.swift"
+        },
+        {
+          "kind" : "file",
           "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/AccessibilityStatus.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/AnswerCandidate.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/AutoAnswerController.swift"
         },
         {
           "kind" : "file",
@@ -1206,11 +1620,51 @@
         },
         {
           "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/CallLifecycleState.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/CallLifecycleTracker.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/CallStateEvidenceExtractor.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/FaceTimeNotificationCallStateClassifier.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/FocusedCallAXSnapshot.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/IncomingAnswerControlMatcher.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/IncomingCallObserver.swift"
+        },
+        {
+          "kind" : "file",
           "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/PhoneAppDiscovery.swift"
         },
         {
           "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Call/SystemAccessibilityClient.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Logging/AXSnapshotExport.swift"
+        },
+        {
+          "kind" : "file",
           "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Logging/BridgeLogger.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Sources/JarvisCallBridge/Logging/LogExport.swift"
         },
         {
           "kind" : "file",
@@ -1248,7 +1702,35 @@
         },
         {
           "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AXDiagnosticSnapshot.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AXEventDiagnosticsSession.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AXRawDiscovery.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AXSnapshotExport.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AccessibilityRawDiagnosticsProviding.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AccessibilityScanning.swift.o"
+        },
+        {
+          "kind" : "file",
           "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AccessibilityStatus.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AnswerCandidate.swift.o"
         },
         {
           "kind" : "file",
@@ -1261,6 +1743,10 @@
         {
           "kind" : "file",
           "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AudioRouteManager.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AutoAnswerController.swift.o"
         },
         {
           "kind" : "file",
@@ -1284,7 +1770,35 @@
         },
         {
           "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/CallLifecycleState.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/CallLifecycleTracker.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/CallStateEvidenceExtractor.swift.o"
+        },
+        {
+          "kind" : "file",
           "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/ContentView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/FaceTimeNotificationCallStateClassifier.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/FocusedCallAXSnapshot.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/IncomingAnswerControlMatcher.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/IncomingCallObserver.swift.o"
         },
         {
           "kind" : "file",
@@ -1292,7 +1806,15 @@
         },
         {
           "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/LogExport.swift.o"
+        },
+        {
+          "kind" : "file",
           "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/PhoneAppDiscovery.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/SystemAccessibilityClient.swift.o"
         }
       ],
       "outputFilePath" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.product/Objects.LinkFileList"
@@ -1324,7 +1846,35 @@
         },
         {
           "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AXDiagnosticSnapshot.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AXEventDiagnosticsSession.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AXRawDiscovery.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AXSnapshotExport.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AccessibilityRawDiagnosticsProviding.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AccessibilityScanning.swift.o"
+        },
+        {
+          "kind" : "file",
           "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AccessibilityStatus.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AnswerCandidate.swift.o"
         },
         {
           "kind" : "file",
@@ -1337,6 +1887,10 @@
         {
           "kind" : "file",
           "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AudioRouteManager.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/AutoAnswerController.swift.o"
         },
         {
           "kind" : "file",
@@ -1360,7 +1914,35 @@
         },
         {
           "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/CallLifecycleState.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/CallLifecycleTracker.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/CallStateEvidenceExtractor.swift.o"
+        },
+        {
+          "kind" : "file",
           "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/ContentView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/FaceTimeNotificationCallStateClassifier.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/FocusedCallAXSnapshot.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/IncomingAnswerControlMatcher.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/IncomingCallObserver.swift.o"
         },
         {
           "kind" : "file",
@@ -1368,7 +1950,15 @@
         },
         {
           "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/LogExport.swift.o"
+        },
+        {
+          "kind" : "file",
           "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/PhoneAppDiscovery.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridge.build/SystemAccessibilityClient.swift.o"
         },
         {
           "kind" : "file",
@@ -1376,7 +1966,39 @@
         },
         {
           "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/AXDiagnosticSnapshotTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/AXEventDiagnosticsSessionTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/AXRawDiscoveryTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/AnswerCandidateResolverTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/AnswerTransitionGraceTests.swift.o"
+        },
+        {
+          "kind" : "file",
           "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/AudioRouteManagerTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/AutoAnswerControllerTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/AutoAnswerGateBTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/AutoAnswerRevalidationTests.swift.o"
         },
         {
           "kind" : "file",
@@ -1384,7 +2006,51 @@
         },
         {
           "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/CallLifecycleActiveTransitionTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/CallLifecycleTrackerTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/FaceTimeNotificationCallStateClassifierTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/FalsePositiveRegressionTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/FocusedCallAXSnapshotTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/GateCSafetyRegressionTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/IncomingCallObserverTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/LogExportTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/MockAccessibilityClient.swift.o"
+        },
+        {
+          "kind" : "file",
           "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/PhoneAppDiscoveryTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/ProductionFocusedScanParityTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/SystemAccessibilityClientDiagnosticsTests.swift.o"
         },
         {
           "kind" : "file",
@@ -1402,7 +2068,39 @@
         },
         {
           "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/AXDiagnosticSnapshotTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/AXEventDiagnosticsSessionTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/AXRawDiscoveryTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/AnswerCandidateResolverTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/AnswerTransitionGraceTests.swift"
+        },
+        {
+          "kind" : "file",
           "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/AudioRouteManagerTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/AutoAnswerControllerTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/AutoAnswerGateBTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/AutoAnswerRevalidationTests.swift"
         },
         {
           "kind" : "file",
@@ -1410,7 +2108,51 @@
         },
         {
           "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/CallLifecycleActiveTransitionTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/CallLifecycleTrackerTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/FaceTimeNotificationCallStateClassifierTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/FalsePositiveRegressionTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/FocusedCallAXSnapshotTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/GateCSafetyRegressionTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/IncomingCallObserverTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/LogExportTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/MockAccessibilityClient.swift"
+        },
+        {
+          "kind" : "file",
           "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/PhoneAppDiscoveryTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/ProductionFocusedScanParityTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/Tests/JarvisCallBridgeTests/SystemAccessibilityClientDiagnosticsTests.swift"
         }
       ],
       "outputFilePath" : "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgeTests.build/sources"

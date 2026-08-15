@@ -230,8 +230,27 @@ sudo ./Scripts/install-driver.sh     # 수정된 새 빌드 설치
 swift run JarvisAudioDriverTool status
 ```
 
+## CHECKPOINT 2~7 — 실제 Mac Studio 최종 검증 결과 (사용자 보고, 2026-08-15)
+
+재설치 후 사용자가 실제 Mac Studio에서 `JarvisAudioDriverTool`로 직접 수행한 결과. 아래 수치는 전부 사용자가 보고한 값을 그대로 옮긴 것이며, 에이전트가 추측/추가하지 않았다.
+
+1. **Driver install**: PASS
+2. **Idle 상태**: Capture `hidden=true active=false`, Inject `hidden=true active=false` — CFBoolean marshaling 수정이 실기기에서 정상 동작함을 확인 (CHECKPOINT 2 버그 해결됨)
+3. **Default route**: Input=`Microphone`, Output=`Smart M80C`, SystemOutput=`Mac Studio 스피커` — 설치/activate/deactivate 전 과정에서 변경 없음
+4. **Device Activation**: Jarvis Call Capture/Inject 각각 48000Hz, Input 2ch, Output 2ch, Virtual로 정상 확인
+5. **Capture Loopback**: ch0 expected 440Hz / measured 437.6Hz / correlation 0.998, ch1 expected 880Hz / measured 875.2Hz / correlation 0.998 — **PASS**
+6. **Inject Loopback**: 동일 수준 correlation 0.998 — **PASS**
+7. **Cross-device isolation**: Capture foreign-tone magnitude ≈2.84e-05, Inject foreign-tone magnitude ≈3.16e-05 (own-tone 대비 극히 낮음) — **PASS**
+8. **Lifecycle stress**: 10/10 iterations PASS
+9. **Deactivation**: Capture/Inject 모두 `hidden=true active=false`로 정상 복귀
+10. **Phase 0 regression**: Work Mode ON/ARMED 상태에서 실제 착신 정상, 착신 중에도 Capture/Inject `active=false` 유지, audio route unchanged
+
 ## Phase Result
 
-에이전트 단계(빌드/자동테스트/self-test)에서 확보 가능한 모든 증거는 PASS다. PRD §35/§36 Phase Gate 원칙에 따라, 실제 coreaudiod 로드와 실제 loopback audio 검증 없이는 PASS/CONDITIONAL PASS/FAIL을 확정하지 않는다.
+**PASS**
 
-**CB v2 Phase 1 = WAITING FOR MANUAL DRIVER REINSTALL (fix applied, not yet verified on real hardware)**
+Phase 0 Gate(CONDITIONAL PASS, 실제 착신 검증됨)를 전제로, CB v2 Phase 1의 모든 Final Acceptance 항목(driver 빌드, 두 디바이스 정상 동작, Capture/Inject loopback correlation ≥0.998, cross-device isolation, 10회 lifecycle stress, default route 불변, Phase 0 regression 없음)이 실제 Mac Studio에서 확인되었다. CHECKPOINT 2에서 발견된 custom-property marshaling 버그는 근본 원인을 규명하고 수정한 뒤 재설치 검증까지 완료했다.
+
+**CB v2 Phase 1 = PASS**
+
+Phase 2(Incoming Call Lifecycle)로 진행 가능.
