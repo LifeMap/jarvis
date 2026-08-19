@@ -62,14 +62,14 @@ final class AutoAnswerGateBTests: XCTestCase {
         let observer = IncomingCallObserver(scanner: scanner, tracker: tracker, autoAnswer: autoAnswer, logger: BridgeLogger(), workModeArmedProvider: { true })
 
         scanner.snapshotsToReturn = TestSnapshots.ringingCallBannerFixture()
-        observer.tick()
+        await observer.tick()
         XCTAssertEqual(tracker.state, .ringing)
         XCTAssertNotNil(autoAnswer.countdownRemaining)
 
         // User manually answers — the banner transforms to the real active signature before the
         // Auto Answer delay elapses.
         scanner.snapshotsToReturn = TestSnapshots.activeCallBannerFixture()
-        observer.tick()
+        await observer.tick()
         XCTAssertEqual(tracker.state, .active)
 
         await autoAnswer.waitForScheduledAttempt()
@@ -87,15 +87,15 @@ final class AutoAnswerGateBTests: XCTestCase {
         let observer = IncomingCallObserver(scanner: scanner, tracker: tracker, autoAnswer: autoAnswer, logger: BridgeLogger(), workModeArmedProvider: { true })
 
         scanner.snapshotsToReturn = TestSnapshots.ringingCallBannerFixture()
-        observer.tick()
+        await observer.tick()
         XCTAssertEqual(tracker.state, .ringing)
 
         scanner.snapshotsToReturn = [] // caller hangs up
-        observer.tick() // starts the tracker's own answerTransitionGrace
+        await observer.tick() // starts the tracker's own answerTransitionGrace
         XCTAssertEqual(tracker.state, .answering)
 
         try? await Task.sleep(nanoseconds: 200_000_000) // past the 0.1s grace
-        observer.tick()
+        await observer.tick()
         XCTAssertEqual(tracker.state, .idle)
 
         await autoAnswer.waitForScheduledAttempt()
@@ -161,7 +161,7 @@ final class AutoAnswerGateBTests: XCTestCase {
         let observer = IncomingCallObserver(scanner: scanner, tracker: tracker, autoAnswer: autoAnswer, logger: BridgeLogger(), workModeArmedProvider: { true })
 
         scanner.snapshotsToReturn = TestSnapshots.ringingCallBannerFixture()
-        observer.tick()
+        await observer.tick()
         let sessionID = tracker.currentSession?.id
         XCTAssertEqual(tracker.state, .ringing)
 
@@ -171,7 +171,7 @@ final class AutoAnswerGateBTests: XCTestCase {
         XCTAssertEqual(tracker.currentSession?.id, sessionID)
 
         scanner.snapshotsToReturn = TestSnapshots.activeCallBannerFixture()
-        observer.tick()
+        await observer.tick()
 
         XCTAssertEqual(tracker.state, .active)
         XCTAssertEqual(tracker.currentSession?.id, sessionID, "same session id must persist from ringing through active")

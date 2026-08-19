@@ -3,21 +3,21 @@ import XCTest
 
 @MainActor
 final class IncomingCallObserverTests: XCTestCase {
-    func testWorkModeOffKeepsObserverInactiveEvenWithCandidatesPresent() {
+    func testWorkModeOffKeepsObserverInactiveEvenWithCandidatesPresent() async {
         let scanner = MockAccessibilityScanning()
         scanner.snapshotsToReturn = [TestSnapshots.highConfidenceAnswerButton()]
         let tracker = CallLifecycleTracker(logger: BridgeLogger())
         let autoAnswer = AutoAnswerController(scanner: scanner, tracker: tracker, logger: BridgeLogger())
         let observer = IncomingCallObserver(scanner: scanner, tracker: tracker, autoAnswer: autoAnswer, logger: BridgeLogger(), workModeArmedProvider: { false })
 
-        observer.tick()
+        await observer.tick()
 
         XCTAssertEqual(tracker.state, .idle)
         XCTAssertTrue(observer.candidates.isEmpty)
         XCTAssertEqual(scanner.pressCallCount, 0)
     }
 
-    func testArmedWithIncomingCandidateReachesRinging() {
+    func testArmedWithIncomingCandidateReachesRinging() async {
         let scanner = MockAccessibilityScanning()
         scanner.snapshotsToReturn = [TestSnapshots.highConfidenceAnswerButton()]
         let tracker = CallLifecycleTracker(logger: BridgeLogger())
@@ -25,7 +25,7 @@ final class IncomingCallObserverTests: XCTestCase {
         autoAnswer.isEnabled = false // isolate detection from auto-answer for this test
         let observer = IncomingCallObserver(scanner: scanner, tracker: tracker, autoAnswer: autoAnswer, logger: BridgeLogger(), workModeArmedProvider: { true })
 
-        observer.tick()
+        await observer.tick()
 
         XCTAssertEqual(tracker.state, .ringing)
         XCTAssertEqual(observer.candidates.count, 1)
@@ -56,7 +56,7 @@ final class IncomingCallObserverTests: XCTestCase {
 
         // Ringing.
         scanner.snapshotsToReturn = [TestSnapshots.highConfidenceAnswerButton()]
-        observer.tick()
+        await observer.tick()
         XCTAssertEqual(tracker.state, .ringing)
         XCTAssertEqual(routeSpy.callCount, 0)
         XCTAssertEqual(driverSpy.activateCallCount, 0)
@@ -71,7 +71,7 @@ final class IncomingCallObserverTests: XCTestCase {
         // candidates (never a separately-mocked `evidenceToReturn`), so this uses the real
         // observed active-call banner shape (응답/거절 replaced by 종료/소리 끔/키패드).
         scanner.snapshotsToReturn = TestSnapshots.activeCallBannerFixture()
-        observer.tick()
+        await observer.tick()
         XCTAssertEqual(tracker.state, .active)
         XCTAssertEqual(routeSpy.callCount, 0)
         XCTAssertEqual(driverSpy.activateCallCount, 0)
@@ -79,7 +79,7 @@ final class IncomingCallObserverTests: XCTestCase {
 
         // End.
         scanner.snapshotsToReturn = []
-        observer.tick()
+        await observer.tick()
         XCTAssertEqual(tracker.state, .ending)
 
         XCTAssertEqual(routeSpy.callCount, 0, "audio route must never be mutated across the whole call lifecycle")

@@ -1,3 +1,0 @@
-module JarvisCallBridgePackageTests {
-    header "/Volumes/Dev/workspaces/twms/jarvis/bridge/.build/arm64-apple-macosx/debug/JarvisCallBridgePackageTests.build/include/JarvisCallBridgePackageTests-Swift.h"
-}

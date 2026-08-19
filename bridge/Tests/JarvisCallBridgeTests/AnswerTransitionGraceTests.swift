@@ -194,7 +194,7 @@ final class AnswerTransitionGraceTests: XCTestCase {
 
     // §16 item 14: Work Mode OFF mid-grace safely resets, via the same `IncomingCallObserver.tick()`
     // path production uses (`workModeArmedProvider() == false` → `tracker.reset()`).
-    func testWorkModeOffDuringGraceCancelsPendingTransitionSafely() {
+    func testWorkModeOffDuringGraceCancelsPendingTransitionSafely() async {
         let scanner = MockAccessibilityScanning()
         let tracker = CallLifecycleTracker(answerTransitionGrace: 2.5, logger: BridgeLogger())
         let autoAnswer = AutoAnswerController(scanner: scanner, tracker: tracker, logger: BridgeLogger())
@@ -202,15 +202,15 @@ final class AnswerTransitionGraceTests: XCTestCase {
         let observer = IncomingCallObserver(scanner: scanner, tracker: tracker, autoAnswer: autoAnswer, logger: BridgeLogger(), workModeArmedProvider: { workModeOn })
 
         scanner.snapshotsToReturn = TestSnapshots.ringingCallBannerFixture()
-        observer.tick()
+        await observer.tick()
         XCTAssertEqual(tracker.state, .ringing)
 
         scanner.snapshotsToReturn = [] // banner transforms mid-grace
-        observer.tick()
+        await observer.tick()
         XCTAssertEqual(tracker.state, .answering)
 
         workModeOn = false
-        observer.tick()
+        await observer.tick()
 
         XCTAssertEqual(tracker.state, .idle, "Work Mode OFF must safely reset out of a pending answer transition")
         XCTAssertNil(tracker.currentSession)

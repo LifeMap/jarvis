@@ -99,3 +99,35 @@ void JarvisLoopbackBufferRead(JarvisLoopbackBuffer *buffer, float *outFrames, ui
 
     __atomic_store_n(&buffer->readIndex, readIndex + framesToCopy, __ATOMIC_RELAXED);
 }
+
+void JarvisLoopbackBufferTapLatest(JarvisLoopbackBuffer *buffer, float *outFrames, uint32_t frameCount) {
+    if (buffer == NULL || outFrames == NULL || frameCount == 0) return;
+    const uint32_t channels = buffer->channelCount;
+    if (buffer->samples == NULL) {
+        memset(outFrames, 0, (size_t)frameCount * channels * sizeof(float));
+        return;
+    }
+
+    const uint32_t capacity = buffer->capacityFrames;
+    uint64_t writeIndex = __atomic_load_n(&buffer->writeIndex, __ATOMIC_ACQUIRE);
+    uint64_t available = writeIndex < (uint64_t)capacity ? writeIndex : (uint64_t)capacity;
+    uint32_t toCopy = available < (uint64_t)frameCount ? (uint32_t)available : frameCount;
+    uint64_t start = writeIndex - toCopy;
+
+    for (uint32_t frame = 0; frame < toCopy; frame++) {
+        uint64_t slot = (start + frame) % capacity;
+        memcpy(&outFrames[(size_t)frame * channels], &buffer->samples[slot * channels], channels * sizeof(float));
+    }
+    if (toCopy < frameCount) {
+        memset(&outFrames[(size_t)toCopy * channels], 0, (size_t)(frameCount - toCopy) * channels * sizeof(float));
+        __atomic_fetch_add(&buffer->underrunCount, 1, __ATOMIC_RELAXED);
+    }
+}
+
+void JarvisLoopbackBufferGetCounters(const JarvisLoopbackBuffer *buffer, uint64_t *outWriteFrames, uint64_t *outReadFrames, uint64_t *outUnderrunCount, uint64_t *outOverrunFrameCount) {
+    if (buffer == NULL) return;
+    if (outWriteFrames) *outWriteFrames = __atomic_load_n(&buffer->writeIndex, __ATOMIC_RELAXED);
+    if (outReadFrames) *outReadFrames = __atomic_load_n(&buffer->readIndex, __ATOMIC_RELAXED);
+    if (outUnderrunCount) *outUnderrunCount = __atomic_load_n(&buffer->underrunCount, __ATOMIC_RELAXED);
+    if (outOverrunFrameCount) *outOverrunFrameCount = __atomic_load_n(&buffer->overrunFrameCount, __ATOMIC_RELAXED);
+}

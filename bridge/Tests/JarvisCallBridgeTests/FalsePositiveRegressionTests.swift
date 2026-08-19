@@ -107,7 +107,7 @@ final class FalsePositiveRegressionTests: XCTestCase {
     /// poll ticks against persistent ordinary Phone.app UI) must never transition into Ringing —
     /// this is the exact real-device symptom (state stuck at Ringing, candidates stuck at 341).
     @MainActor
-    func testPersistentNoCallBaselineNeverReachesRinging() {
+    func testPersistentNoCallBaselineNeverReachesRinging() async {
         let scanner = MockAccessibilityScanning()
         scanner.snapshotsToReturn = TestSnapshots.noCallBaselineFixture()
         let tracker = CallLifecycleTracker(logger: BridgeLogger())
@@ -115,7 +115,7 @@ final class FalsePositiveRegressionTests: XCTestCase {
         let observer = IncomingCallObserver(scanner: scanner, tracker: tracker, autoAnswer: autoAnswer, logger: BridgeLogger(), workModeArmedProvider: { true })
 
         for _ in 0..<10 {
-            observer.tick()
+            await observer.tick()
         }
 
         XCTAssertEqual(tracker.state, .idle, "persistent ordinary Phone.app UI across repeated ticks must never be mistaken for ringing")

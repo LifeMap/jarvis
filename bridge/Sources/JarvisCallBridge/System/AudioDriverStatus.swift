@@ -24,6 +24,11 @@ final class AudioDriverStatus: ObservableObject {
     }()
 
     @Published private(set) var state: AudioDriverState = .notInstalled
+    /// Test-observability only (§25/§26 UI sync fix regression coverage) — lets a test assert
+    /// `refresh()` actually ran at a given transactional boundary instead of only inferring it
+    /// from `state`, which stays `.notInstalled` regardless of refresh count whenever no real
+    /// driver is installed (always true in the test environment).
+    private(set) var refreshCount = 0
 
     private var timer: Timer?
     private let pollInterval: TimeInterval
@@ -46,6 +51,7 @@ final class AudioDriverStatus: ObservableObject {
     }
 
     func refresh() {
+        refreshCount += 1
         guard let captureID = Self.deviceID(forUID: Self.captureUID),
               let injectID = Self.deviceID(forUID: Self.injectUID) else {
             state = .notInstalled

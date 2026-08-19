@@ -141,7 +141,7 @@ final class ProductionFocusedScanParityTests: XCTestCase {
     }
 
     @MainActor
-    func testObserverTickScansExactlyOncePerCycle() {
+    func testObserverTickScansExactlyOncePerCycle() async {
         let scanner = CountingScanner()
         scanner.snapshotsToReturn = TestSnapshots.ringingCallBannerFixture()
         let tracker = CallLifecycleTracker(logger: BridgeLogger())
@@ -149,7 +149,7 @@ final class ProductionFocusedScanParityTests: XCTestCase {
         autoAnswer.isEnabled = false
         let observer = IncomingCallObserver(scanner: scanner, tracker: tracker, autoAnswer: autoAnswer, logger: BridgeLogger(), workModeArmedProvider: { true })
 
-        observer.tick()
+        await observer.tick()
 
         XCTAssertEqual(scanner.scanCallCount, 1, "candidates and evidence must come from a single scan per tick")
         XCTAssertEqual(tracker.state, .ringing)
@@ -158,7 +158,7 @@ final class ProductionFocusedScanParityTests: XCTestCase {
     // MARK: - §11 item 8: candidate disappearance + active signature in the same cycle → Active, never Idle
 
     @MainActor
-    func testObserverTickTransitionsRingingToActiveInSingleTick() {
+    func testObserverTickTransitionsRingingToActiveInSingleTick() async {
         let scanner = MockAccessibilityScanning()
         let tracker = CallLifecycleTracker(logger: BridgeLogger())
         let autoAnswer = AutoAnswerController(scanner: scanner, tracker: tracker, logger: BridgeLogger())
@@ -166,18 +166,18 @@ final class ProductionFocusedScanParityTests: XCTestCase {
         let observer = IncomingCallObserver(scanner: scanner, tracker: tracker, autoAnswer: autoAnswer, logger: BridgeLogger(), workModeArmedProvider: { true })
 
         scanner.snapshotsToReturn = TestSnapshots.ringingCallBannerFixture()
-        observer.tick()
+        await observer.tick()
         XCTAssertEqual(tracker.state, .ringing)
 
         scanner.snapshotsToReturn = TestSnapshots.activeCallBannerFixture()
-        observer.tick()
+        await observer.tick()
         XCTAssertEqual(tracker.state, .active, "a single tick must transition Ringing → Active directly, never dip through Idle")
     }
 
     // MARK: - §11 item 9: active signature persists across repeated ticks
 
     @MainActor
-    func testObserverTickKeepsActiveAcrossRepeatedTicks() {
+    func testObserverTickKeepsActiveAcrossRepeatedTicks() async {
         let scanner = MockAccessibilityScanning()
         scanner.snapshotsToReturn = TestSnapshots.activeCallBannerFixture()
         let tracker = CallLifecycleTracker(logger: BridgeLogger())
@@ -187,7 +187,7 @@ final class ProductionFocusedScanParityTests: XCTestCase {
         let observer = IncomingCallObserver(scanner: scanner, tracker: tracker, autoAnswer: autoAnswer, logger: BridgeLogger(), workModeArmedProvider: { true })
 
         for _ in 0..<5 {
-            observer.tick()
+            await observer.tick()
             XCTAssertEqual(tracker.state, .active)
         }
     }
@@ -195,14 +195,14 @@ final class ProductionFocusedScanParityTests: XCTestCase {
     // MARK: - §11 items 10-11: no-call baseline / normal Phone.app UI still produce nothing
 
     @MainActor
-    func testObserverTickNoCallBaselineStaysIdleWithNoEvidence() {
+    func testObserverTickNoCallBaselineStaysIdleWithNoEvidence() async {
         let scanner = MockAccessibilityScanning()
         scanner.snapshotsToReturn = TestSnapshots.noCallBaselineFixture()
         let tracker = CallLifecycleTracker(logger: BridgeLogger())
         let autoAnswer = AutoAnswerController(scanner: scanner, tracker: tracker, logger: BridgeLogger())
         let observer = IncomingCallObserver(scanner: scanner, tracker: tracker, autoAnswer: autoAnswer, logger: BridgeLogger(), workModeArmedProvider: { true })
 
-        observer.tick()
+        await observer.tick()
 
         XCTAssertEqual(tracker.state, .idle)
         XCTAssertTrue(observer.candidates.isEmpty)

@@ -13,16 +13,34 @@ final class IncomingCallObserver: ObservableObject {
     private let scanner: AccessibilityScanning
     private let tracker: CallLifecycleTracker
     private let autoAnswer: AutoAnswerController
+    /// Phase 3 CHECKPOINT 1: nil in any wiring that doesn't need audio takeover (e.g. a future
+    /// test double) — when present, driven from this exact same poll cycle, right after
+    /// `tracker.update(...)`, so audio-route decisions see the identical lifecycle state
+    /// `IncomingCallObserver` itself just computed (no separate timer, no second race window).
+    private let callAudioSession: CallAudioSessionController?
     private let logger: BridgeLogger
     private let pollInterval: TimeInterval
     private let workModeArmedProvider: () -> Bool
 
     private var timer: Timer?
+    /// Reentrancy guard: `tick()` is `async` (route convergence polling inside
+    /// `CallAudioSessionController` can take up to several hundred ms), so a slow tick could still
+    /// be running when the next 750ms timer fires. Two overlapping ticks racing the same
+    /// `CallLifecycleTracker`/`CallAudioSessionController` would defeat the "one scan cycle drives
+    /// one decision" principle this file already depends on — this guard simply skips a timer fire
+    /// that lands while the previous tick hasn't finished yet, rather than letting them interleave.
+    private var isTicking = false
+    /// `start()` schedules an immediate `Task { tick() }` in addition to the repeating timer.
+    /// `stop()` bumps this so that already-queued Task cannot still mutate audio after the
+    /// observer has been torn down (tests call `start()` then drive `handleLifecycleChange`
+    /// themselves; a stale first tick would idle-preempt underneath them).
+    private var startGeneration = 0
 
     init(
         scanner: AccessibilityScanning,
         tracker: CallLifecycleTracker,
         autoAnswer: AutoAnswerController,
+        callAudioSession: CallAudioSessionController? = nil,
         logger: BridgeLogger,
         pollInterval: TimeInterval = 0.75,
         workModeArmedProvider: @escaping () -> Bool
@@ -30,6 +48,7 @@ final class IncomingCallObserver: ObservableObject {
         self.scanner = scanner
         self.tracker = tracker
         self.autoAnswer = autoAnswer
+        self.callAudioSession = callAudioSession
         self.logger = logger
         self.pollInterval = pollInterval
         self.workModeArmedProvider = workModeArmedProvider
@@ -37,18 +56,31 @@ final class IncomingCallObserver: ObservableObject {
 
     func start() {
         stop()
+        startGeneration += 1
+        let generation = startGeneration
         timer = Timer.scheduledTimer(withTimeInterval: pollInterval, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.tick() }
+            Task { @MainActor in
+                guard let self, self.startGeneration == generation else { return }
+                await self.tick()
+            }
         }
-        tick()
+        Task { @MainActor [weak self] in
+            guard let self, self.startGeneration == generation else { return }
+            await self.tick()
+        }
     }
 
     func stop() {
+        startGeneration += 1
         timer?.invalidate()
         timer = nil
     }
 
-    func tick() {
+    func tick() async {
+        guard !isTicking else { return }
+        isTicking = true
+        defer { isTicking = false }
+
         guard workModeArmedProvider() else {
             if tracker.state != .idle {
                 tracker.reset()
@@ -56,6 +88,9 @@ final class IncomingCallObserver: ObservableObject {
             }
             candidates = []
             lastEvidence = .none
+            // Phase 3 §16: Work Mode OFF / Bridge disabled is an immediate safety-restore
+            // condition even if a call was mid-Active when it happened.
+            await callAudioSession?.emergencyRestore(reason: "work-mode-off")
             return
         }
 
@@ -87,6 +122,10 @@ final class IncomingCallObserver: ObservableObject {
         }
 
         autoAnswer.evaluate(candidates: resolved, workModeArmed: workModeArmedProvider())
+
+        // Phase 3 CHECKPOINT 1: audio route takeover/restore, driven by the exact lifecycle state
+        // just computed above — never its own independent poll.
+        await callAudioSession?.handleLifecycleChange(callState: tracker.state, session: tracker.currentSession, workModeArmed: workModeArmedProvider())
     }
 
     /// Read-only diagnostic (PRD §10, §26): dumps every scanned element's attributes to the log.

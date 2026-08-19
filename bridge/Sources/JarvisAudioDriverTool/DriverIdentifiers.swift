@@ -18,6 +18,16 @@ enum JarvisCallAudio {
         static let name = "Jarvis Call Inject"
     }
 
+    enum Tap {
+        static let deviceUID = "com.jarvis.callbridge.audio.tap"
+        static let name = "Jarvis Call Tap"
+    }
+
+    enum Speaker {
+        static let deviceUID = "com.jarvis.callbridge.audio.speaker"
+        static let name = "Jarvis Speaker"
+    }
+
     static let sampleRate: Double = 48000
     static let channelCount: Int = 2
 
@@ -25,6 +35,9 @@ enum JarvisCallAudio {
     static let propertyActive: AudioObjectPropertySelector = fourCharCode("Ract")
     /// Must match PlugInTypes.h's kJarvisDevicePropertyClearBuffers ('Rclr').
     static let propertyClearBuffers: AudioObjectPropertySelector = fourCharCode("Rclr")
+    /// Must match PlugInTypes.h's kJarvisDevicePropertyPCMDiagnostics ('Rpcm') — Phase 3
+    /// CHECKPOINT 2 RX investigation, read-only.
+    static let propertyPCMDiagnostics: AudioObjectPropertySelector = fourCharCode("Rpcm")
 }
 
 func fourCharCode(_ string: String) -> FourCharCode {

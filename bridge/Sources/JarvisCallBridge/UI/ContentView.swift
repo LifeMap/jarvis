@@ -9,6 +9,8 @@ struct ContentView: View {
     @ObservedObject var callTracker: CallLifecycleTracker
     @ObservedObject var autoAnswer: AutoAnswerController
     @ObservedObject var incomingCallObserver: IncomingCallObserver
+    @ObservedObject var callAudioSession: CallAudioSessionController
+    @ObservedObject var pcmController: SystemCallAudioPCMController
     @State private var focusedSnapshotLabel = "baseline"
     private static let focusedSnapshotLabels = ["baseline", "ringing", "active", "ended"]
 
@@ -17,6 +19,8 @@ struct ContentView: View {
         self.callTracker = model.callTracker
         self.autoAnswer = model.autoAnswer
         self.incomingCallObserver = model.incomingCallObserver
+        self.callAudioSession = model.callAudioSession
+        self.pcmController = model.pcmController
     }
 
     var body: some View {
@@ -99,6 +103,83 @@ struct ContentView: View {
                         Text("Candidates").foregroundStyle(.secondary)
                         Text("\(incomingCallObserver.candidates.count) found").font(.system(.body, design: .monospaced))
                     }
+                }
+
+                Divider()
+
+                Text("Call Audio (Phase 3)").font(.headline)
+                Grid(alignment: .leading, horizontalSpacing: 28, verticalSpacing: 9) {
+                    GridRow {
+                        Text("Call Audio State").foregroundStyle(.secondary)
+                        Text(callAudioSession.state.rawValue).font(.system(.body, design: .monospaced))
+                    }
+                    GridRow {
+                        Text("Route Owner").foregroundStyle(.secondary)
+                        Text(callAudioSession.routeOwnerSessionID.map { String($0.prefix(8)) } ?? "—").font(.system(.body, design: .monospaced))
+                    }
+                    GridRow {
+                        Text("Original Route Snapshot").foregroundStyle(.secondary)
+                        Text(callAudioSession.routeOwnerSessionID != nil ? "Available" : "None").font(.system(.body, design: .monospaced))
+                    }
+                    GridRow {
+                        Text("Recovery Record").foregroundStyle(.secondary)
+                        Text(callAudioSession.hasPersistedRecoveryRecord ? "Present" : "None").font(.system(.body, design: .monospaced))
+                    }
+                }
+
+                Divider()
+
+                Text("Call PCM (Phase 3 CHECKPOINT 2)").font(.headline)
+                Grid(alignment: .leading, horizontalSpacing: 28, verticalSpacing: 9) {
+                    GridRow {
+                        Text("PCM I/O State").foregroundStyle(.secondary)
+                        Text(pcmController.state.rawValue).font(.system(.body, design: .monospaced))
+                    }
+                    GridRow {
+                        Text("PCM Format").foregroundStyle(.secondary)
+                        Text(pcmController.format?.description ?? "—").font(.system(.body, design: .monospaced))
+                    }
+                    GridRow {
+                        Text("RX Frames").foregroundStyle(.secondary)
+                        Text("\(pcmController.metrics.rxFrames)").font(.system(.body, design: .monospaced))
+                    }
+                    GridRow {
+                        Text("RX Callbacks").foregroundStyle(.secondary)
+                        Text("\(pcmController.metrics.rxCallbacks)").font(.system(.body, design: .monospaced))
+                    }
+                    GridRow {
+                        Text("RX RMS / Peak").foregroundStyle(.secondary)
+                        Text(String(format: "%.1f dBFS / %.1f dBFS", pcmController.metrics.rxRMSDBFS, pcmController.metrics.rxPeakDBFS)).font(.system(.body, design: .monospaced))
+                    }
+                    GridRow {
+                        Text("RX Activity").foregroundStyle(.secondary)
+                        Text(pcmController.metrics.rxActive ? "Active" : "Silence").font(.system(.body, design: .monospaced))
+                    }
+                    GridRow {
+                        Text("TX Frames").foregroundStyle(.secondary)
+                        Text("\(pcmController.metrics.txFrames)").font(.system(.body, design: .monospaced))
+                    }
+                    GridRow {
+                        Text("TX Callbacks").foregroundStyle(.secondary)
+                        Text("\(pcmController.metrics.txCallbacks)").font(.system(.body, design: .monospaced))
+                    }
+                    GridRow {
+                        Text("TX Underruns").foregroundStyle(.secondary)
+                        Text("\(pcmController.metrics.txUnderrunCount)").font(.system(.body, design: .monospaced))
+                    }
+                    GridRow {
+                        Text("Test Tone").foregroundStyle(.secondary)
+                        Text(pcmController.testToneState.rawValue).font(.system(.body, design: .monospaced))
+                    }
+                }
+
+                HStack {
+                    // §16/§17 — only enabled while an actual routed call already has PCM running;
+                    // structurally cannot open Capture/Inject, activate the driver, or change
+                    // routes itself — it only queues the fixed diagnostic tone into an
+                    // already-running TX path.
+                    Button("Send 1 kHz Test Tone") { pcmController.sendTestTone() }
+                        .disabled(!(callAudioSession.state == .routed && pcmController.state == .running))
                 }
 
                 HStack {
@@ -206,7 +287,13 @@ struct ContentView: View {
             }
             .padding(20)
         }
-        .onAppear { model.start() }
+        .onAppear {
+            // First HAL query after a driver reinstall can block for a long time. Don't do
+            // it inside the appear transaction or the window never commits.
+            DispatchQueue.main.async {
+                model.start()
+            }
+        }
     }
 
     /// CHECKPOINT 2 diagnostic UX: copies the entire current in-memory log buffer (not just what's

@@ -1,0 +1,13 @@
+# macOS
+.DS_Store
+
+# SwiftPM / Xcode build products
+.build/
+*.dSYM/
+
+# Driver local compile output (rebuild with Scripts/build-driver.sh)
+bridge/AudioDriver/build/
+
+# Xcode / SwiftPM user state
+xcuserdata/
+*.xcuserstate

@@ -18,5 +18,7 @@
     <string>1</string>
     <key>LSMinimumSystemVersion</key>
     <string>14.2</string>
+    <key>NSAudioCaptureUsageDescription</key>
+    <string>통화 상대의 목소리만 Jarvis가 듣고, 회의·유튜브에 쓰는 스피커는 그대로 두기 위해 통화 재생 소리를 잠시 끕니다.</string>
 </dict>
 </plist>

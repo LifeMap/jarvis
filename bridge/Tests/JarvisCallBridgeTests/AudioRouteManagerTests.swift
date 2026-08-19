@@ -26,7 +26,11 @@ final class AudioRouteManagerTests: XCTestCase {
     }
 }
 
-struct FakeAudioRouteReader: AudioRouteReading {
-    let snapshot: AudioRouteSnapshot?
+/// A `class` (not `struct`) with a mutable `snapshot` — Phase 3 UI-sync tests need to change what
+/// the "real CoreAudio route" reports mid-test (simulating a takeover/restore actually having
+/// happened) and assert `BridgeViewModel.routeSnapshot` picks up the new value automatically.
+final class FakeAudioRouteReader: AudioRouteReading {
+    var snapshot: AudioRouteSnapshot?
+    init(snapshot: AudioRouteSnapshot?) { self.snapshot = snapshot }
     func currentSnapshot() -> AudioRouteSnapshot? { snapshot }
 }

@@ -5,6 +5,8 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#include "JarvisCaptureRXRing.h"
+
 /*
  * CB v2 Phase 1. Pure, CoreAudio-independent loopback ring buffer used INSIDE a single HAL
  * device to connect that device's own Output stream to its own Input stream — this is
@@ -50,8 +52,22 @@ void JarvisLoopbackBufferReset(JarvisLoopbackBuffer *buffer);
    never allocates. On overrun, oldest unread frames are dropped and overrunFrameCount increases. */
 void JarvisLoopbackBufferWrite(JarvisLoopbackBuffer *buffer, const float *frames, uint32_t frameCount);
 
-/* Consumer side — called from the device's Input-stream DoIOOperation (ReadInput). Never blocks,
-   never allocates. On underrun, the missing tail is silence and underrunCount increases. */
+/* Consumer side — exclusive drain. Never blocks, never allocates. On underrun, the missing tail
+   is silence and underrunCount increases. Kept for unit tests and any single-reader path; the
+   live driver ReadInput uses TapLatest so a default-output client's unused duplex ReadInput
+   cannot starve a second reader (Bridge). */
 void JarvisLoopbackBufferRead(JarvisLoopbackBuffer *buffer, float *outFrames, uint32_t frameCount);
+
+/* Non-destructive monitor. Copies the most recently written `frameCount` frames (silence-pads
+   the tail if fewer are available) and does not advance readIndex. Two consecutive taps of the
+   same size therefore return the same samples. Real-time safe. */
+void JarvisLoopbackBufferTapLatest(JarvisLoopbackBuffer *buffer, float *outFrames, uint32_t frameCount);
+
+/* Phase 3 CHECKPOINT 2 RX investigation (§10) — read-only snapshot of the counters already
+   tracked by the buffer (writeIndex/readIndex are cumulative frame counts, not ring offsets, so
+   they double as "total frames ever written/read"). Safe to call from any thread at any time —
+   plain atomic loads, no locks, no allocation. Reused by the driver's PCM diagnostics property
+   instead of a duplicate counter set. */
+void JarvisLoopbackBufferGetCounters(const JarvisLoopbackBuffer *buffer, uint64_t *outWriteFrames, uint64_t *outReadFrames, uint64_t *outUnderrunCount, uint64_t *outOverrunFrameCount);
 
 #endif /* JARVIS_LOOPBACK_BUFFER_H */

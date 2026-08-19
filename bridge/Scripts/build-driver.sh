@@ -23,6 +23,8 @@ echo "Compiling..."
 clang -Wall -Wextra -std=c11 -c -I "$shared_dir/include" -I "$plugin_dir" \
     -o "$build_dir/JarvisLoopbackBuffer.o" "$shared_dir/JarvisLoopbackBuffer.c"
 clang -Wall -Wextra -std=c11 -c -I "$shared_dir/include" -I "$plugin_dir" \
+    -o "$build_dir/JarvisCaptureRXRing.o" "$shared_dir/JarvisCaptureRXRing.c"
+clang -Wall -Wextra -std=c11 -c -I "$shared_dir/include" -I "$plugin_dir" \
     -o "$build_dir/PlugInEntry.o" "$plugin_dir/PlugInEntry.c"
 clang -Wall -Wextra -std=c11 -c -I "$shared_dir/include" -I "$plugin_dir" \
     -o "$build_dir/PlugInInterface.o" "$plugin_dir/PlugInInterface.c"
@@ -30,7 +32,7 @@ clang -Wall -Wextra -std=c11 -c -I "$shared_dir/include" -I "$plugin_dir" \
 echo "Linking bundle executable..."
 clang -bundle \
     -o "$driver_bundle/Contents/MacOS/$driver_name" \
-    "$build_dir/JarvisLoopbackBuffer.o" "$build_dir/PlugInEntry.o" "$build_dir/PlugInInterface.o" \
+    "$build_dir/JarvisLoopbackBuffer.o" "$build_dir/JarvisCaptureRXRing.o" "$build_dir/PlugInEntry.o" "$build_dir/PlugInInterface.o" \
     -framework CoreFoundation \
     -framework CoreAudio
 
@@ -41,7 +43,7 @@ codesign --force --sign - "$driver_bundle"
 
 echo "Building selftest (dlopen-based in-process verification, no coreaudiod/no sudo)..."
 clang -Wall -Wextra -std=c11 -I "$shared_dir/include" -I "$plugin_dir" \
-    -o "$build_dir/selftest" "$plugin_dir/selftest.c" \
+    -o "$build_dir/selftest" "$plugin_dir/selftest.c" "$shared_dir/JarvisCaptureRXRing.c" \
     -framework CoreFoundation \
     -framework CoreAudio
 
