@@ -4,8 +4,9 @@
 최종 판정 (에이전트 단계, 최신 상태 — 아래는 매 체크포인트마다 갱신되며 과거 기록은 하단에 그대로 보존):
 
 - **Phase 3 CHECKPOINT 1**: **FINAL PASS**
-- **Phase 3 CHECKPOINT 2**: **BLOCKED — idle reproduction confirmed Rpcm repeated-read failure independent of AudioObjectID churn (0 ID changes / 0 UID mismatches / 100 rpcm failures out of 100 attempts). Root cause: driver returned a persistent, single-instance CFMutableDataRef from GetPropertyData without an extra CFRetain — the only explicit CF-ownership language in AudioServerPlugIn.h (CopyFromStorage's "caller releases") plus the fact every other CF-returning property in this driver used an immortal/singleton object (CFBoolean/CFSTR literals, immune to over-release) together strongly implicate a "host releases what the driver returns" contract mismatch. Fixed: Rpcm now returns a fresh, immutable, single-owner CFDataRef per call. DRIVER MODIFIED — user must reinstall before the next idle retest.**
-- **Phase 4**: **BLOCKED**
+- **Phase 3 CHECKPOINT 2**: **FINAL PASS** — 실기기: RX, TX 1 kHz, 동시 RX/TX, 연속 2통화, route restore, Active+PCM 중 Work Mode OFF (PCM stop → inject/capture stop → route restore)
+- **Phase 3**: **COMPLETE**
+- **Phase 4**: 이 문서에서 이어 쓰지 않음 — `docs/Call_Bridge_v2_Phase_4_Report.md`
 
 Phase 2는 CHECKPOINT 1/2, Gate A/B/C 전부 실기기 PASS로 **FINAL PASS**됐다(`docs/Call_Bridge_v2_Phase_2_Report.md` 참조). Phase 3부터의 모든 작업은 이 문서에 기록하며, Phase 2 문서는 더 이상 이어서 작성하지 않는다.
 
