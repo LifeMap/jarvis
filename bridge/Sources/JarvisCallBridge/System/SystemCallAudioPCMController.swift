@@ -36,19 +36,25 @@ final class SystemCallAudioPCMController: CallAudioPCMControlling, ObservableObj
     /// at 5 Hz; reset to `nil` on every `start()` so a new call never logs using a stale
     /// previous-call timestamp.
     private var lastMetricsLogAt: Date?
+    /// When the shm ring is leftover from a previous process, writeIndex never moves.
+    /// After this deadline we drop it and ingest Capture `Rrxc` instead.
+    private var pcmRunningAt: Date?
+    private var didAbandonStaleCaptureRXRing = false
     /// Control-plane poll of Capture `Rrxc` when POSIX shm cannot be opened.
     private var fallbackRXTimer: Timer?
     private var fallbackCaptureDeviceID: AudioDeviceID?
+    private var tonePumpTimer: Timer?
+    private var toneFramesLeftToWrite: Int = 0
+    private var tonePhaseFrame: Int = 0
 
     /// §19 — one fixed diagnostic tone: 1 kHz, 1.0s (48,000 frames at the native 48 kHz rate),
     /// same signal on every channel, amplitude 0.1 ≈ -20 dBFS, deterministic phase starting at 0
-    /// every time. The actual generation now lives in `JarvisPCMInjectIOProc` (C); these Swift
-    /// constants are only used to compute the frame count for a request.
+    /// every time. Generation lives on this control-plane producer; Inject IOProc only reads the TX ring.
     private static let toneDurationSeconds: Double = 1.0
 
     init(logger: BridgeLogger) {
         self.logger = logger
-        logger.log("[CALL-PCM] realtime backend=native-c-writemix-ring-rx+ioproc-tx")
+        logger.log("[CALL-PCM] realtime backend=native-c-writemix-ring-rx+tx-ring")
     }
 
     @discardableResult
@@ -62,6 +68,8 @@ final class SystemCallAudioPCMController: CallAudioPCMControlling, ObservableObj
         testToneState = .idle
         format = nil
         lastMetricsLogAt = nil
+        pcmRunningAt = nil
+        didAbandonStaleCaptureRXRing = false
         logger.log("[CALL-PCM] prepare reason=\(reason)")
 
         // §14 — verified once, before any IOProc is registered, never discovered from inside a
@@ -82,7 +90,7 @@ final class SystemCallAudioPCMController: CallAudioPCMControlling, ObservableObj
         }
         self.runtime = runtime
         if JarvisPCMRuntimeOpenCaptureRXRing(runtime) {
-            logger.log("[CALL-PCM] capture-rx ring opened")
+            logger.log("[CALL-PCM] capture-rx ring opened writeIndex=\(JarvisPCMRuntimeCaptureRXRingWriteIndex(runtime))")
         } else {
             logger.log("[CALL-PCM] capture-rx ring unavailable — using Rrxc property fallback")
         }
@@ -188,6 +196,7 @@ final class SystemCallAudioPCMController: CallAudioPCMControlling, ObservableObj
         logger.log("[CALL-PCM] inject started")
 
         startMetricsTimer()
+        pcmRunningAt = Date()
         if !JarvisPCMRuntimeCaptureRXRingIsMapped(runtime) {
             fallbackCaptureDeviceID = Self.resolvedDeviceID(forUID: JarvisAudioDeviceUIDs.capture, role: "capture-rx-fallback", logger: logger)
             startFallbackRXTimer()
@@ -203,8 +212,11 @@ final class SystemCallAudioPCMController: CallAudioPCMControlling, ObservableObj
         logger.log("[CALL-PCM] stop started reason=\(reason)")
 
         stopMetricsTimer() // prevents any further test-tone-state observation/logging before teardown.
+        stopTonePump()
         stopFallbackRXTimer()
         fallbackCaptureDeviceID = nil
+        pcmRunningAt = nil
+        didAbandonStaleCaptureRXRing = false
 
         // §14/§22/§24/§25 — Inject (TX, the side Phone.app is actively reading from) stops
         // before Capture; each is fully stopped (`AudioDeviceStop` returns — CoreAudio
@@ -256,6 +268,53 @@ final class SystemCallAudioPCMController: CallAudioPCMControlling, ObservableObj
         }
         testToneState = .queued
         logger.log("[CALL-PCM] test-tone queued")
+        tonePumpTimer?.invalidate()
+        tonePumpTimer = nil
+        toneFramesLeftToWrite = Int(frameCount)
+        tonePhaseFrame = 0
+        _ = writeToneFrames(to: runtime, maxFrames: Int(JARVIS_PCM_TX_RING_FRAMES))
+        if toneFramesLeftToWrite > 0 {
+            let timer = Timer(timeInterval: 0.05, repeats: true) { [weak self] _ in
+                Task { @MainActor in self?.pumpTone() }
+            }
+            tonePumpTimer = timer
+            RunLoop.main.add(timer, forMode: .common)
+        }
+    }
+
+    private func stopTonePump() {
+        tonePumpTimer?.invalidate()
+        tonePumpTimer = nil
+        toneFramesLeftToWrite = 0
+        tonePhaseFrame = 0
+    }
+
+    private func pumpTone() {
+        guard state == .running, let runtime, toneFramesLeftToWrite > 0 else {
+            stopTonePump()
+            return
+        }
+        _ = writeToneFrames(to: runtime, maxFrames: 4800)
+        if toneFramesLeftToWrite == 0 { stopTonePump() }
+    }
+
+    @discardableResult
+    private func writeToneFrames(to runtime: OpaquePointer, maxFrames: Int) -> Int {
+        let frames = min(maxFrames, toneFramesLeftToWrite)
+        guard frames > 0 else { return 0 }
+        var samples = [Float](repeating: 0, count: frames * 2)
+        let sampleRate = CallAudioPCMFormat.expected.sampleRate
+        for frame in 0..<frames {
+            let sample = Float(sin(2 * Double.pi * 1000.0 * Double(tonePhaseFrame + frame) / sampleRate)) * 0.1
+            samples[frame * 2] = sample
+            samples[frame * 2 + 1] = sample
+        }
+        let written = samples.withUnsafeBufferPointer { buf in
+            Int(JarvisPCMRuntimeWriteTXFrames(runtime, buf.baseAddress!, UInt32(frames)))
+        }
+        tonePhaseFrame += written
+        toneFramesLeftToWrite -= written
+        return written
     }
 
     // MARK: - Low-frequency UI metrics (§32/§34 — never per-callback; ~5Hz, only while running)
@@ -274,6 +333,19 @@ final class SystemCallAudioPCMController: CallAudioPCMControlling, ObservableObj
     private func stopMetricsTimer() {
         metricsTimer?.invalidate()
         metricsTimer = nil
+    }
+
+    private func abandonStaleCaptureRXRingIfNeeded(runtime: OpaquePointer) {
+        guard !didAbandonStaleCaptureRXRing else { return }
+        guard JarvisPCMRuntimeCaptureRXRingIsMapped(runtime) else { return }
+        guard !JarvisPCMRuntimeCaptureRXRingProducerHasAdvanced(runtime) else { return }
+        guard let pcmRunningAt, Date().timeIntervalSince(pcmRunningAt) >= 0.3 else { return }
+        didAbandonStaleCaptureRXRing = true
+        let frozenIndex = JarvisPCMRuntimeCaptureRXRingWriteIndex(runtime)
+        JarvisPCMRuntimeCloseCaptureRXRing(runtime)
+        fallbackCaptureDeviceID = Self.resolvedDeviceID(forUID: JarvisAudioDeviceUIDs.capture, role: "capture-rx-fallback", logger: logger)
+        startFallbackRXTimer()
+        logger.log("[CALL-PCM] capture-rx ring stale writeIndex=\(frozenIndex) — falling back to Rrxc")
     }
 
     private func startFallbackRXTimer() {
@@ -331,6 +403,7 @@ final class SystemCallAudioPCMController: CallAudioPCMControlling, ObservableObj
     /// linear `rxMeanSquareLinear`/`rxPeakLinear`.
     private func publishMetrics() {
         guard let runtime else { return }
+        abandonStaleCaptureRXRingIfNeeded(runtime: runtime)
         var snapshot = JarvisPCMMetricsSnapshot()
         JarvisPCMRuntimeReadMetrics(runtime, &snapshot)
 
