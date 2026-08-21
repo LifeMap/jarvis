@@ -3,12 +3,12 @@ import Foundation
 /// Phase 3 CHECKPOINT 1 — Active Call Audio Route Takeover & Safe Restore.
 ///
 /// Owns the audio-route side of a call. On `.ringing` it activates Capture/Inject, takes
-/// Default Input (Inject) so Jarvis can talk, and mutes Continuity playback (`avconferenced`)
-/// so the original speaker can keep serving Zoom/YouTube. Default Output is left alone —
-/// switching it to Capture steals already-playing apps. PCM starts only once that same session
-/// is `.active`. Idle Work Mode must **not** seize the Mac's audio. Hangup restores the original
-/// input and stops mute, even if Work Mode stays ON. Restore also happens on Work Mode OFF, app
-/// quit, or route-ownership loss.
+/// Default Output (Capture) so Phone.app writes caller PCM there, takes Default Input (Inject)
+/// so Jarvis can talk, and mutes Continuity playback (`avconferenced`) so remote voice does not
+/// also leak onto the original speaker. Other apps duck for the call — that is an OS limit.
+/// PCM starts only once that same session is `.active`. Idle Work Mode must **not** seize the
+/// Mac's audio. Hangup restores the original input/output and stops mute, even if Work Mode
+/// stays ON. Restore also happens on Work Mode OFF, app quit, or route-ownership loss.
 /// Deliberately
 /// separate from `CallLifecycleTracker` (§7). A session that appears as `.active` without a
 /// prior ringing takeover still falls back to Active-time acquisition.
@@ -59,6 +59,7 @@ final class CallAudioSessionController: ObservableObject {
     /// stays "route ownership/recovery/restore"; `pcmController` stays "CoreAudio stream I/O
     /// only" — this class is purely the coordinator between the two.
     let pcmController: CallAudioPCMControlling
+    private let realtimeSession: RealtimeVoiceSessionControlling
     private let processMute: CallAudioProcessMuteControlling
 
     /// Convergence polling bounds — real-device evidence showed settling happens well under this;
@@ -85,6 +86,7 @@ final class CallAudioSessionController: ObservableObject {
         deviceActivator: JarvisAudioDeviceActivating? = nil,
         recoveryStore: CallAudioRecoveryStore = FileCallAudioRecoveryStore(),
         pcmController: CallAudioPCMControlling? = nil,
+        realtimeSession: RealtimeVoiceSessionControlling? = nil,
         processMute: CallAudioProcessMuteControlling? = nil,
         logger: BridgeLogger,
         convergenceMaxAttempts: Int = 10,
@@ -99,6 +101,7 @@ final class CallAudioSessionController: ObservableObject {
         self.deviceActivator = deviceActivator ?? SystemJarvisAudioDeviceActivator(logger: logger)
         self.recoveryStore = recoveryStore
         self.pcmController = pcmController ?? SystemCallAudioPCMController(logger: logger)
+        self.realtimeSession = realtimeSession ?? NullRealtimeVoiceSessionController()
         self.processMute = processMute ?? NullCallAudioProcessMuteController()
         self.logger = logger
         self.convergenceMaxAttempts = convergenceMaxAttempts
@@ -116,10 +119,11 @@ final class CallAudioSessionController: ObservableObject {
             // CallAudioRouteSnapshot is UID-only by design (the same reason ownership comparison
             // itself never touches an AudioObjectID), and the UID mismatch alone already fully
             // explains the decision.
-            logger.log("[CALL-AUDIO] route-ownership-lost session=\(owner) expectedInputUID=\(JarvisAudioDeviceUIDs.inject) observedInputUID=\(lostOwnershipSnapshot.inputUID) leftOutputUID=\(originalSnapshot?.outputUID ?? "nil") observedOutputUID=\(lostOwnershipSnapshot.outputUID)")
+            logger.log("[CALL-AUDIO] route-ownership-lost session=\(owner) expectedInputUID=\(JarvisAudioDeviceUIDs.inject) observedInputUID=\(lostOwnershipSnapshot.inputUID) expectedOutputUID=\(JarvisAudioDeviceUIDs.capture) leftOutputUID=\(originalSnapshot?.outputUID ?? "nil") observedOutputUID=\(lostOwnershipSnapshot.outputUID)")
             // §22 of CHECKPOINT 2: PCM must be fully stopped before any device deactivation —
             // the user just took the route back, so Bridge's own I/O against Capture/Inject must
             // not still be running underneath them.
+            await realtimeSession.disconnect(reason: "ownership-loss")
             await pcmController.stop(reason: "ownership-loss")
             pcmStarted = false
             stopContinuityOutputMute()
@@ -143,8 +147,7 @@ final class CallAudioSessionController: ObservableObject {
 
         switch callState {
         case .ringing:
-            // Input + Continuity mute only. Default Output stays on the meeting speaker — switching
-            // it to Capture steals Chrome/Zoom. Idle Work Mode must not seize audio.
+            // Capture/Inject + Continuity mute. Idle Work Mode must not seize audio.
             guard let session else { return }
             await attemptRouteTakeoverIfNeeded(session: session)
 
@@ -250,6 +253,12 @@ final class CallAudioSessionController: ObservableObject {
         }
         logger.log("[CALL-AUDIO] driver inject activated")
 
+        guard routeController.setDefaultOutputDevice(uid: JarvisAudioDeviceUIDs.capture) else {
+            await rollback(to: snapshot, ownerID: ownerID, stage: "output-route", activatedCapture: true, activatedInject: true)
+            return
+        }
+        logger.log("[CALL-AUDIO] default-output -> capture")
+
         guard routeController.setDefaultInputDevice(uid: JarvisAudioDeviceUIDs.inject) else {
             await rollback(to: snapshot, ownerID: ownerID, stage: "input-route", activatedCapture: true, activatedInject: true)
             return
@@ -257,8 +266,7 @@ final class CallAudioSessionController: ObservableObject {
         logger.log("[CALL-AUDIO] default-input -> inject")
 
         logger.log("[CALL-AUDIO] route verification waiting session=\(ownerID)")
-        // Leave Default Output on the pre-call speaker (YouTube/meetings). Only Input is Jarvis.
-        let target = CallAudioRouteSnapshot(inputUID: JarvisAudioDeviceUIDs.inject, outputUID: snapshot.outputUID, systemOutputUID: snapshot.systemOutputUID)
+        let target = CallAudioRouteSnapshot(inputUID: JarvisAudioDeviceUIDs.inject, outputUID: JarvisAudioDeviceUIDs.capture, systemOutputUID: snapshot.systemOutputUID)
         let convergence = await waitForRouteConvergence(target: target)
         guard convergence.converged else {
             logger.log("[CALL-AUDIO] route verification timeout attempts=\(convergence.attempts) elapsedMs=\(convergence.elapsedMs) inputMatch=\(convergence.inputMatch) outputMatch=\(convergence.outputMatch) systemOutputMatch=\(convergence.systemOutputMatch) \(convergence.timeoutLogSuffix) session=\(ownerID)")
@@ -300,6 +308,7 @@ final class CallAudioSessionController: ObservableObject {
             return
         }
         pcmStarted = true
+        await realtimeSession.connect(reason: "takeover")
     }
 
     private func fail(ownerID: String, stage: String) {
@@ -319,6 +328,7 @@ final class CallAudioSessionController: ObservableObject {
         // §22: PCM (if it ever started — most rollback stages fire before it would have) must be
         // fully stopped before any route-restoring setter call below. Idempotent/no-op when PCM
         // was never running (true for every stage except "pcm-start").
+        await realtimeSession.disconnect(reason: "rollback")
         await pcmController.stop(reason: "rollback")
         pcmStarted = false
         stopContinuityOutputMute()
@@ -364,6 +374,7 @@ final class CallAudioSessionController: ObservableObject {
 
         // §22: PCM must be completely stopped before Default Output/Input are restored — never
         // leave an active IOProc referencing a device that's about to be handed back/deactivated.
+        await realtimeSession.disconnect(reason: reason)
         await pcmController.stop(reason: reason)
         pcmStarted = false
         stopContinuityOutputMute()
@@ -460,6 +471,7 @@ final class CallAudioSessionController: ObservableObject {
     private func lostRouteOwnershipSnapshot() -> CallAudioRouteSnapshot? {
         guard let current = routeController.currentRouteSnapshot() else { return nil }
         let lost = current.inputUID != JarvisAudioDeviceUIDs.inject
+            || current.outputUID != JarvisAudioDeviceUIDs.capture
         return lost ? current : nil
     }
 

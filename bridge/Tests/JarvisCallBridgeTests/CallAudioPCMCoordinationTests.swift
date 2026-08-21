@@ -121,9 +121,10 @@ final class CallAudioPCMCoordinationTests: XCTestCase {
         let outputIndex = log.entries.firstIndex(of: "route-set-output")
         let inputIndex = log.entries.firstIndex(of: "route-set-input")
         let pcmStartIndex = log.entries.firstIndex(of: "pcm-start")
-        XCTAssertNil(outputIndex, "takeover must not steal Default Output")
+        XCTAssertNotNil(outputIndex, "takeover must set Default Output to Capture before PCM starts")
         XCTAssertNotNil(inputIndex); XCTAssertNotNil(pcmStartIndex)
-        XCTAssertLessThan(inputIndex!, pcmStartIndex!, "PCM must start only after the input route setter")
+        XCTAssertLessThan(outputIndex!, inputIndex!, "Default Output → Capture must precede Default Input → Inject")
+        XCTAssertLessThan(inputIndex!, pcmStartIndex!, "PCM must start only after both route setters")
     }
 
     // MARK: - §44: stop ordering — PCM fully stops before route restoration begins
@@ -262,5 +263,82 @@ final class CallAudioPCMCoordinationTests: XCTestCase {
         XCTAssertEqual(controller.state, .idle)
         XCTAssertFalse(controller.hasPersistedRecoveryRecord)
         XCTAssertFalse(spies.pcm.isRunning)
+    }
+
+    func testRealtimeConnectsOnlyAfterSuccessfulPCMStartOnActive() async {
+        let spies = CallAudioTestFixtures.makeSpies()
+        let realtime = RealtimeVoiceSessionControllingSpy()
+        let log = CallAudioTestFixtures.attachOrderLog(to: spies)
+        realtime.orderLog = log
+        let controller = CallAudioSessionController(
+            routeController: spies.route, deviceActivator: spies.activator, recoveryStore: spies.store,
+            pcmController: spies.pcm, realtimeSession: realtime, processMute: spies.mute,
+            logger: BridgeLogger(), convergenceMaxAttempts: 5, convergencePollNanoseconds: 1_000_000
+        )
+        let session = CallSession()
+        await controller.handleLifecycleChange(callState: .ringing, session: session, workModeArmed: true)
+        XCTAssertTrue(realtime.connectCalls.isEmpty)
+        await controller.handleLifecycleChange(callState: .active, session: session, workModeArmed: true)
+        XCTAssertEqual(realtime.connectCalls, ["takeover"])
+        let pcmStart = log.entries.firstIndex(of: "pcm-start")!
+        let rtConnect = log.entries.firstIndex(of: "realtime-connect")!
+        XCTAssertLessThan(pcmStart, rtConnect)
+    }
+
+    func testRealtimeDisconnectsBeforePCMStopOnWorkModeOff() async {
+        let spies = CallAudioTestFixtures.makeSpies()
+        let realtime = RealtimeVoiceSessionControllingSpy()
+        let log = CallAudioTestFixtures.attachOrderLog(to: spies)
+        realtime.orderLog = log
+        let controller = CallAudioSessionController(
+            routeController: spies.route, deviceActivator: spies.activator, recoveryStore: spies.store,
+            pcmController: spies.pcm, realtimeSession: realtime, processMute: spies.mute,
+            logger: BridgeLogger(), convergenceMaxAttempts: 5, convergencePollNanoseconds: 1_000_000
+        )
+        let session = CallSession()
+        await controller.handleLifecycleChange(callState: .active, session: session, workModeArmed: true)
+        await controller.handleLifecycleChange(callState: .active, session: session, workModeArmed: false)
+        XCTAssertEqual(realtime.disconnectCalls.last, "work-mode-off")
+        let disconnect = log.entries.lastIndex(of: "realtime-disconnect")!
+        let pcmStop = log.entries.lastIndex(of: "pcm-stop")!
+        let restoreOutput = log.entries[pcmStop...].firstIndex(of: "route-set-output")!
+        XCTAssertLessThan(disconnect, pcmStop)
+        XCTAssertLessThan(pcmStop, restoreOutput)
+    }
+
+    func testRealtimeDisconnectsBeforePCMStopOnOwnershipLoss() async {
+        let spies = CallAudioTestFixtures.makeSpies()
+        let realtime = RealtimeVoiceSessionControllingSpy()
+        let log = CallAudioTestFixtures.attachOrderLog(to: spies)
+        realtime.orderLog = log
+        let controller = CallAudioSessionController(
+            routeController: spies.route, deviceActivator: spies.activator, recoveryStore: spies.store,
+            pcmController: spies.pcm, realtimeSession: realtime, processMute: spies.mute,
+            logger: BridgeLogger(), convergenceMaxAttempts: 5, convergencePollNanoseconds: 1_000_000
+        )
+        let session = CallSession()
+        await controller.handleLifecycleChange(callState: .active, session: session, workModeArmed: true)
+        spies.route.currentSnapshot = CallAudioRouteSnapshot(
+            inputUID: "com.example.airpods", outputUID: "com.example.airpods",
+            systemOutputUID: CallAudioTestFixtures.originalSystemOutputUID
+        )
+        await controller.handleLifecycleChange(callState: .active, session: session, workModeArmed: true)
+        XCTAssertEqual(realtime.disconnectCalls.last, "ownership-loss")
+        XCTAssertLessThan(log.entries.lastIndex(of: "realtime-disconnect")!, log.entries.lastIndex(of: "pcm-stop")!)
+    }
+
+    func testRealtimeConnectFailureDoesNotRollbackRoute() async {
+        let spies = CallAudioTestFixtures.makeSpies()
+        let realtime = RealtimeVoiceSessionControllingSpy()
+        realtime.failConnect = true
+        let controller = CallAudioSessionController(
+            routeController: spies.route, deviceActivator: spies.activator, recoveryStore: spies.store,
+            pcmController: spies.pcm, realtimeSession: realtime, processMute: spies.mute,
+            logger: BridgeLogger(), convergenceMaxAttempts: 5, convergencePollNanoseconds: 1_000_000
+        )
+        await controller.handleLifecycleChange(callState: .active, session: CallSession(), workModeArmed: true)
+        XCTAssertEqual(controller.state, .routed)
+        XCTAssertTrue(spies.pcm.isRunning)
+        XCTAssertEqual(spies.route.currentSnapshot?.outputUID, JarvisAudioDeviceUIDs.capture)
     }
 }

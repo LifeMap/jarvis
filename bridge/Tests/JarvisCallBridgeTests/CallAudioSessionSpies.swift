@@ -183,6 +183,25 @@ final class CallAudioPCMControllingSpy: CallAudioPCMControlling {
 }
 
 @MainActor
+final class RealtimeVoiceSessionControllingSpy: RealtimeVoiceSessionControlling {
+    var failConnect = false
+    var orderLog: CallAudioOperationOrderLog?
+    private(set) var connectCalls: [String] = []
+    private(set) var disconnectCalls: [String] = []
+
+    func connect(reason: String) async {
+        connectCalls.append(reason)
+        orderLog?.record("realtime-connect")
+        _ = failConnect
+    }
+
+    func disconnect(reason: String) async {
+        disconnectCalls.append(reason)
+        orderLog?.record("realtime-disconnect")
+    }
+}
+
+@MainActor
 enum CallAudioTestFixtures {
     static let originalInputUID = "com.example.mic"
     static let originalOutputUID = "com.example.speaker"
