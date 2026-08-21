@@ -66,6 +66,20 @@ final class SystemCallAudioPCMControllerComputationTests: XCTestCase {
         return snapshot
     }
 
+    /// Producer-side 1 kHz stereo sine (same constants as Phase 3). Returns frames accepted by the TX ring.
+    @discardableResult
+    private func writeSine(to ctx: OpaquePointer, frames: Int, startFrame: Int = 0) -> UInt32 {
+        var samples = [Float](repeating: 0, count: frames * channelCount)
+        for frame in 0..<frames {
+            let sample = Float(sin(2 * Double.pi * 1000.0 * Double(startFrame + frame) / 48000.0)) * 0.1
+            samples[frame * channelCount] = sample
+            samples[frame * channelCount + 1] = sample
+        }
+        return samples.withUnsafeBufferPointer { buf in
+            JarvisPCMRuntimeWriteTXFrames(ctx, buf.baseAddress!, UInt32(frames))
+        }
+    }
+
     // MARK: - Control plane (§10/§11)
 
     func testCreateReturnsAFreshlyResetContext() {
@@ -91,6 +105,7 @@ final class SystemCallAudioPCMControllerComputationTests: XCTestCase {
         runCaptureIOProc(context: ctx, input: input, output: output)
         disposeIn(); disposeOut()
         XCTAssertTrue(JarvisPCMRuntimeRequestTone(ctx, 48000))
+        XCTAssertEqual(writeSine(to: ctx, frames: 16), 16)
         XCTAssertGreaterThan(readMetrics(ctx).rxFrames, 0)
 
         JarvisPCMRuntimeReset(ctx)
@@ -98,6 +113,11 @@ final class SystemCallAudioPCMControllerComputationTests: XCTestCase {
         let metrics = readMetrics(ctx)
         XCTAssertEqual(metrics.rxFrames, 0)
         XCTAssertEqual(metrics.toneState, 0, "no request from before reset may survive it")
+
+        let (outputAfter, samplesAfter, disposeAfter) = makeBufferList(frameCount: 8, initial: [Float](repeating: 0.4, count: 16))
+        defer { disposeAfter() }
+        runInjectIOProc(context: ctx, output: outputAfter)
+        for i in 0..<16 { XCTAssertEqual(samplesAfter[i], 0, "reset must ClearTX") }
     }
 
     func testAtomicsReportLockFree() {
@@ -112,6 +132,36 @@ final class SystemCallAudioPCMControllerComputationTests: XCTestCase {
         let status = JarvisPCMCaptureAUInputCallback(UnsafeMutableRawPointer(ctx), &flags, &timestamp, 1, 64, nil)
         XCTAssertEqual(status, kAudioUnitErr_Uninitialized)
         XCTAssertEqual(readMetrics(ctx).rxIOProcInvocations, 1)
+    }
+
+    func testAUInputCallbackIgnoresStaleRingUntilProducerAdvances() {
+        guard let ctx = JarvisPCMRuntimeCreate() else { return XCTFail() }
+        defer { JarvisPCMRuntimeDestroy(ctx) }
+
+        var ring = JarvisCaptureRXRing(header: nil, samples: nil, mappingSize: 0, fd: -1, mapped: false, heapAllocated: false, owner: false)
+        XCTAssertTrue(JarvisCaptureRXRingInitInMemory(&ring, 2, 128))
+        defer { JarvisCaptureRXRingClose(&ring) }
+
+        let leftover: [Float] = (0..<128).map { _ in Float(0.627) }
+        leftover.withUnsafeBufferPointer { ptr in
+            JarvisCaptureRXRingWrite(&ring, ptr.baseAddress, 64)
+        }
+        XCTAssertTrue(withUnsafeMutablePointer(to: &ring) { ptr in
+            JarvisPCMRuntimeAdoptCaptureRXRing(ctx, UnsafeMutableRawPointer(ptr))
+        })
+        JarvisPCMRuntimeArmCaptureRXRingProducerCheck(ctx)
+
+        var flags: AudioUnitRenderActionFlags = []
+        var timestamp = AudioTimeStamp()
+        XCTAssertEqual(JarvisPCMCaptureAUInputCallback(UnsafeMutableRawPointer(ctx), &flags, &timestamp, 1, 64, nil), noErr)
+        XCTAssertEqual(readMetrics(ctx).rxPeakLinear, 0, "leftover shm with a frozen writeIndex must not be reported as live caller audio")
+
+        let live: [Float] = (0..<128).map { _ in Float(0.011) }
+        live.withUnsafeBufferPointer { ptr in
+            JarvisCaptureRXRingWrite(&ring, ptr.baseAddress, 64)
+        }
+        XCTAssertEqual(JarvisPCMCaptureAUInputCallback(UnsafeMutableRawPointer(ctx), &flags, &timestamp, 1, 64, nil), noErr)
+        XCTAssertEqual(readMetrics(ctx).rxPeakLinear, 0.011, accuracy: 0.0001)
     }
 
     func testAUInputCallbackPublishesNonZeroMetricsFromAttachedRXRing() {
@@ -564,6 +614,7 @@ final class SystemCallAudioPCMControllerComputationTests: XCTestCase {
         guard let ctx = JarvisPCMRuntimeCreate() else { return XCTFail() }
         defer { JarvisPCMRuntimeDestroy(ctx) }
         XCTAssertTrue(JarvisPCMRuntimeRequestTone(ctx, 48000))
+        XCTAssertEqual(writeSine(to: ctx, frames: 10), 10)
         let (output, _, disposeOut) = makeBufferList(frameCount: 10) // one callback claims Queued -> Playing
         runInjectIOProc(context: ctx, output: output)
         disposeOut()
@@ -576,6 +627,7 @@ final class SystemCallAudioPCMControllerComputationTests: XCTestCase {
         guard let ctx = JarvisPCMRuntimeCreate() else { return XCTFail() }
         defer { JarvisPCMRuntimeDestroy(ctx) }
         XCTAssertTrue(JarvisPCMRuntimeRequestTone(ctx, 48000))
+        XCTAssertEqual(writeSine(to: ctx, frames: 10), 10)
         let (output, _, disposeOut) = makeBufferList(frameCount: 10)
         defer { disposeOut() }
 
@@ -587,7 +639,7 @@ final class SystemCallAudioPCMControllerComputationTests: XCTestCase {
     func testInjectIOProcWritesExactDeterministicSineAtConfiguredFrequencyAndAmplitude() {
         guard let ctx = JarvisPCMRuntimeCreate() else { return XCTFail() }
         defer { JarvisPCMRuntimeDestroy(ctx) }
-        XCTAssertTrue(JarvisPCMRuntimeRequestTone(ctx, 480))
+        XCTAssertEqual(writeSine(to: ctx, frames: 480), 480)
         let (output, samples, disposeOut) = makeBufferList(frameCount: 480)
         defer { disposeOut() }
 
@@ -606,7 +658,7 @@ final class SystemCallAudioPCMControllerComputationTests: XCTestCase {
     func testInjectIOProcTonePhaseIsContinuousAcrossMultipleInvocations() {
         guard let ctx = JarvisPCMRuntimeCreate() else { return XCTFail() }
         defer { JarvisPCMRuntimeDestroy(ctx) }
-        XCTAssertTrue(JarvisPCMRuntimeRequestTone(ctx, 200))
+        XCTAssertEqual(writeSine(to: ctx, frames: 200), 200)
 
         let (output1, _, disposeOut1) = makeBufferList(frameCount: 100)
         runInjectIOProc(context: ctx, output: output1)
@@ -626,6 +678,7 @@ final class SystemCallAudioPCMControllerComputationTests: XCTestCase {
         guard let ctx = JarvisPCMRuntimeCreate() else { return XCTFail() }
         defer { JarvisPCMRuntimeDestroy(ctx) }
         XCTAssertTrue(JarvisPCMRuntimeRequestTone(ctx, 30)) // fewer frames than the callback will request
+        XCTAssertEqual(writeSine(to: ctx, frames: 30), 30)
         let (output, samples, disposeOut) = makeBufferList(frameCount: 100, initial: [Float](repeating: 0.9, count: 200))
         defer { disposeOut() }
 
@@ -636,12 +689,14 @@ final class SystemCallAudioPCMControllerComputationTests: XCTestCase {
             XCTAssertEqual(samples[frame * channelCount + 1], 0)
         }
         XCTAssertEqual(readMetrics(ctx).toneState, 0, "0 = idle — must have marked itself complete")
+        XCTAssertEqual(readMetrics(ctx).txUnderrunCount, 0, "tone completing mid-callback is not an underrun")
     }
 
     func testStaleRequestCannotReplayOnALaterInvocationAfterCompletion() {
         guard let ctx = JarvisPCMRuntimeCreate() else { return XCTFail() }
         defer { JarvisPCMRuntimeDestroy(ctx) }
         XCTAssertTrue(JarvisPCMRuntimeRequestTone(ctx, 5))
+        XCTAssertEqual(writeSine(to: ctx, frames: 5), 5)
         let (output1, _, disposeOut1) = makeBufferList(frameCount: 5)
         runInjectIOProc(context: ctx, output: output1)
         disposeOut1()
@@ -653,6 +708,62 @@ final class SystemCallAudioPCMControllerComputationTests: XCTestCase {
         defer { disposeOut2() }
         runInjectIOProc(context: ctx, output: output2)
         for i in 0..<20 { XCTAssertEqual(samples2[i], 0) }
+    }
+
+    func testWriteThenInjectCopiesExactFramesAndIdleEmptyRingIsNotUnderrun() {
+        guard let ctx = JarvisPCMRuntimeCreate() else { return XCTFail() }
+        defer { JarvisPCMRuntimeDestroy(ctx) }
+
+        XCTAssertEqual(writeSine(to: ctx, frames: 8), 8)
+
+        let (output, samples, disposeOut) = makeBufferList(frameCount: 8)
+        defer { disposeOut() }
+        runInjectIOProc(context: ctx, output: output)
+
+        for frame in 0..<8 {
+            let expected = Float(sin(2 * Double.pi * 1000.0 * Double(frame) / 48000.0)) * 0.1
+            XCTAssertEqual(samples[frame * channelCount], expected, accuracy: 0.0001)
+            XCTAssertEqual(samples[frame * channelCount + 1], expected, accuracy: 0.0001)
+        }
+        XCTAssertEqual(readMetrics(ctx).txUnderrunCount, 0)
+        XCTAssertEqual(readMetrics(ctx).txFrames, 8)
+
+        let (output2, samples2, dispose2) = makeBufferList(frameCount: 8, initial: [Float](repeating: 0.7, count: 16))
+        defer { dispose2() }
+        runInjectIOProc(context: ctx, output: output2)
+        for i in 0..<16 { XCTAssertEqual(samples2[i], 0) }
+        XCTAssertEqual(readMetrics(ctx).txUnderrunCount, 0, "idle empty ring is silence, not underrun")
+    }
+
+    func testWriteTXFramesReturnsPartialWhenRingIsFull() {
+        guard let ctx = JarvisPCMRuntimeCreate() else { return XCTFail() }
+        defer { JarvisPCMRuntimeDestroy(ctx) }
+        let frames = Int(JARVIS_PCM_TX_RING_FRAMES)
+        XCTAssertEqual(writeSine(to: ctx, frames: frames), UInt32(frames))
+        XCTAssertEqual(writeSine(to: ctx, frames: 16), 0)
+    }
+
+    func testClearTXDropsUnreadFrames() {
+        guard let ctx = JarvisPCMRuntimeCreate() else { return XCTFail() }
+        defer { JarvisPCMRuntimeDestroy(ctx) }
+        XCTAssertEqual(writeSine(to: ctx, frames: 32), 32)
+        JarvisPCMRuntimeClearTX(ctx)
+        let (output, samples, disposeOut) = makeBufferList(frameCount: 8, initial: [Float](repeating: 0.5, count: 16))
+        defer { disposeOut() }
+        runInjectIOProc(context: ctx, output: output)
+        for i in 0..<16 { XCTAssertEqual(samples[i], 0) }
+    }
+
+    func testQueuedToneWithEmptyRingRecordsOneUnderrun() {
+        guard let ctx = JarvisPCMRuntimeCreate() else { return XCTFail() }
+        defer { JarvisPCMRuntimeDestroy(ctx) }
+        XCTAssertTrue(JarvisPCMRuntimeRequestTone(ctx, 480))
+        let (output, samples, disposeOut) = makeBufferList(frameCount: 10, initial: [Float](repeating: 0.9, count: 20))
+        defer { disposeOut() }
+        runInjectIOProc(context: ctx, output: output)
+        for i in 0..<20 { XCTAssertEqual(samples[i], 0) }
+        XCTAssertEqual(readMetrics(ctx).txUnderrunCount, 1)
+        XCTAssertEqual(readMetrics(ctx).toneState, 1, "still queued — nothing consumed")
     }
 
     func testInjectIOProcMalformedBufferRecordsUnderrunNotCrash() {

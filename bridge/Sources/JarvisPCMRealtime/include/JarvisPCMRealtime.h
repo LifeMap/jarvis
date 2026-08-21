@@ -43,10 +43,11 @@
  *     callback is the sole consumer. Release/acquire ordering guarantees the callback that
  *     observes toneState == 1 also observes the toneRequestFrames value stored immediately
  *     before it.
- *   - toneFramesRemaining/tonePhase: callback-owned, plain (non-atomic) fields inside the
- *     context. Only the Inject IOProc ever reads or writes them - CoreAudio never invokes a
- *     given device's IOProc concurrently with itself, so single-writer ownership here needs no
- *     synchronization of any kind, atomic or otherwise.
+ *   - toneFramesRemaining: callback-owned consume countdown. The Inject IOProc decrements it
+ *     as it reads frames from the TX ring while a tone is queued/playing. Sine generation and
+ *     phase live on the non-real-time producer (WriteTXFrames), not inside the callback.
+ *   - txRing: SPSC lock-free stereo Float32 ring. WriteTXFrames is the sole producer;
+ *     Inject IOProc is the sole consumer.
  *
  * Fixed contract this runtime is built against (validated by Swift BEFORE any IOProc is
  * registered - see CallAudioPCMFormat.expected in SystemCallAudioPCMController.swift): 48000 Hz,
@@ -59,6 +60,7 @@
 #define JARVIS_PCM_TONE_FREQUENCY_HZ 1000.0
 #define JARVIS_PCM_TONE_AMPLITUDE 0.1f
 #define JARVIS_PCM_CAPTURE_RENDER_MAX_FRAMES 8192
+#define JARVIS_PCM_TX_RING_FRAMES 9600
 
 /* Opaque to Swift on purpose (§10 - "do not expose raw internal atomics to Swift"): only this
    translation unit ever sees the full struct definition and its atomic fields. Swift holds and
@@ -131,6 +133,18 @@ void JarvisPCMRuntimeDestroy(JarvisPCMRuntimeContext *_Nullable context);
    playing/queued" policy, preserved exactly). */
 bool JarvisPCMRuntimeRequestTone(JarvisPCMRuntimeContext *context, int32_t frameCount);
 
+/* Control plane. Writes up to frameCount interleaved stereo Float32 frames.
+   Returns frames actually stored. Never blocks. */
+uint32_t JarvisPCMRuntimeWriteTXFrames(
+    JarvisPCMRuntimeContext *context,
+    const float *interleaved,
+    uint32_t frameCount
+);
+
+/* Control plane after both IOProcs have stopped, or during Reset.
+   Drops unread TX. Future barge-in may call this; CP1 does not call it while IOProc runs. */
+void JarvisPCMRuntimeClearTX(JarvisPCMRuntimeContext *context);
+
 /* Copies the current state into *outSnapshot. Safe to call at any time, including while IOProcs
    are actively running - never blocks, never allocates. */
 void JarvisPCMRuntimeReadMetrics(const JarvisPCMRuntimeContext *context, JarvisPCMMetricsSnapshot *outSnapshot);
@@ -155,6 +169,20 @@ bool JarvisPCMRuntimeAdoptCaptureRXRing(JarvisPCMRuntimeContext *context, void *
 
 /* True after a successful Open/Adopt. */
 bool JarvisPCMRuntimeCaptureRXRingIsMapped(const JarvisPCMRuntimeContext *context);
+
+/* After Open/Adopt, treat the current writeIndex as leftover. AUHAL publishes silence
+   until the producer advances. Same-call evidence: Bridge opened a leftover shm whose
+   writeIndex never moved while Capture WriteMix (peak ~0.01) went only to the HAL loopback. */
+void JarvisPCMRuntimeArmCaptureRXRingProducerCheck(JarvisPCMRuntimeContext *context);
+
+/* Current shm writeIndex, or 0 if unmapped. */
+uint64_t JarvisPCMRuntimeCaptureRXRingWriteIndex(const JarvisPCMRuntimeContext *context);
+
+/* False only while a producer check is armed and writeIndex has not moved. */
+bool JarvisPCMRuntimeCaptureRXRingProducerHasAdvanced(const JarvisPCMRuntimeContext *context);
+
+/* Drop a stale shm mapping so the Rrxc fallback can take over. */
+void JarvisPCMRuntimeCloseCaptureRXRing(JarvisPCMRuntimeContext *context);
 
 /* Control-plane ingest for the `Rrxc` fallback poller. Same PublishRX path as the callback. */
 void JarvisPCMRuntimePublishRXFrames(JarvisPCMRuntimeContext *context, const float *samples, uint32_t frameCount);
@@ -200,9 +228,8 @@ OSStatus JarvisPCMCaptureAUInputCallback(
 );
 
 /* The native Inject AudioDeviceIOProc. inClientData must be a JarvisPCMRuntimeContext*. Always
-   fully initializes Inject's OUTPUT buffer to digital silence, or to the deterministic test tone
-   (channel-identical, phase-continuous across callbacks, exactly the requested frame count, then
-   back to silence) whenever one is queued or already playing. */
+   fully initializes Inject's OUTPUT buffer from the TX ring, or to digital silence when the
+   ring is empty. Never synthesizes the test tone. */
 OSStatus JarvisPCMInjectIOProc(
     AudioObjectID inDevice,
     const AudioTimeStamp *inNow,
