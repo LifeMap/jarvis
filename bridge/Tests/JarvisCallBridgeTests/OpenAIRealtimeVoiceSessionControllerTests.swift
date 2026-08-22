@@ -82,6 +82,25 @@ final class OpenAIRealtimeVoiceSessionControllerTests: XCTestCase {
         XCTAssertEqual(pcm.queuedTXFrames(), 0)
     }
 
+    func testRemoteSpeechStartedClearsTXAndLeavesRXAndPCMRunning() async {
+        let pcm = InMemoryRealtimePCMBuffer()
+        pcm.isRunning = true
+        pcm.rx = [0.4, 0.4]
+        pcm.tx = [0.9, 0.9]
+        let mock = MockRealtimeVoiceAdapter()
+        mock.enqueueTX([100, 101])
+        let session = makeSession(pcm: pcm, adapter: mock, enabled: true)
+        await session.connect(reason: "takeover")
+        mock.fireRemoteSpeechStarted()
+        XCTAssertEqual(pcm.clearTXCount, 1)
+        XCTAssertEqual(pcm.clearRXCount, 0)
+        XCTAssertEqual(pcm.tx, [])
+        XCTAssertEqual(pcm.rx, [0.4, 0.4])
+        XCTAssertTrue(pcm.isRunning)
+        XCTAssertEqual(mock.pollTX(), [])
+        XCTAssertEqual(session.uiState, .connected)
+    }
+
     private func makeSession(
         pcm: InMemoryRealtimePCMBuffer,
         adapter: MockRealtimeVoiceAdapter,
@@ -104,6 +123,8 @@ final class InMemoryRealtimePCMBuffer: RealtimePCMBuffering {
     var isRunning = false
     var rx: [Float] = []
     var tx: [Float] = []
+    private(set) var clearRXCount = 0
+    private(set) var clearTXCount = 0
 
     func readRXFrames(maxFrames: Int) -> [Float] {
         let take = min(maxFrames * 2, rx.count)
@@ -119,6 +140,13 @@ final class InMemoryRealtimePCMBuffer: RealtimePCMBuffering {
 
     func queuedTXFrames() -> Int { tx.count / 2 }
 
-    func clearRX() { rx = [] }
-    func clearTX() { tx = [] }
+    func clearRX() {
+        clearRXCount += 1
+        rx = []
+    }
+
+    func clearTX() {
+        clearTXCount += 1
+        tx = []
+    }
 }
