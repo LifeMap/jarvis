@@ -51,6 +51,13 @@ struct JarvisPCMRuntimeContext {
     uint32_t txRingReadPos;
     _Atomic uint32_t txRingCount;
 
+    /* App consume ring — sequential RX for Realtime. Distinct from capture shm `rxRing`. */
+    float rxConsume[JARVIS_PCM_TX_RING_FRAMES * JARVIS_PCM_CHANNEL_COUNT];
+    uint32_t rxConsumeWritePos;
+    uint32_t rxConsumeReadPos;
+    _Atomic uint32_t rxConsumeCount;
+    _Atomic int64_t rxOverflowCount;
+
     /* Capture AUHAL - set from the control plane before AudioOutputUnitStart. The render
        scratch is allocated once in Attach and freed in Destroy; the callback never allocates. */
     AudioUnit captureAudioUnit;
@@ -62,7 +69,31 @@ struct JarvisPCMRuntimeContext {
     uint64_t rxRingWriteIndexAtArm;
 };
 
+void JarvisPCMRuntimeClearRX(JarvisPCMRuntimeContext *context);
+void JarvisPCMRuntimeClearTX(JarvisPCMRuntimeContext *context);
+
 /* MARK: - Internal atomic helpers (file-local; never exposed to Swift - §10) */
+
+static uint32_t EnqueueRXConsume(JarvisPCMRuntimeContext *ctx, const float *interleaved, uint32_t frameCount) {
+    if (ctx == NULL || interleaved == NULL || frameCount == 0) return 0;
+    uint32_t used = atomic_load_explicit(&ctx->rxConsumeCount, memory_order_acquire);
+    uint32_t space = JARVIS_PCM_TX_RING_FRAMES - used;
+    uint32_t take = frameCount < space ? frameCount : space;
+    uint32_t pos = ctx->rxConsumeWritePos;
+    for (uint32_t f = 0; f < take; f++) {
+        uint32_t idx = ((pos + f) % JARVIS_PCM_TX_RING_FRAMES) * JARVIS_PCM_CHANNEL_COUNT;
+        ctx->rxConsume[idx] = interleaved[f * JARVIS_PCM_CHANNEL_COUNT];
+        ctx->rxConsume[idx + 1] = interleaved[f * JARVIS_PCM_CHANNEL_COUNT + 1];
+    }
+    ctx->rxConsumeWritePos = (pos + take) % JARVIS_PCM_TX_RING_FRAMES;
+    if (take > 0) {
+        atomic_fetch_add_explicit(&ctx->rxConsumeCount, take, memory_order_release);
+    }
+    if (take < frameCount) {
+        atomic_fetch_add_explicit(&ctx->rxOverflowCount, (int64_t)(frameCount - take), memory_order_relaxed);
+    }
+    return take;
+}
 
 static void RecordRX(JarvisPCMRuntimeContext *ctx, int64_t frameCount, float meanSquare, float peak) {
     atomic_fetch_add_explicit(&ctx->rxFrames, frameCount, memory_order_relaxed);
@@ -92,6 +123,9 @@ static void PublishRXInterleaved(JarvisPCMRuntimeContext *ctx, const float *samp
         atomic_fetch_add_explicit(&ctx->rxReadableNonZeroBufferCount, 1, memory_order_relaxed);
     }
     RecordRX(ctx, frameCount, meanSquare, peak);
+    if (frameCount > 0) {
+        (void)EnqueueRXConsume(ctx, samples, (uint32_t)frameCount);
+    }
 }
 
 static void RecordTX(JarvisPCMRuntimeContext *ctx, int64_t frameCount) {
@@ -149,11 +183,13 @@ void JarvisPCMRuntimeReset(JarvisPCMRuntimeContext *context) {
     atomic_init(&context->txFrames, (int64_t)0);
     atomic_init(&context->txCallbacks, (int64_t)0);
     atomic_init(&context->txUnderrunCount, (int64_t)0);
+    atomic_init(&context->rxOverflowCount, (int64_t)0);
     atomic_init(&context->toneState, (int32_t)0);
     atomic_init(&context->toneRequestFrames, (int32_t)0);
     context->toneFramesRemaining = 0;
     context->tonePhase = 0.0;
     JarvisPCMRuntimeClearTX(context);
+    JarvisPCMRuntimeClearRX(context);
     /* captureAudioUnit / captureRenderFrames are owned across reset (attach → destroy). */
 }
 
@@ -254,9 +290,40 @@ void JarvisPCMRuntimeCloseCaptureRXRing(JarvisPCMRuntimeContext *context) {
     context->rxRingWriteIndexAtArm = 0;
 }
 
-void JarvisPCMRuntimePublishRXFrames(JarvisPCMRuntimeContext *context, const float *samples, uint32_t frameCount) {
-    if (context == NULL || samples == NULL || frameCount == 0) return;
+uint32_t JarvisPCMRuntimePublishRXFrames(JarvisPCMRuntimeContext *context, const float *samples, uint32_t frameCount) {
+    if (context == NULL || samples == NULL || frameCount == 0) return 0;
+    uint32_t before = atomic_load_explicit(&context->rxConsumeCount, memory_order_acquire);
     PublishRXInterleaved(context, samples, frameCount * (UInt32)JARVIS_PCM_CHANNEL_COUNT);
+    uint32_t after = atomic_load_explicit(&context->rxConsumeCount, memory_order_acquire);
+    return after - before;
+}
+
+void JarvisPCMRuntimeClearRX(JarvisPCMRuntimeContext *context) {
+    if (context == NULL) return;
+    atomic_store_explicit(&context->rxConsumeCount, 0, memory_order_relaxed);
+    context->rxConsumeWritePos = 0;
+    context->rxConsumeReadPos = 0;
+}
+
+uint32_t JarvisPCMRuntimeReadRXFrames(
+    JarvisPCMRuntimeContext *context,
+    float *interleaved,
+    uint32_t frameCount
+) {
+    if (context == NULL || interleaved == NULL || frameCount == 0) return 0;
+    uint32_t available = atomic_load_explicit(&context->rxConsumeCount, memory_order_acquire);
+    uint32_t take = available < frameCount ? available : frameCount;
+    uint32_t pos = context->rxConsumeReadPos;
+    for (uint32_t f = 0; f < take; f++) {
+        uint32_t idx = ((pos + f) % JARVIS_PCM_TX_RING_FRAMES) * JARVIS_PCM_CHANNEL_COUNT;
+        interleaved[f * JARVIS_PCM_CHANNEL_COUNT] = context->rxConsume[idx];
+        interleaved[f * JARVIS_PCM_CHANNEL_COUNT + 1] = context->rxConsume[idx + 1];
+    }
+    context->rxConsumeReadPos = (pos + take) % JARVIS_PCM_TX_RING_FRAMES;
+    if (take > 0) {
+        atomic_fetch_sub_explicit(&context->rxConsumeCount, take, memory_order_release);
+    }
+    return take;
 }
 
 bool JarvisPCMRuntimeRequestTone(JarvisPCMRuntimeContext *context, int32_t frameCount) {
@@ -331,10 +398,12 @@ void JarvisPCMRuntimeReadMetrics(const JarvisPCMRuntimeContext *context, JarvisP
     outSnapshot->rxNullDataBufferCount = atomic_load_explicit((_Atomic int64_t *)&context->rxNullDataBufferCount, memory_order_relaxed);
     outSnapshot->rxReadableDataBufferCount = atomic_load_explicit((_Atomic int64_t *)&context->rxReadableDataBufferCount, memory_order_relaxed);
     outSnapshot->rxReadableNonZeroBufferCount = atomic_load_explicit((_Atomic int64_t *)&context->rxReadableNonZeroBufferCount, memory_order_relaxed);
+    outSnapshot->rxOverflowCount = atomic_load_explicit((_Atomic int64_t *)&context->rxOverflowCount, memory_order_relaxed);
 
     outSnapshot->txFrames = atomic_load_explicit((_Atomic int64_t *)&context->txFrames, memory_order_relaxed);
     outSnapshot->txCallbacks = atomic_load_explicit((_Atomic int64_t *)&context->txCallbacks, memory_order_relaxed);
     outSnapshot->txUnderrunCount = atomic_load_explicit((_Atomic int64_t *)&context->txUnderrunCount, memory_order_relaxed);
+    outSnapshot->txQueuedFrames = atomic_load_explicit((_Atomic uint32_t *)&context->txRingCount, memory_order_acquire);
     outSnapshot->toneState = atomic_load_explicit((_Atomic int32_t *)&context->toneState, memory_order_acquire);
 }
 
@@ -356,7 +425,9 @@ bool JarvisPCMRuntimeAtomicsAreLockFree(void) {
         && atomic_is_lock_free(&probe.txUnderrunCount)
         && atomic_is_lock_free(&probe.toneState)
         && atomic_is_lock_free(&probe.toneRequestFrames)
-        && atomic_is_lock_free(&probe.txRingCount);
+        && atomic_is_lock_free(&probe.txRingCount)
+        && atomic_is_lock_free(&probe.rxConsumeCount)
+        && atomic_is_lock_free(&probe.rxOverflowCount);
 }
 
 /* MARK: - Real-time callbacks (§30 - no malloc/calloc/realloc/free, no Objective-C messaging, no

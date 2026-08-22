@@ -3,15 +3,16 @@
 작성일: 2026-08-21
 
 - **Phase 4 CHECKPOINT 1**: **FINAL PASS** — TX 링 + 변환 + adapter/세션 순서. 앱에 OpenAI 없음. 실기기: Active+PCM에서 1 kHz 1초 연속 청취 (2026-08-22)
-- **Phase 4 CHECKPOINT 2**: **BLOCKED** — 실통화 speech-to-speech
-- **Phase 4**: **IN PROGRESS** — CHECKPOINT 2는 사용자 승인 전까지 시작하지 않음
+- **Phase 4 CHECKPOINT 2**: **IN PROGRESS** — OpenAI Realtime 실연결. 앱 안 WebSocket. Jarvis Agent 없음
+- **Phase 4**: **IN PROGRESS**
 
-스펙: `docs/superpowers/specs/2026-08-21-phase4-cp1-realtime-voice-design.md`  
-계획: `docs/superpowers/plans/2026-08-21-phase4-cp1-realtime-foundation.md`
+스펙(CP1): `docs/superpowers/specs/2026-08-21-phase4-cp1-realtime-voice-design.md`  
+스펙(CP2): `docs/superpowers/specs/2026-08-22-phase4-cp2-openai-realtime-design.md`  
+계획(CP2): `docs/superpowers/plans/2026-08-22-phase4-cp2-openai-realtime.md`
 
 ## 자동화 (2026-08-21)
 
-`cd bridge && swift test` — **346 passed, 0 failed**.
+`cd bridge && swift test` — **366 passed, 0 failed** (CP2 자동화 포함, 2026-08-22).
 
 ## 실기기 1 kHz (2026-08-22)
 

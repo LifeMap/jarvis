@@ -566,7 +566,42 @@ final class SystemCallAudioPCMController: CallAudioPCMControlling, ObservableObj
         guard linear > 0 else { return CallAudioPCMMetrics.silenceFloorDBFS }
         return max(20 * log10(linear), CallAudioPCMMetrics.silenceFloorDBFS)
     }
+
+    var isRunning: Bool { state == .running }
+
+    func readRXFrames(maxFrames: Int) -> [Float] {
+        guard let runtime, maxFrames > 0 else { return [] }
+        var samples = [Float](repeating: 0, count: maxFrames * 2)
+        let read = samples.withUnsafeMutableBufferPointer { buf in
+            JarvisPCMRuntimeReadRXFrames(runtime, buf.baseAddress!, UInt32(maxFrames))
+        }
+        guard read > 0 else { return [] }
+        return Array(samples.prefix(Int(read) * 2))
+    }
+
+    @discardableResult
+    func writeTXFrames(_ interleavedStereo: [Float]) -> Int {
+        guard let runtime, interleavedStereo.count >= 2 else { return 0 }
+        let frames = interleavedStereo.count / 2
+        return interleavedStereo.withUnsafeBufferPointer { buf in
+            Int(JarvisPCMRuntimeWriteTXFrames(runtime, buf.baseAddress!, UInt32(frames)))
+        }
+    }
+
+    func queuedTXFrames() -> Int {
+        guard let runtime else { return 0 }
+        var snapshot = JarvisPCMMetricsSnapshot()
+        JarvisPCMRuntimeReadMetrics(runtime, &snapshot)
+        return Int(snapshot.txQueuedFrames)
+    }
+
+    func clearRX() {
+        guard let runtime else { return }
+        JarvisPCMRuntimeClearRX(runtime)
+    }
 }
+
+extension SystemCallAudioPCMController: RealtimePCMBuffering {}
 
 /// Control-plane TX producer for the 1 s diagnostic tone. With JARVIS_PCM_TX_RING_FRAMES = 48000
 /// the entire 1 s sine fits in one write; the timer path is never entered and no underrun is possible.

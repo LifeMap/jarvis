@@ -107,6 +107,8 @@ typedef struct {
     int64_t rxNullDataBufferCount;
     int64_t rxReadableDataBufferCount;
     int64_t rxReadableNonZeroBufferCount;
+    int64_t rxOverflowCount;
+    uint32_t txQueuedFrames;
 } JarvisPCMMetricsSnapshot;
 
 /* MARK: - Control plane (non-real-time only; never called from a callback) */
@@ -184,8 +186,20 @@ bool JarvisPCMRuntimeCaptureRXRingProducerHasAdvanced(const JarvisPCMRuntimeCont
 /* Drop a stale shm mapping so the Rrxc fallback can take over. */
 void JarvisPCMRuntimeCloseCaptureRXRing(JarvisPCMRuntimeContext *context);
 
-/* Control-plane ingest for the `Rrxc` fallback poller. Same PublishRX path as the callback. */
-void JarvisPCMRuntimePublishRXFrames(JarvisPCMRuntimeContext *context, const float *samples, uint32_t frameCount);
+/* Control-plane ingest for the `Rrxc` fallback poller. Same PublishRX path as the callback.
+   Returns frames stored in the consume ring (may be less than frameCount on overflow). */
+uint32_t JarvisPCMRuntimePublishRXFrames(JarvisPCMRuntimeContext *context, const float *samples, uint32_t frameCount);
+
+/* Control plane. Copies up to frameCount interleaved stereo Float32 frames from the consume ring.
+   Returns frames actually copied. Empty ring returns 0. Never blocks. */
+uint32_t JarvisPCMRuntimeReadRXFrames(
+    JarvisPCMRuntimeContext *context,
+    float *interleaved,
+    uint32_t frameCount
+);
+
+/* Control plane. Drops unread consume-ring RX. Does not touch TX or the capture shm ring. */
+void JarvisPCMRuntimeClearRX(JarvisPCMRuntimeContext *context);
 
 CF_ASSUME_NONNULL_END
 

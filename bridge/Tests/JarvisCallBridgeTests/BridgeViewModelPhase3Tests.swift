@@ -23,6 +23,8 @@ final class BridgeViewModelPhase3Tests: XCTestCase {
         XCTAssertTrue(spies.activator.injectActiveCalls.isEmpty)
         XCTAssertTrue(spies.route.setOutputCalls.isEmpty)
         XCTAssertTrue(spies.route.setInputCalls.isEmpty)
+        XCTAssertFalse(model.realtimeEnabled, "Realtime toggle must start OFF")
+        XCTAssertEqual(model.realtimeSessionController.uiState, .idle)
     }
 
     /// §21: startup recovery runs before Work Mode auto-arms — verified here by pre-seeding a

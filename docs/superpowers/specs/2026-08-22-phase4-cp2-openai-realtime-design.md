@@ -1,7 +1,7 @@
 # Phase 4 CHECKPOINT 2 — OpenAI Realtime 실연결 설계
 
 날짜: 2026-08-22  
-상태: 설계 승인 대기 — 구현 전  
+상태: 구현 IN PROGRESS — 자동화 366 passed. 실기기 한 턴 대기  
 브랜치: `phase4-cp2-openai-realtime`  
 근거: `docs/Jarvis_Call_Bridge_Client_PRD.md` §16–18, §21, Phase 4  
 선행: Phase 4 CHECKPOINT 1 FINAL PASS (1 kHz 실기기, 2026-08-22)  

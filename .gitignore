@@ -11,3 +11,6 @@ bridge/AudioDriver/build/
 # Xcode / SwiftPM user state
 xcuserdata/
 *.xcuserstate
+
+# Call Bridge local secrets (never commit)
+bridge/.env

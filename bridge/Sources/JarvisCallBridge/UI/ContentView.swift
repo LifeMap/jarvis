@@ -11,6 +11,7 @@ struct ContentView: View {
     @ObservedObject var incomingCallObserver: IncomingCallObserver
     @ObservedObject var callAudioSession: CallAudioSessionController
     @ObservedObject var pcmController: SystemCallAudioPCMController
+    @ObservedObject var realtimeSession: OpenAIRealtimeVoiceSessionController
     @State private var focusedSnapshotLabel = "baseline"
     private static let focusedSnapshotLabels = ["baseline", "ringing", "active", "ended"]
 
@@ -21,6 +22,7 @@ struct ContentView: View {
         self.incomingCallObserver = model.incomingCallObserver
         self.callAudioSession = model.callAudioSession
         self.pcmController = model.pcmController
+        self.realtimeSession = model.realtimeSessionController
     }
 
     var body: some View {
@@ -78,7 +80,16 @@ struct ContentView: View {
                     }
                     GridRow {
                         Text("Realtime").foregroundStyle(.secondary)
-                        Text("Not implemented — Phase 4").font(.system(.body, design: .monospaced)).foregroundStyle(.secondary)
+                        HStack {
+                            Toggle("", isOn: Binding(
+                                get: { model.realtimeEnabled },
+                                set: { model.setRealtimeEnabled($0) }
+                            ))
+                            .labelsHidden()
+                            .toggleStyle(.switch)
+                            Text(realtimeSession.uiState.label)
+                                .font(.system(.body, design: .monospaced))
+                        }
                     }
                 }
 

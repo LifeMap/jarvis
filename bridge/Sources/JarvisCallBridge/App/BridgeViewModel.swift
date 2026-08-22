@@ -25,6 +25,8 @@ final class BridgeViewModel: ObservableObject {
     /// placeholder purely so the type is always safe to construct — tests never render SwiftUI, so
     /// they never observe it.
     let pcmController: SystemCallAudioPCMController
+    let realtimeSessionController: OpenAIRealtimeVoiceSessionController
+    @Published private(set) var realtimeEnabled = false
 
     /// nil when `accessibilityScanner` is a test mock — only the real `SystemAccessibilityClient`
     /// implements the raw-discovery/event-diagnostics capabilities (CHECKPOINT 2 fix).
@@ -55,12 +57,17 @@ final class BridgeViewModel: ObservableObject {
         self.rawDiagnostics = accessibilityScanner as? AccessibilityRawDiagnosticsProviding
         if let callAudioSession {
             self.callAudioSession = callAudioSession
-            self.pcmController = SystemCallAudioPCMController(logger: logger) // see doc comment — inert in this (test-injected) path
+            let pcm = SystemCallAudioPCMController(logger: logger) // see doc comment — inert in this (test-injected) path
+            self.pcmController = pcm
+            self.realtimeSessionController = OpenAIRealtimeVoiceSessionController(pcm: pcm)
         } else {
             let pcm = SystemCallAudioPCMController(logger: logger)
             self.pcmController = pcm
+            let realtime = OpenAIRealtimeVoiceSessionController(pcm: pcm)
+            self.realtimeSessionController = realtime
             self.callAudioSession = CallAudioSessionController(
                 pcmController: pcm,
+                realtimeSession: realtime,
                 processMute: SystemCallAudioProcessMuteController(logger: logger),
                 logger: logger
             )
@@ -121,6 +128,19 @@ final class BridgeViewModel: ObservableObject {
         // meeting on the user's speaker keeps working. Auto Answer already defaults to `true`.
         setWorkMode(true)
         incomingCallObserver.start()
+    }
+
+    func setRealtimeEnabled(_ enabled: Bool) {
+        realtimeEnabled = enabled
+        realtimeSessionController.isEnabled = enabled
+        Task { [weak self] in
+            guard let self else { return }
+            if enabled, self.pcmController.isRunning {
+                await self.realtimeSessionController.connect(reason: "toggle-on")
+            } else if !enabled {
+                await self.realtimeSessionController.disconnect(reason: "toggle-off")
+            }
+        }
     }
 
     func setWorkMode(_ enabled: Bool) {

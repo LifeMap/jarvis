@@ -902,6 +902,50 @@ final class SystemCallAudioPCMControllerComputationTests: XCTestCase {
     func testDBFSKnownAmplitudeMatchesExpectedDecibels() {
         XCTAssertEqual(SystemCallAudioPCMController.dBFS(0.1), -20, accuracy: 0.1)
     }
+
+    // MARK: - CP2 RX consume ring
+
+    func testReadRXFramesReturnsPublishedInterleavedSamples() {
+        let ctx = JarvisPCMRuntimeCreate()!
+        defer { JarvisPCMRuntimeDestroy(ctx) }
+        let input: [Float] = [0.25, -0.5, 0.75, 0.125]
+        XCTAssertEqual(input.withUnsafeBufferPointer { JarvisPCMRuntimePublishRXFrames(ctx, $0.baseAddress!, 2) }, 2)
+        var out = [Float](repeating: 99, count: 4)
+        let read = out.withUnsafeMutableBufferPointer { JarvisPCMRuntimeReadRXFrames(ctx, $0.baseAddress!, 2) }
+        XCTAssertEqual(read, 2)
+        XCTAssertEqual(out, input)
+    }
+
+    func testReadRXFramesOnEmptyRingReturnsZero() {
+        let ctx = JarvisPCMRuntimeCreate()!
+        defer { JarvisPCMRuntimeDestroy(ctx) }
+        var out = [Float](repeating: 1, count: 2)
+        XCTAssertEqual(out.withUnsafeMutableBufferPointer { JarvisPCMRuntimeReadRXFrames(ctx, $0.baseAddress!, 1) }, 0)
+    }
+
+    func testRXOverflowDiscardsNewFrames() {
+        let ctx = JarvisPCMRuntimeCreate()!
+        defer { JarvisPCMRuntimeDestroy(ctx) }
+        let capacity = UInt32(JARVIS_PCM_TX_RING_FRAMES)
+        let chunk = [Float](repeating: 0.1, count: Int(capacity) * 2)
+        XCTAssertEqual(chunk.withUnsafeBufferPointer { JarvisPCMRuntimePublishRXFrames(ctx, $0.baseAddress!, capacity) }, capacity)
+        let extra: [Float] = [0.9, 0.9]
+        XCTAssertEqual(extra.withUnsafeBufferPointer { JarvisPCMRuntimePublishRXFrames(ctx, $0.baseAddress!, 1) }, 0)
+        XCTAssertEqual(readMetrics(ctx).rxOverflowCount, 1)
+        var first = [Float](repeating: 0, count: 2)
+        XCTAssertEqual(first.withUnsafeMutableBufferPointer { JarvisPCMRuntimeReadRXFrames(ctx, $0.baseAddress!, 1) }, 1)
+        XCTAssertEqual(first, [0.1, 0.1])
+    }
+
+    func testClearRXDropsUnreadFrames() {
+        let ctx = JarvisPCMRuntimeCreate()!
+        defer { JarvisPCMRuntimeDestroy(ctx) }
+        let input: [Float] = [0.2, 0.3]
+        _ = input.withUnsafeBufferPointer { JarvisPCMRuntimePublishRXFrames(ctx, $0.baseAddress!, 1) }
+        JarvisPCMRuntimeClearRX(ctx)
+        var out = [Float](repeating: 7, count: 2)
+        XCTAssertEqual(out.withUnsafeMutableBufferPointer { JarvisPCMRuntimeReadRXFrames(ctx, $0.baseAddress!, 1) }, 0)
+    }
 }
 
 /// `OpaquePointer` isn't `Sendable` by default (it carries no compiler-provable thread-safety
