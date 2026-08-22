@@ -20,6 +20,7 @@
 
 - 2026-08-22 CP2 구현 직후: **366 passed**
 - 2026-08-22 Continuity 탭 RX 추가 후: **368 passed, 0 failed**
+- 2026-08-23 CP3 자동화: **373 passed, 0 failed**. 실기기 게이트 전. Phase 4 COMPLETE 아님.
 
 드라이버는 이 체크포인트에서 수정·재설치하지 않았다. `bridge/.env`는 gitignore. 키 미커밋.
 
@@ -111,12 +112,8 @@ Continuity 원격 음성은 `com.apple.avconferenced`가 스피커로 쓴다. �
 
 ---
 
-## Phase 4 잔여 (CHECKPOINT 3, 미착수)
+## Phase 4 잔여 (CHECKPOINT 3, 자동화 완료 / 실기기 전)
 
-PRD Phase 4 완료 기준 중 CP2에 넣지 않은 것:
+CP3 앱 자동화는 2026-08-23에 넣었다. `server_vad` + `interrupt_response`, `speech_started` → adapter TX 큐 비움 + `clearTX()`, 클라이언트 `response.cancel` 없음. 주인 개입/Phase 5 없음.
 
-- 여러 턴 대화
-- VAD
-- barge-in / local TX clear / response cancel
-
-스펙 없음. 에이전트는 CHECKPOINT 2 PASS 뒤에 다음 체크포인트를 자동으로 시작하지 않는다.
+실기기 여러 턴 + 상대 끼어들기가 PASS하기 전에는 CHECKPOINT 3를 FINAL PASS로 쓰지 않는다. Phase 5를 여기서 시작하지 않는다.
