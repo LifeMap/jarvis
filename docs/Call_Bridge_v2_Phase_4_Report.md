@@ -11,7 +11,8 @@
 스펙(CP1): `docs/superpowers/specs/2026-08-21-phase4-cp1-realtime-voice-design.md`  
 스펙(CP2): `docs/superpowers/specs/2026-08-22-phase4-cp2-openai-realtime-design.md`  
 스펙(CP3): `docs/superpowers/specs/2026-08-23-phase4-cp3-multiturn-barge-in-design.md`  
-계획(CP2): `docs/superpowers/plans/2026-08-22-phase4-cp2-openai-realtime.md`
+계획(CP2): `docs/superpowers/plans/2026-08-22-phase4-cp2-openai-realtime.md`  
+계획(CP3): `docs/superpowers/plans/2026-08-23-phase4-cp3-multiturn-barge-in.md`
 
 ## 자동화
 
