@@ -86,6 +86,36 @@ final class OpenAIRealtimeVoiceAdapterTests: XCTestCase {
         XCTAssertFalse(connected)
         XCTAssertTrue(transport.sentTexts.isEmpty)
     }
+
+    func testSpeechStartedClearsQueuedTXAndDoesNotSendCancel() async {
+        let transport = FakeRealtimeWebSocketTransport()
+        let adapter = OpenAIRealtimeVoiceAdapter(apiKey: "sk-test", model: "m", transport: transport)
+        var speechCallbacks = 0
+        adapter.onRemoteSpeechStarted = { speechCallbacks += 1 }
+        let connected = await adapter.connect()
+        XCTAssertTrue(connected)
+        adapter.ingestServerMessage("""
+        {"type":"response.output_audio.delta","delta":"\(pcm16Base64([9, 8, 7]))"}
+        """)
+        adapter.ingestServerMessage(#"{"type":"input_audio_buffer.speech_started"}"#)
+        XCTAssertEqual(adapter.pollTX(), [])
+        XCTAssertEqual(speechCallbacks, 1)
+        XCTAssertFalse(transport.sentTexts.contains(where: { $0.contains("response.cancel") }))
+        await adapter.disconnect()
+    }
+
+    func testBareSpeechStartedTypeAlsoClearsTX() async {
+        let transport = FakeRealtimeWebSocketTransport()
+        let adapter = OpenAIRealtimeVoiceAdapter(apiKey: "sk-test", model: "m", transport: transport)
+        let connected = await adapter.connect()
+        XCTAssertTrue(connected)
+        adapter.ingestServerMessage("""
+        {"type":"response.audio.delta","delta":"\(pcm16Base64([5]))"}
+        """)
+        adapter.ingestServerMessage(#"{"type":"speech_started"}"#)
+        XCTAssertEqual(adapter.pollTX(), [])
+        await adapter.disconnect()
+    }
 }
 
 private func pcm16Base64(_ samples: [Int16]) -> String {

@@ -6,6 +6,12 @@ final class MockRealtimeVoiceAdapter: RealtimeVoiceAdapting {
     private(set) var disconnectCount = 0
     private(set) var sentRX: [[Int16]] = []
     private var txQueue: [[Int16]] = []
+    var onRemoteSpeechStarted: (() -> Void)?
+
+    func fireRemoteSpeechStarted() {
+        txQueue = []
+        onRemoteSpeechStarted?()
+    }
 
     func connect() async -> Bool {
         connectCount += 1
