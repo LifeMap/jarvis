@@ -21,6 +21,29 @@ final class OpenAIRealtimeVoiceAdapterTests: XCTestCase {
         XCTAssertEqual(session["instructions"] as? String, OpenAIRealtimeVoiceAdapter.defaultInstructions)
         let encoded = String(data: try JSONSerialization.data(withJSONObject: session), encoding: .utf8) ?? ""
         XCTAssertTrue(encoded.contains("24000") || encoded.contains("pcm16"))
+        let audio = try XCTUnwrap(session["audio"] as? [String: Any])
+        let input = try XCTUnwrap(audio["input"] as? [String: Any])
+        let turn = try XCTUnwrap(input["turn_detection"] as? [String: Any])
+        XCTAssertEqual(turn["type"] as? String, "server_vad")
+        XCTAssertEqual((turn["create_response"] as? Bool) ?? (turn["create_response"] as? NSNumber)?.boolValue, true)
+        XCTAssertEqual((turn["interrupt_response"] as? Bool) ?? (turn["interrupt_response"] as? NSNumber)?.boolValue, true)
+        XCTAssertNil(session["turn_detection"], "do not send both turn_detection locations")
+        await adapter.disconnect()
+    }
+
+    func testPollTXKeepsTwoResponseDeltas() async {
+        let transport = FakeRealtimeWebSocketTransport()
+        let adapter = OpenAIRealtimeVoiceAdapter(apiKey: "sk-test", model: "m", transport: transport)
+        let connected = await adapter.connect()
+        XCTAssertTrue(connected)
+        adapter.ingestServerMessage("""
+        {"type":"response.output_audio.delta","delta":"\(pcm16Base64([1, 2]))"}
+        """)
+        adapter.ingestServerMessage("""
+        {"type":"response.output_audio.delta","delta":"\(pcm16Base64([3, 4]))"}
+        """)
+        XCTAssertEqual(adapter.pollTX(), [1, 2])
+        XCTAssertEqual(adapter.pollTX(), [3, 4])
         await adapter.disconnect()
     }
 

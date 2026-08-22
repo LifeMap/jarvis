@@ -93,7 +93,14 @@ final class OpenAIRealtimeVoiceAdapter: RealtimeVoiceAdapting {
             "type": "realtime",
             "instructions": instructions,
             "audio": [
-                "input": ["format": ["type": "audio/pcm", "rate": 24000]],
+                "input": [
+                    "format": ["type": "audio/pcm", "rate": 24000],
+                    "turn_detection": [
+                        "type": "server_vad",
+                        "create_response": true,
+                        "interrupt_response": true,
+                    ],
+                ],
                 "output": ["format": ["type": "audio/pcm", "rate": 24000]],
             ],
         ]
