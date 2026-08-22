@@ -66,4 +66,7 @@ void JarvisCaptureRXRingWrite(JarvisCaptureRXRing *ring, const float *frames, ui
 /* Non-destructive monitor of the newest `frameCount` frames. Silence-pads a short ring. */
 void JarvisCaptureRXRingTapLatest(JarvisCaptureRXRing *ring, float *outFrames, uint32_t frameCount);
 
+/* Producer cursor. 0 if the ring is not mapped. */
+uint64_t JarvisCaptureRXRingWriteIndex(const JarvisCaptureRXRing *ring);
+
 #endif /* JARVIS_CAPTURE_RX_RING_H */

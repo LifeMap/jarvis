@@ -48,6 +48,11 @@ static bool JarvisCaptureRXRingMapShared(JarvisCaptureRXRing *ring, bool create,
     const uint32_t channels = JARVIS_CAPTURE_RX_CHANNEL_COUNT;
     const uint32_t capacity = JARVIS_CAPTURE_RX_CAPACITY_FRAMES;
     const size_t mappingSize = JarvisCaptureRXRingByteCount(channels, capacity);
+    if (create) {
+        /* Leftover shm from a previous helper/userspace create survives coreaudiod restart.
+           Unlink first so Create either owns a fresh mapping or fails and Bridge uses Rrxc. */
+        (void)shm_unlink(name);
+    }
     const int oflag = create ? (O_RDWR | O_CREAT) : O_RDWR;
     const int fd = shm_open(name, oflag, 0666);
     if (fd < 0) {
@@ -152,6 +157,11 @@ void JarvisCaptureRXRingWrite(JarvisCaptureRXRing *ring, const float *frames, ui
         __atomic_store_n(&ring->header->readIndex, newWriteIndex - capacity, __ATOMIC_RELAXED);
     }
     __atomic_store_n(&ring->header->writeIndex, newWriteIndex, __ATOMIC_RELEASE);
+}
+
+uint64_t JarvisCaptureRXRingWriteIndex(const JarvisCaptureRXRing *ring) {
+    if (!JarvisCaptureRXRingIsMapped(ring)) return 0;
+    return __atomic_load_n(&ring->header->writeIndex, __ATOMIC_ACQUIRE);
 }
 
 void JarvisCaptureRXRingTapLatest(JarvisCaptureRXRing *ring, float *outFrames, uint32_t frameCount) {
