@@ -19,8 +19,8 @@ final class AudioRouteUISynchronizationTests: XCTestCase {
         defaultInputName: "Microphone", defaultOutputName: "Smart M80C", defaultSystemOutputName: "Mac Studio 스피커"
     )
     private let routedSnapshot = AudioRouteSnapshot(
-        defaultInputDeviceID: 396, defaultOutputDeviceID: 2, defaultSystemOutputDeviceID: 2,
-        defaultInputName: "Jarvis Call Inject", defaultOutputName: "Smart M80C", defaultSystemOutputName: "Mac Studio 스피커"
+        defaultInputDeviceID: 396, defaultOutputDeviceID: 264, defaultSystemOutputDeviceID: 2,
+        defaultInputName: "Jarvis Call Inject", defaultOutputName: "Jarvis Call Capture", defaultSystemOutputName: "Mac Studio 스피커"
     )
     private let userChosenSnapshot = AudioRouteSnapshot(
         defaultInputDeviceID: 55, defaultOutputDeviceID: 56, defaultSystemOutputDeviceID: 2,
@@ -45,7 +45,7 @@ final class AudioRouteUISynchronizationTests: XCTestCase {
     }
 
     // Answering/ending/unknown still do not refresh the route display. Ringing now *does*
-    // take the input route (Inject) and must refresh. Default Output stays on the meeting speaker.
+    // take Input (Inject) and Output (Capture) and must refresh.
     func testAnsweringAloneDoesNotChangeRouteDisplay() async {
         let fakeReader = FakeAudioRouteReader(snapshot: originalSnapshot)
         let model = makeModel(fakeReader: fakeReader, spies: CallAudioTestFixtures.makeSpies())
@@ -95,7 +95,7 @@ final class AudioRouteUISynchronizationTests: XCTestCase {
         XCTAssertEqual(model.callAudioSession.state, .routed)
         XCTAssertEqual(model.routeSnapshot, routedSnapshot)
         XCTAssertEqual(model.routeSnapshot?.defaultInputName, "Jarvis Call Inject")
-        XCTAssertEqual(model.routeSnapshot?.defaultOutputName, "Smart M80C")
+        XCTAssertEqual(model.routeSnapshot?.defaultOutputName, "Jarvis Call Capture")
         XCTAssertEqual(model.routeSnapshot?.defaultSystemOutputName, "Mac Studio 스피커", "System Output must display as unchanged")
     }
 

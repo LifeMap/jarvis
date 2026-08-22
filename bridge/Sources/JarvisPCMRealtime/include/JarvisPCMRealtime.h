@@ -60,7 +60,7 @@
 #define JARVIS_PCM_TONE_FREQUENCY_HZ 1000.0
 #define JARVIS_PCM_TONE_AMPLITUDE 0.1f
 #define JARVIS_PCM_CAPTURE_RENDER_MAX_FRAMES 8192
-#define JARVIS_PCM_TX_RING_FRAMES 9600
+#define JARVIS_PCM_TX_RING_FRAMES 48000
 
 /* Opaque to Swift on purpose (§10 - "do not expose raw internal atomics to Swift"): only this
    translation unit ever sees the full struct definition and its atomic fields. Swift holds and

@@ -43,9 +43,7 @@ final class SystemCallAudioPCMController: CallAudioPCMControlling, ObservableObj
     /// Control-plane poll of Capture `Rrxc` when POSIX shm cannot be opened.
     private var fallbackRXTimer: Timer?
     private var fallbackCaptureDeviceID: AudioDeviceID?
-    private var tonePumpTimer: Timer?
-    private var toneFramesLeftToWrite: Int = 0
-    private var tonePhaseFrame: Int = 0
+    private let toneProducer = CallAudioToneRingProducer()
 
     /// §19 — one fixed diagnostic tone: 1 kHz, 1.0s (48,000 frames at the native 48 kHz rate),
     /// same signal on every channel, amplitude 0.1 ≈ -20 dBFS, deterministic phase starting at 0
@@ -268,53 +266,18 @@ final class SystemCallAudioPCMController: CallAudioPCMControlling, ObservableObj
         }
         testToneState = .queued
         logger.log("[CALL-PCM] test-tone queued")
-        tonePumpTimer?.invalidate()
-        tonePumpTimer = nil
-        toneFramesLeftToWrite = Int(frameCount)
-        tonePhaseFrame = 0
-        _ = writeToneFrames(to: runtime, maxFrames: Int(JARVIS_PCM_TX_RING_FRAMES))
-        if toneFramesLeftToWrite > 0 {
-            let timer = Timer(timeInterval: 0.05, repeats: true) { [weak self] _ in
-                Task { @MainActor in self?.pumpTone() }
-            }
-            tonePumpTimer = timer
-            RunLoop.main.add(timer, forMode: .common)
-        }
-    }
-
-    private func stopTonePump() {
-        tonePumpTimer?.invalidate()
-        tonePumpTimer = nil
-        toneFramesLeftToWrite = 0
-        tonePhaseFrame = 0
-    }
-
-    private func pumpTone() {
-        guard state == .running, let runtime, toneFramesLeftToWrite > 0 else {
-            stopTonePump()
-            return
-        }
-        _ = writeToneFrames(to: runtime, maxFrames: 4800)
-        if toneFramesLeftToWrite == 0 { stopTonePump() }
-    }
-
-    @discardableResult
-    private func writeToneFrames(to runtime: OpaquePointer, maxFrames: Int) -> Int {
-        let frames = min(maxFrames, toneFramesLeftToWrite)
-        guard frames > 0 else { return 0 }
-        var samples = [Float](repeating: 0, count: frames * 2)
+        var samples = [Float](repeating: 0, count: Int(frameCount) * 2)
         let sampleRate = CallAudioPCMFormat.expected.sampleRate
-        for frame in 0..<frames {
-            let sample = Float(sin(2 * Double.pi * 1000.0 * Double(tonePhaseFrame + frame) / sampleRate)) * 0.1
+        for frame in 0..<Int(frameCount) {
+            let sample = Float(sin(2 * Double.pi * 1000.0 * Double(frame) / sampleRate)) * 0.1
             samples[frame * 2] = sample
             samples[frame * 2 + 1] = sample
         }
-        let written = samples.withUnsafeBufferPointer { buf in
-            Int(JarvisPCMRuntimeWriteTXFrames(runtime, buf.baseAddress!, UInt32(frames)))
-        }
-        tonePhaseFrame += written
-        toneFramesLeftToWrite -= written
-        return written
+        toneProducer.start(runtime: runtime, interleavedStereo: samples)
+    }
+
+    private func stopTonePump() {
+        toneProducer.stop()
     }
 
     // MARK: - Low-frequency UI metrics (§32/§34 — never per-callback; ~5Hz, only while running)
@@ -437,7 +400,7 @@ final class SystemCallAudioPCMController: CallAudioPCMControlling, ObservableObj
             // "buffers but mData NULL" / "readable buffers" from each other, so a real-device log
             // alone can localize the RX failure without needing a same-call CoreAudio debugger
             // attach.
-            logger.log("[CALL-PCM-METRICS] rxFrames=\(snapshot.rxFrames) rxCallbacks=\(snapshot.rxCallbacks) rawMeanSquareLinear=\(snapshot.rxMeanSquareLinear) rawPeakLinear=\(snapshot.rxPeakLinear) rmsDbFS=\(metrics.rxRMSDBFS) peakDbFS=\(metrics.rxPeakDBFS) activity=\(metrics.rxActive ? "active" : "silence") ioProcInvocations=\(snapshot.rxIOProcInvocations) inputListNullCallbacks=\(snapshot.rxNullInputListCallbacks) inputZeroBufferCountCallbacks=\(snapshot.rxZeroBufferCountCallbacks) inputBufferCountLast=\(snapshot.rxInputBufferCountLast) inputNullDataBufferCount=\(snapshot.rxNullDataBufferCount) readableDataBufferCount=\(snapshot.rxReadableDataBufferCount) readableNonZeroBufferCount=\(snapshot.rxReadableNonZeroBufferCount)")
+            logger.log("[CALL-PCM-METRICS] rxFrames=\(snapshot.rxFrames) rxCallbacks=\(snapshot.rxCallbacks) rawMeanSquareLinear=\(snapshot.rxMeanSquareLinear) rawPeakLinear=\(snapshot.rxPeakLinear) rmsDbFS=\(metrics.rxRMSDBFS) peakDbFS=\(metrics.rxPeakDBFS) activity=\(metrics.rxActive ? "active" : "silence") txUnderrunCount=\(snapshot.txUnderrunCount) ioProcInvocations=\(snapshot.rxIOProcInvocations) inputListNullCallbacks=\(snapshot.rxNullInputListCallbacks) inputZeroBufferCountCallbacks=\(snapshot.rxZeroBufferCountCallbacks) inputBufferCountLast=\(snapshot.rxInputBufferCountLast) inputNullDataBufferCount=\(snapshot.rxNullDataBufferCount) readableDataBufferCount=\(snapshot.rxReadableDataBufferCount) readableNonZeroBufferCount=\(snapshot.rxReadableNonZeroBufferCount)")
         }
     }
 
@@ -602,5 +565,63 @@ final class SystemCallAudioPCMController: CallAudioPCMControlling, ObservableObj
     nonisolated static func dBFS(_ linear: Float) -> Float {
         guard linear > 0 else { return CallAudioPCMMetrics.silenceFloorDBFS }
         return max(20 * log10(linear), CallAudioPCMMetrics.silenceFloorDBFS)
+    }
+}
+
+/// Control-plane TX producer for the 1 s diagnostic tone. With JARVIS_PCM_TX_RING_FRAMES = 48000
+/// the entire 1 s sine fits in one write; the timer path is never entered and no underrun is possible.
+final class CallAudioToneRingProducer: @unchecked Sendable {
+    private let queue = DispatchQueue(label: "com.jarvis.callbridge.tone-pump")
+    private var source: DispatchSourceTimer?
+    private var runtime: OpaquePointer?
+    private var samples: [Float] = []
+    private var framesWritten = 0
+
+    func start(runtime: OpaquePointer, interleavedStereo: [Float]) {
+        stop()
+        queue.sync {
+            self.runtime = runtime
+            self.samples = interleavedStereo
+            self.framesWritten = 0
+            self.writeAvailable()
+            guard self.framesWritten * 2 < interleavedStereo.count else { return }
+            let source = DispatchSource.makeTimerSource(queue: self.queue)
+            source.schedule(deadline: .now() + .milliseconds(5), repeating: .milliseconds(5))
+            source.setEventHandler { [weak self] in
+                self?.writeAvailable()
+            }
+            self.source = source
+            source.resume()
+        }
+    }
+
+    func stop() {
+        queue.sync {
+            source?.cancel()
+            source = nil
+            runtime = nil
+            samples = []
+            framesWritten = 0
+        }
+    }
+
+    private func writeAvailable() {
+        guard let runtime else { return }
+        let totalFrames = samples.count / 2
+        guard framesWritten < totalFrames else {
+            source?.cancel()
+            source = nil
+            return
+        }
+        let remaining = UInt32(totalFrames - framesWritten)
+        let written = samples.withUnsafeBufferPointer { buf -> UInt32 in
+            guard let base = buf.baseAddress else { return 0 }
+            return JarvisPCMRuntimeWriteTXFrames(runtime, base + framesWritten * 2, remaining)
+        }
+        framesWritten += Int(written)
+        if framesWritten >= totalFrames {
+            source?.cancel()
+            source = nil
+        }
     }
 }

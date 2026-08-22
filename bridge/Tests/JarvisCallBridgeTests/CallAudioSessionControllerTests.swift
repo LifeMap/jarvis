@@ -68,7 +68,7 @@ final class CallAudioSessionControllerTests: XCTestCase {
         XCTAssertEqual(controller.routeOwnerSessionID, session.id)
         XCTAssertEqual(spies.activator.captureActiveCalls, [true])
         XCTAssertEqual(spies.activator.injectActiveCalls, [true])
-        XCTAssertTrue(spies.route.setOutputCalls.isEmpty, "Default Output must stay on the meeting speaker")
+        XCTAssertEqual(spies.route.setOutputCalls, [JarvisAudioDeviceUIDs.capture], "Phone.app only writes caller PCM when Default Output is Capture")
         XCTAssertEqual(spies.route.setInputCalls, [JarvisAudioDeviceUIDs.inject])
         XCTAssertTrue(spies.pcm.startCalls.isEmpty, "ringing takeover is route-only — PCM stays closed until Active")
     }
@@ -84,7 +84,7 @@ final class CallAudioSessionControllerTests: XCTestCase {
 
         XCTAssertEqual(controller.state, .routed)
         XCTAssertEqual(spies.activator.captureActiveCalls, [true])
-        XCTAssertTrue(spies.route.setOutputCalls.isEmpty)
+        XCTAssertEqual(spies.route.setOutputCalls, [JarvisAudioDeviceUIDs.capture])
         XCTAssertTrue(spies.pcm.startCalls.isEmpty)
     }
 
@@ -168,7 +168,7 @@ final class CallAudioSessionControllerTests: XCTestCase {
         XCTAssertEqual(controller.state, .routed)
         XCTAssertEqual(spies.pcm.startCalls, ["takeover"])
         XCTAssertEqual(spies.activator.captureActiveCalls, [true], "Active after ringing must not re-run takeover")
-        XCTAssertTrue(spies.route.setOutputCalls.isEmpty)
+        XCTAssertEqual(spies.route.setOutputCalls, [JarvisAudioDeviceUIDs.capture])
     }
 
     // MARK: - §31 items 7-8/19/20: verified Active takeover, idempotency, session ownership
@@ -186,7 +186,7 @@ final class CallAudioSessionControllerTests: XCTestCase {
         XCTAssertEqual(controller.routeOwnerSessionID, session.id)
         XCTAssertEqual(spies.activator.captureActiveCalls, [true])
         XCTAssertEqual(spies.activator.injectActiveCalls, [true])
-        XCTAssertTrue(spies.route.setOutputCalls.isEmpty)
+        XCTAssertEqual(spies.route.setOutputCalls, [JarvisAudioDeviceUIDs.capture])
         XCTAssertEqual(spies.route.setInputCalls, [JarvisAudioDeviceUIDs.inject])
     }
 
@@ -224,7 +224,7 @@ final class CallAudioSessionControllerTests: XCTestCase {
 
         await controller.handleLifecycleChange(callState: .active, session: session, workModeArmed: true)
 
-        let markers = ["prepare session", "snapshot inputUID", "driver capture activated", "driver inject activated", "default-input -> inject", "route verification pass", "state=routed"]
+        let markers = ["prepare session", "snapshot inputUID", "driver capture activated", "driver inject activated", "default-output -> capture", "default-input -> inject", "route verification pass", "state=routed"]
         let stages = logger.lines.compactMap { line in markers.first { line.contains($0) } }
         XCTAssertEqual(stages, markers)
     }
@@ -248,7 +248,7 @@ final class CallAudioSessionControllerTests: XCTestCase {
 
         XCTAssertEqual(controller.state, .routed)
         XCTAssertEqual(spies.route.currentSnapshot?.systemOutputUID, CallAudioTestFixtures.originalSystemOutputUID)
-        XCTAssertEqual(spies.route.currentSnapshot?.outputUID, CallAudioTestFixtures.originalOutputUID, "Default Output must remain the pre-call speaker")
+        XCTAssertEqual(spies.route.currentSnapshot?.outputUID, JarvisAudioDeviceUIDs.capture, "Default Output must be Capture so Phone.app writes caller PCM there")
         XCTAssertEqual(spies.route.currentSnapshot?.inputUID, JarvisAudioDeviceUIDs.inject)
     }
 
@@ -293,16 +293,18 @@ final class CallAudioSessionControllerTests: XCTestCase {
         XCTAssertEqual(spies.route.currentSnapshot?.inputUID, CallAudioTestFixtures.originalInputUID)
     }
 
-    func testTakeoverSucceedsEvenWhenOutputSetterWouldFail() async {
+    func testOutputRouteFailureTriggersRollback() async {
         let spies = CallAudioTestFixtures.makeSpies()
         spies.route.failSetOutput = true
         let controller = makeController(spies)
 
         await controller.handleLifecycleChange(callState: .active, session: CallSession(), workModeArmed: true)
 
-        XCTAssertEqual(controller.state, .routed, "takeover must not touch Default Output")
-        XCTAssertTrue(spies.route.setOutputCalls.isEmpty)
+        XCTAssertNotEqual(controller.state, .routed)
+        XCTAssertEqual(spies.activator.captureActiveCalls, [true, false])
+        XCTAssertEqual(spies.activator.injectActiveCalls, [true, false])
         XCTAssertEqual(spies.route.currentSnapshot?.outputUID, CallAudioTestFixtures.originalOutputUID)
+        XCTAssertEqual(spies.route.currentSnapshot?.inputUID, CallAudioTestFixtures.originalInputUID)
     }
 
     func testInputRouteFailureTriggersRollback() async {
@@ -519,8 +521,8 @@ final class CallAudioSessionControllerTests: XCTestCase {
         await controller.handleLifecycleChange(callState: .active, session: session, workModeArmed: true)
         XCTAssertEqual(controller.state, .routed)
 
-        // The user manually picks a different input device mid-call. Output is not owned.
-        spies.route.currentSnapshot = CallAudioRouteSnapshot(inputUID: "com.example.headphones", outputUID: CallAudioTestFixtures.originalOutputUID, systemOutputUID: CallAudioTestFixtures.originalSystemOutputUID)
+        // The user manually picks a different input device mid-call.
+        spies.route.currentSnapshot = CallAudioRouteSnapshot(inputUID: "com.example.headphones", outputUID: JarvisAudioDeviceUIDs.capture, systemOutputUID: CallAudioTestFixtures.originalSystemOutputUID)
 
         await controller.handleLifecycleChange(callState: .active, session: session, workModeArmed: true)
         XCTAssertEqual(controller.state, .idle, "ownership loss must drop back to idle, not keep trying to force the route back")
@@ -535,6 +537,24 @@ final class CallAudioSessionControllerTests: XCTestCase {
         XCTAssertEqual(spies.route.setOutputCalls.count, outputCallsAfterLoss, "must never fight the user by re-acquiring the route for the same session")
     }
 
+    func testUserChangingDefaultOutputMidCallIsOwnershipLoss() async {
+        let spies = CallAudioTestFixtures.makeSpies()
+        let controller = makeController(spies)
+        let session = CallSession()
+        await controller.handleLifecycleChange(callState: .active, session: session, workModeArmed: true)
+        XCTAssertEqual(controller.state, .routed)
+
+        spies.route.currentSnapshot = CallAudioRouteSnapshot(
+            inputUID: JarvisAudioDeviceUIDs.inject,
+            outputUID: CallAudioTestFixtures.originalOutputUID,
+            systemOutputUID: CallAudioTestFixtures.originalSystemOutputUID
+        )
+
+        await controller.handleLifecycleChange(callState: .active, session: session, workModeArmed: true)
+        XCTAssertEqual(controller.state, .idle, "leaving Capture as Default Output mid-call is ownership loss")
+        XCTAssertEqual(spies.mute.stopCallCount, 1)
+    }
+
     /// Phase 3 CHECKPOINT 2 Rpcm/AudioObjectID-churn investigation (§31/§32/§41) — the
     /// `route-ownership-lost` diagnostic must carry the exact expected-vs-observed UIDs that
     /// explain WHY it fired, and the underlying detection must be UID-based (never
@@ -547,15 +567,16 @@ final class CallAudioSessionControllerTests: XCTestCase {
         await controller.handleLifecycleChange(callState: .active, session: session, workModeArmed: true)
         XCTAssertEqual(controller.state, .routed)
 
-        spies.route.currentSnapshot = CallAudioRouteSnapshot(inputUID: "com.example.headphones", outputUID: CallAudioTestFixtures.originalOutputUID, systemOutputUID: CallAudioTestFixtures.originalSystemOutputUID)
+        spies.route.currentSnapshot = CallAudioRouteSnapshot(inputUID: "com.example.headphones", outputUID: JarvisAudioDeviceUIDs.capture, systemOutputUID: CallAudioTestFixtures.originalSystemOutputUID)
         await controller.handleLifecycleChange(callState: .active, session: session, workModeArmed: true)
 
         let ownershipLossLine = logger.lines.first { $0.contains("route-ownership-lost") }
         XCTAssertNotNil(ownershipLossLine, "must log a route-ownership-lost line at all")
         XCTAssertTrue(ownershipLossLine?.contains("expectedInputUID=\(JarvisAudioDeviceUIDs.inject)") ?? false)
         XCTAssertTrue(ownershipLossLine?.contains("observedInputUID=com.example.headphones") ?? false, "must show the ACTUAL observed input UID that triggered the loss")
+        XCTAssertTrue(ownershipLossLine?.contains("expectedOutputUID=\(JarvisAudioDeviceUIDs.capture)") ?? false)
         XCTAssertTrue(ownershipLossLine?.contains("leftOutputUID=\(CallAudioTestFixtures.originalOutputUID)") ?? false)
-        XCTAssertTrue(ownershipLossLine?.contains("observedOutputUID=\(CallAudioTestFixtures.originalOutputUID)") ?? false)
+        XCTAssertTrue(ownershipLossLine?.contains("observedOutputUID=\(JarvisAudioDeviceUIDs.capture)") ?? false)
     }
 
     /// A route snapshot reporting the SAME UIDs Jarvis expects must never be treated as ownership
@@ -573,7 +594,7 @@ final class CallAudioSessionControllerTests: XCTestCase {
         // AudioObjectID scenario would look like from this controller's perspective — it only
         // ever sees UIDs, so there is nothing here that COULD distinguish an ID change).
         for _ in 0..<5 {
-            spies.route.currentSnapshot = CallAudioRouteSnapshot(inputUID: JarvisAudioDeviceUIDs.inject, outputUID: CallAudioTestFixtures.originalOutputUID, systemOutputUID: CallAudioTestFixtures.originalSystemOutputUID)
+            spies.route.currentSnapshot = CallAudioRouteSnapshot(inputUID: JarvisAudioDeviceUIDs.inject, outputUID: JarvisAudioDeviceUIDs.capture, systemOutputUID: CallAudioTestFixtures.originalSystemOutputUID)
             await controller.handleLifecycleChange(callState: .active, session: session, workModeArmed: true)
         }
         XCTAssertEqual(controller.state, .routed, "identical UIDs must never be treated as ownership loss")
@@ -680,7 +701,7 @@ final class CallAudioSessionControllerTests: XCTestCase {
     func testInputConvergesBeforeOutputStillWaitsForBothToConverge() async {
         let spies = CallAudioTestFixtures.makeSpies()
         spies.route.staleSnapshotOverride = CallAudioRouteSnapshot(
-            inputUID: CallAudioTestFixtures.originalInputUID, outputUID: JarvisAudioDeviceUIDs.capture,
+            inputUID: JarvisAudioDeviceUIDs.inject, outputUID: CallAudioTestFixtures.originalOutputUID,
             systemOutputUID: CallAudioTestFixtures.originalSystemOutputUID
         )
         spies.route.staleOutputReadbackCount = 2
@@ -689,7 +710,7 @@ final class CallAudioSessionControllerTests: XCTestCase {
         await controller.handleLifecycleChange(callState: .active, session: CallSession(), workModeArmed: true)
 
         XCTAssertEqual(controller.state, .routed)
-        XCTAssertEqual(spies.route.snapshotCallCount, 4, "1 initial snapshot + 3 convergence attempts — output already matched but the poll must not stop until input matches too")
+        XCTAssertEqual(spies.route.snapshotCallCount, 4, "1 initial snapshot + 3 convergence attempts — input matched from attempt 1 but the poll must not stop until output matches too")
     }
 
     // §16 item 7: a permanent System Output mismatch must fail verification even when Input and
@@ -830,7 +851,7 @@ final class CallAudioSessionControllerTests: XCTestCase {
         XCTAssertEqual(controller.state, .routed)
 
         spies.route.currentSnapshot = CallAudioRouteSnapshot(
-            inputUID: "com.example.headphones", outputUID: CallAudioTestFixtures.originalOutputUID,
+            inputUID: "com.example.headphones", outputUID: JarvisAudioDeviceUIDs.capture,
             systemOutputUID: CallAudioTestFixtures.originalSystemOutputUID
         )
         await controller.handleLifecycleChange(callState: .active, session: session, workModeArmed: true)
