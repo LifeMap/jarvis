@@ -124,6 +124,17 @@ final class SystemCallAudioPCMControllerComputationTests: XCTestCase {
         XCTAssertTrue(JarvisPCMRuntimeAtomicsAreLockFree(), "every atomic type this runtime relies on must be lock-free on this build target")
     }
 
+    func testProcessTapAUInputCallbackWithoutAttachedUnitIsSafe() {
+        guard let ctx = JarvisPCMRuntimeCreate() else { return XCTFail() }
+        defer { JarvisPCMRuntimeDestroy(ctx) }
+        var flags: AudioUnitRenderActionFlags = []
+        var timestamp = AudioTimeStamp()
+        let status = JarvisPCMProcessTapAUInputCallback(UnsafeMutableRawPointer(ctx), &flags, &timestamp, 1, 64, nil)
+        XCTAssertEqual(status, kAudioUnitErr_Uninitialized)
+        XCTAssertEqual(readMetrics(ctx).rxIOProcInvocations, 1)
+        XCTAssertEqual(readMetrics(ctx).rxCallbacks, 0)
+    }
+
     func testAUInputCallbackWithoutAttachedUnitIsSafe() {
         guard let ctx = JarvisPCMRuntimeCreate() else { return XCTFail() }
         defer { JarvisPCMRuntimeDestroy(ctx) }

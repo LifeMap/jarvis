@@ -1,6 +1,6 @@
 # Phase 4 CHECKPOINT 2 — OpenAI Realtime Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+상태: **COMPLETE / FINAL PASS** (2026-08-22). 실기기 한 턴과 자동화 368 passed는 `docs/Call_Bridge_v2_Phase_4_Report.md`에 기록. 이 문서는 구현 당시 작업 목록이며 새 작업을 여기서 이어 하지 않는다.
 
 **Goal:** 토글 ON + Active + PCM Running일 때만 OpenAI Realtime에 붙어 한 턴 speech-to-speech를 실통화로 확인한다.
 

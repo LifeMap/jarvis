@@ -1,3 +1,4 @@
+import CoreAudio
 import Foundation
 @testable import JarvisCallBridge
 
@@ -158,13 +159,15 @@ final class CallAudioPCMControllingSpy: CallAudioPCMControlling {
     var orderLog: CallAudioOperationOrderLog?
 
     private(set) var startCalls: [String] = []
+    private(set) var startRXTapDeviceIDs: [AudioDeviceID?] = []
     private(set) var stopCalls: [String] = []
     private(set) var testToneCallCount = 0
     private(set) var isRunning = false
 
     @discardableResult
-    func start(reason: String) async -> Bool {
+    func start(reason: String, rxTapDeviceID: AudioDeviceID?) async -> Bool {
         startCalls.append(reason)
+        startRXTapDeviceIDs.append(rxTapDeviceID)
         orderLog?.record("pcm-start")
         guard !failStart else { return false }
         isRunning = true
@@ -233,9 +236,12 @@ final class CallAudioProcessMuteControllingSpy: CallAudioProcessMuteControlling 
     var failStart = false
     var orderLog: CallAudioOperationOrderLog?
 
+    static let stubRXTapDeviceID: AudioDeviceID = 4242
+
     private(set) var startCalls: [[String]] = []
     private(set) var stopCallCount = 0
     private(set) var isMuting = false
+    private(set) var rxTapDeviceID: AudioDeviceID?
 
     @discardableResult
     func startMuting(bundleIDs: [String]) -> Bool {
@@ -243,6 +249,7 @@ final class CallAudioProcessMuteControllingSpy: CallAudioProcessMuteControlling 
         orderLog?.record("process-mute-start")
         guard !failStart else { return false }
         isMuting = true
+        rxTapDeviceID = Self.stubRXTapDeviceID
         return true
     }
 
@@ -250,5 +257,6 @@ final class CallAudioProcessMuteControllingSpy: CallAudioProcessMuteControlling 
         stopCallCount += 1
         orderLog?.record("process-mute-stop")
         isMuting = false
+        rxTapDeviceID = nil
     }
 }

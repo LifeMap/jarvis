@@ -241,6 +241,17 @@ OSStatus JarvisPCMCaptureAUInputCallback(
     AudioBufferList *_Nullable ioData
 );
 
+/* AUHAL input callback for the Continuity process-tap aggregate. Unlike Capture's extra
+   HAL client, this device's AudioUnitRender is the actual avconferenced mix. */
+OSStatus JarvisPCMProcessTapAUInputCallback(
+    void *inRefCon,
+    AudioUnitRenderActionFlags *ioActionFlags,
+    const AudioTimeStamp *inTimeStamp,
+    UInt32 inBusNumber,
+    UInt32 inNumberFrames,
+    AudioBufferList *_Nullable ioData
+);
+
 /* The native Inject AudioDeviceIOProc. inClientData must be a JarvisPCMRuntimeContext*. Always
    fully initializes Inject's OUTPUT buffer from the TX ring, or to digital silence when the
    ring is empty. Never synthesizes the test tone. */

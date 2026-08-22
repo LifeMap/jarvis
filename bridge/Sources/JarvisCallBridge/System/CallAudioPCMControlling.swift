@@ -72,7 +72,9 @@ protocol CallAudioPCMControlling: AnyObject {
     /// Capture/Inject `AudioDeviceID`s fresh (§10), validates their native stream format (§11),
     /// creates CoreAudio Direct I/O, and starts Capture RX + Inject TX. On ANY failure, unwinds
     /// only what was actually started (§51) and returns to `.idle` — never left half-started.
-    @discardableResult func start(reason: String) async -> Bool
+    /// `rxTapDeviceID` is the Continuity mute-aggregate input when process mute succeeded.
+    /// Nil keeps the Capture WriteMix / Rrxc path.
+    @discardableResult func start(reason: String, rxTapDeviceID: AudioDeviceID?) async -> Bool
     /// §22 — idempotent; safe to call when already `.idle`. Must fully stop and dispose I/O
     /// resources before returning, so the caller can safely proceed to route restoration
     /// immediately afterward.

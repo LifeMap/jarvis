@@ -1,3 +1,4 @@
+import CoreAudio
 import Foundation
 
 /// Mutes Continuity call playback (`avconferenced`) so the original speaker (e.g. M80C) stays
@@ -5,6 +6,9 @@ import Foundation
 @MainActor
 protocol CallAudioProcessMuteControlling: AnyObject {
     var isMuting: Bool { get }
+    /// Mute-aggregate device that exposes the process tap as input. Nil when mute is off or
+    /// failed. PCM reads this as RX — Phone.app's Capture WriteMix is silence during Active.
+    var rxTapDeviceID: AudioDeviceID? { get }
     @discardableResult
     func startMuting(bundleIDs: [String]) -> Bool
     func stopMuting()
@@ -26,6 +30,7 @@ enum CallAudioProcessMutePolicy {
 @MainActor
 final class NullCallAudioProcessMuteController: CallAudioProcessMuteControlling {
     private(set) var isMuting = false
+    var rxTapDeviceID: AudioDeviceID? { nil }
 
     func startMuting(bundleIDs: [String]) -> Bool {
         guard !CallAudioProcessMutePolicy.sanitized(bundleIDs).isEmpty else { return false }

@@ -12,6 +12,9 @@ final class SystemCallAudioProcessMuteController: CallAudioProcessMuteControllin
     private var tapID = AudioObjectID(kAudioObjectUnknown)
     private var aggregateID = AudioObjectID(kAudioObjectUnknown)
     private(set) var isMuting = false
+    var rxTapDeviceID: AudioDeviceID? {
+        aggregateID != kAudioObjectUnknown ? aggregateID : nil
+    }
 
     init(logger: BridgeLogger) {
         self.logger = logger

@@ -1,7 +1,7 @@
 # Phase 4 CHECKPOINT 2 — OpenAI Realtime 실연결 설계
 
 날짜: 2026-08-22  
-상태: 구현 IN PROGRESS — 자동화 366 passed. 실기기 한 턴 대기  
+상태: **FINAL PASS** (실기기 한 턴 2026-08-22 23:57). 보고: `docs/Call_Bridge_v2_Phase_4_Report.md`  
 브랜치: `phase4-cp2-openai-realtime`  
 근거: `docs/Jarvis_Call_Bridge_Client_PRD.md` §16–18, §21, Phase 4  
 선행: Phase 4 CHECKPOINT 1 FINAL PASS (1 kHz 실기기, 2026-08-22)  
@@ -43,8 +43,8 @@ Active + PCM Running인 실통화에서, 토글이 켜져 있을 때만 OpenAI R
 
 ```text
 상대
-  → Phone.app → Capture → Bridge RX (48 kHz stereo f32)
-  → RX 링 (제어면 Read, IOProc은 복사만)
+  → Continuity (avconferenced) → 기존 mute 탭 aggregate (input-only AUHAL)
+  → RX 소비 링 (제어면 Read)
   → 변환 (24 kHz mono PCM16)
   → OpenAI Realtime WebSocket
   → 변환 (48 kHz stereo f32)
@@ -52,6 +52,8 @@ Active + PCM Running인 실통화에서, 토글이 켜져 있을 때만 OpenAI R
   → Inject IOProc (링만 읽음)
   → Phone.app → 상대
 ```
+
+실기기 개정 (2026-08-22): Active 구간 Capture WriteMix는 벨/연결음 뒤에 디지털 무음이었다 (`captureWriteMixNonZero` 고정, peak 0). Phone 기본 출력 경로로는 상대 음성이 오지 않아, 이미 켜 둔 `avconferenced` 뮤트 탭을 RX로 읽는다. 뮤트는 유지. 드라이버 변경 없음. 탭 AUHAL 실패 시에만 WriteMix/Rrxc 폴백.
 
 IOProc 안에서 하지 않는 것: 리샘플, Swift 호출, 할당, 파일, 네트워크, 로그. CP1과 같다.
 
@@ -283,6 +285,8 @@ PASS
 이 전까지 Phase 5 (Jarvis Agent / ephemeral 키)와 barge-in은 BLOCKED
 에이전트는 CHECKPOINT 2 PASS 뒤에 다음 체크포인트를 자동으로 시작하지 않는다
 ```
+
+실기기 한 턴 PASS 증거: 로그 `jarvis-call-bridge-log-20260822-235804.txt`, RX/TX WAV `…-235749.wav`. `rxSource=continuity-tap`, TX WAV 8.1 s 에너지, `txUnderrunCount=0`. 상세는 Phase 4 리포트.
 
 ---
 

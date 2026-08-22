@@ -43,6 +43,10 @@ final class SystemCallAudioPCMController: CallAudioPCMControlling, ObservableObj
     /// Control-plane poll of Capture `Rrxc` when POSIX shm cannot be opened.
     private var fallbackRXTimer: Timer?
     private var fallbackCaptureDeviceID: AudioDeviceID?
+    private var lastFallbackRXPeak: Float = 0
+    private var lastFallbackRXFrames: Int = 0
+    private var lastFallbackRXMissing = false
+    private var usingContinuityTap = false
     private let toneProducer = CallAudioToneRingProducer()
 
     /// §19 — one fixed diagnostic tone: 1 kHz, 1.0s (48,000 frames at the native 48 kHz rate),
@@ -56,7 +60,7 @@ final class SystemCallAudioPCMController: CallAudioPCMControlling, ObservableObj
     }
 
     @discardableResult
-    func start(reason: String) async -> Bool {
+    func start(reason: String, rxTapDeviceID: AudioDeviceID? = nil) async -> Bool {
         guard state == .idle else {
             logger.log("[CALL-PCM] start ignored — already state=\(state.rawValue)")
             return state == .running
@@ -68,6 +72,10 @@ final class SystemCallAudioPCMController: CallAudioPCMControlling, ObservableObj
         lastMetricsLogAt = nil
         pcmRunningAt = nil
         didAbandonStaleCaptureRXRing = false
+        lastFallbackRXPeak = 0
+        lastFallbackRXFrames = 0
+        lastFallbackRXMissing = false
+        usingContinuityTap = false
         logger.log("[CALL-PCM] prepare reason=\(reason)")
 
         // §14 — verified once, before any IOProc is registered, never discovered from inside a
@@ -87,21 +95,6 @@ final class SystemCallAudioPCMController: CallAudioPCMControlling, ObservableObj
             return false
         }
         self.runtime = runtime
-        if JarvisPCMRuntimeOpenCaptureRXRing(runtime) {
-            logger.log("[CALL-PCM] capture-rx ring opened writeIndex=\(JarvisPCMRuntimeCaptureRXRingWriteIndex(runtime))")
-        } else {
-            logger.log("[CALL-PCM] capture-rx ring unavailable — using Rrxc property fallback")
-        }
-
-        // §10 — resolved fresh every time, never cached/persisted, with a UID round-trip check —
-        // exactly mirroring `SystemCallAudioRouteController.setDefault`'s existing pattern.
-        guard let tapID = Self.resolvedDeviceID(forUID: JarvisAudioDeviceUIDs.tap, role: "tap", logger: logger) else {
-            JarvisPCMRuntimeDestroy(runtime)
-            self.runtime = nil
-            state = .idle
-            return false
-        }
-        logger.log("[CALL-PCM] tap device resolved deviceID=\(tapID)")
 
         guard let injectID = Self.resolvedDeviceID(forUID: JarvisAudioDeviceUIDs.inject, role: "inject", logger: logger) else {
             JarvisPCMRuntimeDestroy(runtime)
@@ -110,24 +103,6 @@ final class SystemCallAudioPCMController: CallAudioPCMControlling, ObservableObj
             return false
         }
         logger.log("[CALL-PCM] inject device resolved deviceID=\(injectID)")
-
-        // §48 — format validation stays in the Swift control plane, never moved into the
-        // real-time callback; validated against the actual driver ASBD, never assumed.
-        guard let tapFormat = Self.nativeFormat(deviceID: tapID, scope: kAudioObjectPropertyScopeInput) else {
-            logger.log("[CALL-PCM] tap format query failed")
-            JarvisPCMRuntimeDestroy(runtime)
-            self.runtime = nil
-            state = .failed
-            return false
-        }
-        guard tapFormat == .expected else {
-            logger.log("[CALL-PCM] tap format validation failed expected=\(CallAudioPCMFormat.expected) actual=\(tapFormat)")
-            JarvisPCMRuntimeDestroy(runtime)
-            self.runtime = nil
-            state = .failed
-            return false
-        }
-        logger.log("[CALL-PCM] tap format \(tapFormat)")
 
         guard let injectFormat = Self.nativeFormat(deviceID: injectID, scope: kAudioObjectPropertyScopeOutput) else {
             logger.log("[CALL-PCM] inject format query failed")
@@ -144,19 +119,61 @@ final class SystemCallAudioPCMController: CallAudioPCMControlling, ObservableObj
             return false
         }
         logger.log("[CALL-PCM] inject format \(injectFormat)")
-        format = tapFormat
+
+        if let continuityTapID = rxTapDeviceID {
+            if let native = Self.nativeFormat(deviceID: continuityTapID, scope: kAudioObjectPropertyScopeInput) {
+                logger.log("[CALL-PCM] continuity-tap native format \(native) deviceID=\(continuityTapID)")
+            }
+            if startCaptureAUHAL(deviceID: continuityTapID, runtime: runtime, source: .continuityTap) {
+                usingContinuityTap = true
+                format = .expected
+                logger.log("[CALL-PCM] continuity-tap auhal started deviceID=\(continuityTapID)")
+            } else {
+                logger.log("[CALL-PCM] continuity-tap auhal failed — falling back to capture WriteMix")
+            }
+        }
+
+        if !usingContinuityTap {
+            if JarvisPCMRuntimeOpenCaptureRXRing(runtime) {
+                logger.log("[CALL-PCM] capture-rx ring opened writeIndex=\(JarvisPCMRuntimeCaptureRXRingWriteIndex(runtime))")
+            } else {
+                logger.log("[CALL-PCM] capture-rx ring unavailable — using Rrxc property fallback")
+            }
+
+            guard let tapID = Self.resolvedDeviceID(forUID: JarvisAudioDeviceUIDs.tap, role: "tap", logger: logger) else {
+                JarvisPCMRuntimeDestroy(runtime)
+                self.runtime = nil
+                state = .idle
+                return false
+            }
+            logger.log("[CALL-PCM] tap device resolved deviceID=\(tapID)")
+
+            guard let tapFormat = Self.nativeFormat(deviceID: tapID, scope: kAudioObjectPropertyScopeInput) else {
+                logger.log("[CALL-PCM] tap format query failed")
+                JarvisPCMRuntimeDestroy(runtime)
+                self.runtime = nil
+                state = .failed
+                return false
+            }
+            guard tapFormat == .expected else {
+                logger.log("[CALL-PCM] tap format validation failed expected=\(CallAudioPCMFormat.expected) actual=\(tapFormat)")
+                JarvisPCMRuntimeDestroy(runtime)
+                self.runtime = nil
+                state = .failed
+                return false
+            }
+            logger.log("[CALL-PCM] tap format \(tapFormat)")
+            format = tapFormat
+
+            guard startCaptureAUHAL(deviceID: tapID, runtime: runtime, source: .jarvisTap) else {
+                JarvisPCMRuntimeDestroy(runtime)
+                self.runtime = nil
+                state = .failed
+                return false
+            }
+        }
 
         let clientData = UnsafeMutableRawPointer(runtime)
-
-        // RX opens the hidden Tap device, not Capture. Same-call evidence: any extra input
-        // client on Capture (IOProc or AUHAL) got 512-frame silence while Capture ReadInput
-        // ran at 960 frames with real PCM. Tap has its own HAL IO cycle and reads Capture's ring.
-        guard startCaptureAUHAL(deviceID: tapID, runtime: runtime) else {
-            JarvisPCMRuntimeDestroy(runtime)
-            self.runtime = nil
-            state = .failed
-            return false
-        }
 
         var newInjectProcID: AudioDeviceIOProcID?
         let injectCreateStatus = AudioDeviceCreateIOProcID(injectID, JarvisPCMInjectIOProc, clientData, &newInjectProcID)
@@ -195,7 +212,7 @@ final class SystemCallAudioPCMController: CallAudioPCMControlling, ObservableObj
 
         startMetricsTimer()
         pcmRunningAt = Date()
-        if !JarvisPCMRuntimeCaptureRXRingIsMapped(runtime) {
+        if !usingContinuityTap, !JarvisPCMRuntimeCaptureRXRingIsMapped(runtime) {
             fallbackCaptureDeviceID = Self.resolvedDeviceID(forUID: JarvisAudioDeviceUIDs.capture, role: "capture-rx-fallback", logger: logger)
             startFallbackRXTimer()
         }
@@ -215,6 +232,10 @@ final class SystemCallAudioPCMController: CallAudioPCMControlling, ObservableObj
         fallbackCaptureDeviceID = nil
         pcmRunningAt = nil
         didAbandonStaleCaptureRXRing = false
+        lastFallbackRXPeak = 0
+        lastFallbackRXFrames = 0
+        lastFallbackRXMissing = false
+        usingContinuityTap = false
 
         // §14/§22/§24/§25 — Inject (TX, the side Phone.app is actively reading from) stops
         // before Capture; each is fully stopped (`AudioDeviceStop` returns — CoreAudio
@@ -299,6 +320,7 @@ final class SystemCallAudioPCMController: CallAudioPCMControlling, ObservableObj
     }
 
     private func abandonStaleCaptureRXRingIfNeeded(runtime: OpaquePointer) {
+        guard !usingContinuityTap else { return }
         guard !didAbandonStaleCaptureRXRing else { return }
         guard JarvisPCMRuntimeCaptureRXRingIsMapped(runtime) else { return }
         guard !JarvisPCMRuntimeCaptureRXRingProducerHasAdvanced(runtime) else { return }
@@ -327,7 +349,15 @@ final class SystemCallAudioPCMController: CallAudioPCMControlling, ObservableObj
 
     private func ingestFallbackRXChunk() {
         guard let runtime, let deviceID = fallbackCaptureDeviceID else { return }
-        guard let samples = Self.readCaptureRXChunk(deviceID: deviceID), samples.count >= 2 else { return }
+        guard let samples = Self.readCaptureRXChunk(deviceID: deviceID), samples.count >= 2 else {
+            lastFallbackRXMissing = true
+            lastFallbackRXFrames = 0
+            lastFallbackRXPeak = 0
+            return
+        }
+        lastFallbackRXMissing = false
+        lastFallbackRXFrames = samples.count / 2
+        lastFallbackRXPeak = samples.reduce(0) { max($0, abs($1)) }
         samples.withUnsafeBufferPointer { ptr in
             guard let base = ptr.baseAddress else { return }
             JarvisPCMRuntimePublishRXFrames(runtime, base, UInt32(samples.count / 2))
@@ -359,6 +389,33 @@ final class SystemCallAudioPCMController: CallAudioPCMControlling, ObservableObj
         guard data.count >= needed else { return nil }
         return data.subdata(in: headerSize..<needed).withUnsafeBytes { raw in
             Array(raw.bindMemory(to: Float.self))
+        }
+    }
+
+    /// Capture `Rpcm` — WriteMix counters. Same +1 CF ownership as Rrxc. Offsets match
+    /// `JarvisPCMDeviceDiagnostics` / JarvisAudioDriverTool (version=1, 104 bytes).
+    private static func readCapturePCMDiagnostics(deviceID: AudioDeviceID) -> (outputOperationCount: Int64, outputNonZeroCallbacks: Int64, outputPeakLinear: Float)? {
+        var address = AudioObjectPropertyAddress(
+            mSelector: 0x5270636d, /* 'Rpcm' */
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        guard AudioObjectHasProperty(deviceID, &address) else { return nil }
+        var size: UInt32 = 0
+        guard AudioObjectGetPropertyDataSize(deviceID, &address, 0, nil, &size) == noErr else { return nil }
+        var value: Unmanaged<CFData>?
+        var dataSize = size
+        guard AudioObjectGetPropertyData(deviceID, &address, 0, nil, &dataSize, &value) == noErr, let value else { return nil }
+        let data = value.takeRetainedValue() as Data
+        guard data.count >= 104 else { return nil }
+        return data.withUnsafeBytes { raw in
+            let version: UInt32 = raw.load(fromByteOffset: 0, as: UInt32.self)
+            guard version == 1 else { return nil }
+            return (
+                raw.load(fromByteOffset: 8, as: Int64.self),
+                raw.load(fromByteOffset: 24, as: Int64.self),
+                raw.load(fromByteOffset: 32, as: Float.self)
+            )
         }
     }
 
@@ -400,7 +457,20 @@ final class SystemCallAudioPCMController: CallAudioPCMControlling, ObservableObj
             // "buffers but mData NULL" / "readable buffers" from each other, so a real-device log
             // alone can localize the RX failure without needing a same-call CoreAudio debugger
             // attach.
-            logger.log("[CALL-PCM-METRICS] rxFrames=\(snapshot.rxFrames) rxCallbacks=\(snapshot.rxCallbacks) rawMeanSquareLinear=\(snapshot.rxMeanSquareLinear) rawPeakLinear=\(snapshot.rxPeakLinear) rmsDbFS=\(metrics.rxRMSDBFS) peakDbFS=\(metrics.rxPeakDBFS) activity=\(metrics.rxActive ? "active" : "silence") txUnderrunCount=\(snapshot.txUnderrunCount) ioProcInvocations=\(snapshot.rxIOProcInvocations) inputListNullCallbacks=\(snapshot.rxNullInputListCallbacks) inputZeroBufferCountCallbacks=\(snapshot.rxZeroBufferCountCallbacks) inputBufferCountLast=\(snapshot.rxInputBufferCountLast) inputNullDataBufferCount=\(snapshot.rxNullDataBufferCount) readableDataBufferCount=\(snapshot.rxReadableDataBufferCount) readableNonZeroBufferCount=\(snapshot.rxReadableNonZeroBufferCount)")
+            var line = "[CALL-PCM-METRICS] rxSource=\(usingContinuityTap ? "continuity-tap" : "capture-writemix") rxFrames=\(snapshot.rxFrames) rxCallbacks=\(snapshot.rxCallbacks) rawMeanSquareLinear=\(snapshot.rxMeanSquareLinear) rawPeakLinear=\(snapshot.rxPeakLinear) rmsDbFS=\(metrics.rxRMSDBFS) peakDbFS=\(metrics.rxPeakDBFS) activity=\(metrics.rxActive ? "active" : "silence") txUnderrunCount=\(snapshot.txUnderrunCount) ioProcInvocations=\(snapshot.rxIOProcInvocations) inputListNullCallbacks=\(snapshot.rxNullInputListCallbacks) inputZeroBufferCountCallbacks=\(snapshot.rxZeroBufferCountCallbacks) inputBufferCountLast=\(snapshot.rxInputBufferCountLast) inputNullDataBufferCount=\(snapshot.rxNullDataBufferCount) readableDataBufferCount=\(snapshot.rxReadableDataBufferCount) readableNonZeroBufferCount=\(snapshot.rxReadableNonZeroBufferCount)"
+            if fallbackRXTimer != nil, let deviceID = fallbackCaptureDeviceID {
+                if let driver = Self.readCapturePCMDiagnostics(deviceID: deviceID) {
+                    line += " captureWriteMixOps=\(driver.outputOperationCount) captureWriteMixNonZero=\(driver.outputNonZeroCallbacks) captureWriteMixPeakLinear=\(driver.outputPeakLinear)"
+                } else {
+                    line += " captureWriteMix=unreadable"
+                }
+                if lastFallbackRXMissing {
+                    line += " rrxc=missing"
+                } else {
+                    line += " rrxcFrames=\(lastFallbackRXFrames) rrxcPeakLinear=\(lastFallbackRXPeak)"
+                }
+            }
+            logger.log(line)
         }
     }
 
@@ -473,7 +543,12 @@ final class SystemCallAudioPCMController: CallAudioPCMControlling, ObservableObj
         AudioComponentInstanceDispose(audioUnit)
     }
 
-    private func startCaptureAUHAL(deviceID: AudioDeviceID, runtime: OpaquePointer) -> Bool {
+    private enum CaptureAUHALSource {
+        case jarvisTap
+        case continuityTap
+    }
+
+    private func startCaptureAUHAL(deviceID: AudioDeviceID, runtime: OpaquePointer, source: CaptureAUHALSource) -> Bool {
         var description = AudioComponentDescription(
             componentType: kAudioUnitType_Output,
             componentSubType: kAudioUnitSubType_HALOutput,
@@ -528,10 +603,10 @@ final class SystemCallAudioPCMController: CallAudioPCMControlling, ObservableObj
         )
         guard maxStatus == noErr else { return fail("set-max-frames", maxStatus) }
 
-        var callback = AURenderCallbackStruct(
-            inputProc: JarvisPCMCaptureAUInputCallback,
-            inputProcRefCon: UnsafeMutableRawPointer(runtime)
-        )
+        var callback = AURenderCallbackStruct(inputProc: JarvisPCMCaptureAUInputCallback, inputProcRefCon: UnsafeMutableRawPointer(runtime))
+        if source == .continuityTap {
+            callback = AURenderCallbackStruct(inputProc: JarvisPCMProcessTapAUInputCallback, inputProcRefCon: UnsafeMutableRawPointer(runtime))
+        }
         let callbackStatus = AudioUnitSetProperty(
             audioUnit, kAudioOutputUnitProperty_SetInputCallback, kAudioUnitScope_Global, 0,
             &callback, UInt32(MemoryLayout<AURenderCallbackStruct>.size)
@@ -551,7 +626,7 @@ final class SystemCallAudioPCMController: CallAudioPCMControlling, ObservableObj
 
         captureDeviceID = deviceID
         captureAudioUnit = audioUnit
-        logger.log("[CALL-PCM] tap auhal started")
+        logger.log("[CALL-PCM] \(source == .continuityTap ? "continuity-tap" : "tap") auhal started")
         return true
     }
 

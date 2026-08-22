@@ -544,6 +544,53 @@ OSStatus JarvisPCMCaptureAUInputCallback(
     return noErr;
 }
 
+OSStatus JarvisPCMProcessTapAUInputCallback(
+    void *inRefCon,
+    AudioUnitRenderActionFlags *ioActionFlags,
+    const AudioTimeStamp *inTimeStamp,
+    UInt32 inBusNumber,
+    UInt32 inNumberFrames,
+    AudioBufferList *ioData
+) {
+    (void)ioData;
+    JarvisPCMRuntimeContext *ctx = (JarvisPCMRuntimeContext *)inRefCon;
+    if (ctx == NULL) return kAudioUnitErr_Uninitialized;
+    atomic_fetch_add_explicit(&ctx->rxIOProcInvocations, 1, memory_order_relaxed);
+
+    if (inNumberFrames == 0 || inNumberFrames > JARVIS_PCM_CAPTURE_RENDER_MAX_FRAMES) {
+        atomic_fetch_add_explicit(&ctx->rxZeroBufferCountCallbacks, 1, memory_order_relaxed);
+        return noErr;
+    }
+    if (ctx->captureAudioUnit == NULL || ctx->captureRenderFrames == NULL) {
+        atomic_fetch_add_explicit(&ctx->rxNullInputListCallbacks, 1, memory_order_relaxed);
+        return kAudioUnitErr_Uninitialized;
+    }
+
+    const UInt32 floatCount = inNumberFrames * (UInt32)JARVIS_PCM_CHANNEL_COUNT;
+    AudioBufferList abl;
+    abl.mNumberBuffers = 1;
+    abl.mBuffers[0].mNumberChannels = (UInt32)JARVIS_PCM_CHANNEL_COUNT;
+    abl.mBuffers[0].mDataByteSize = floatCount * (UInt32)sizeof(float);
+    abl.mBuffers[0].mData = ctx->captureRenderFrames;
+
+    OSStatus status = AudioUnitRender(
+        ctx->captureAudioUnit,
+        ioActionFlags,
+        inTimeStamp,
+        inBusNumber,
+        inNumberFrames,
+        &abl
+    );
+    if (status != noErr) {
+        atomic_fetch_add_explicit(&ctx->rxNullDataBufferCount, 1, memory_order_relaxed);
+        return status;
+    }
+
+    atomic_store_explicit(&ctx->rxInputBufferCountLast, 1, memory_order_relaxed);
+    PublishRXInterleaved(ctx, ctx->captureRenderFrames, floatCount);
+    return noErr;
+}
+
 OSStatus JarvisPCMInjectIOProc(
     AudioObjectID inDevice,
     const AudioTimeStamp *inNow,

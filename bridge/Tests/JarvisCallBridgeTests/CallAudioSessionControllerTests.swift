@@ -167,8 +167,23 @@ final class CallAudioSessionControllerTests: XCTestCase {
 
         XCTAssertEqual(controller.state, .routed)
         XCTAssertEqual(spies.pcm.startCalls, ["takeover"])
+        XCTAssertEqual(spies.pcm.startRXTapDeviceIDs, [CallAudioProcessMuteControllingSpy.stubRXTapDeviceID], "Active PCM must read the Continuity mute tap, not Capture WriteMix")
         XCTAssertEqual(spies.activator.captureActiveCalls, [true], "Active after ringing must not re-run takeover")
         XCTAssertEqual(spies.route.setOutputCalls, [JarvisAudioDeviceUIDs.capture])
+    }
+
+    func testActivePCMGetsNilRXTapWhenMuteFails() async {
+        let spies = CallAudioTestFixtures.makeSpies()
+        spies.mute.failStart = true
+        let controller = makeController(spies)
+        let session = CallSession()
+
+        await controller.handleLifecycleChange(callState: .ringing, session: session, workModeArmed: true)
+        await controller.handleLifecycleChange(callState: .active, session: session, workModeArmed: true)
+
+        XCTAssertEqual(controller.state, .routed)
+        XCTAssertEqual(spies.pcm.startCalls, ["takeover"])
+        XCTAssertEqual(spies.pcm.startRXTapDeviceIDs, [nil], "mute failure must not block PCM; WriteMix fallback stays available")
     }
 
     // MARK: - §31 items 7-8/19/20: verified Active takeover, idempotency, session ownership

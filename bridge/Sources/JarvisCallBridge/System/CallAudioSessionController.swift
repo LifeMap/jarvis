@@ -302,7 +302,7 @@ final class CallAudioSessionController: ObservableObject {
         guard routeOwnerSessionID == session.id, state == .routed else { return }
         guard !pcmStarted else { return }
         guard let snapshot = originalSnapshot else { return }
-        guard await pcmController.start(reason: "takeover") else {
+        guard await pcmController.start(reason: "takeover", rxTapDeviceID: processMute.rxTapDeviceID) else {
             logger.log("[CALL-AUDIO] pcm start failed — emergency-restoring route session=\(session.id)")
             await rollback(to: snapshot, ownerID: session.id, stage: "pcm-start", activatedCapture: true, activatedInject: true)
             return
