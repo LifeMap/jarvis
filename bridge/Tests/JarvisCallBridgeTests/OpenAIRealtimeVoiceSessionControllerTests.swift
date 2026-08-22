@@ -72,6 +72,16 @@ final class OpenAIRealtimeVoiceSessionControllerTests: XCTestCase {
         XCTAssertLessThanOrEqual(pcm.queuedTXFrames(), OpenAIRealtimeVoiceSessionController.txWatermarkFrames)
     }
 
+    func testInMemoryClearTXDropsQueuedFramesOnly() {
+        let pcm = InMemoryRealtimePCMBuffer()
+        pcm.rx = [0.1, 0.1]
+        pcm.tx = [0.2, 0.2, 0.3, 0.3]
+        pcm.clearTX()
+        XCTAssertEqual(pcm.tx, [])
+        XCTAssertEqual(pcm.rx, [0.1, 0.1])
+        XCTAssertEqual(pcm.queuedTXFrames(), 0)
+    }
+
     private func makeSession(
         pcm: InMemoryRealtimePCMBuffer,
         adapter: MockRealtimeVoiceAdapter,
@@ -110,4 +120,5 @@ final class InMemoryRealtimePCMBuffer: RealtimePCMBuffering {
     func queuedTXFrames() -> Int { tx.count / 2 }
 
     func clearRX() { rx = [] }
+    func clearTX() { tx = [] }
 }
