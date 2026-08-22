@@ -5,10 +5,12 @@
 
 - **Phase 4 CHECKPOINT 1**: **FINAL PASS** — TX 링 + 변환 + adapter/세션 순서. 앱에 OpenAI 없음. 실기기: Active+PCM에서 1 kHz 1초 연속 청취 (2026-08-22)
 - **Phase 4 CHECKPOINT 2**: **FINAL PASS** — OpenAI Realtime 한 턴 speech-to-speech. 앱 안 WebSocket. RX는 Continuity 프로세스 탭. Jarvis Agent 없음 (2026-08-22)
-- **Phase 4**: **IN PROGRESS** — VAD / barge-in / 여러 턴은 CHECKPOINT 3. 자동 진행하지 않음
+- **Phase 4 CHECKPOINT 3**: **IN PROGRESS** — 여러 턴 + 상대 끼어들기. 주인 개입 없음
+- **Phase 4**: **IN PROGRESS**
 
 스펙(CP1): `docs/superpowers/specs/2026-08-21-phase4-cp1-realtime-voice-design.md`  
 스펙(CP2): `docs/superpowers/specs/2026-08-22-phase4-cp2-openai-realtime-design.md`  
+스펙(CP3): `docs/superpowers/specs/2026-08-23-phase4-cp3-multiturn-barge-in-design.md`  
 계획(CP2): `docs/superpowers/plans/2026-08-22-phase4-cp2-openai-realtime.md`
 
 ## 자동화
