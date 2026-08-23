@@ -114,6 +114,16 @@ describe("Jarvis Phase 1 Worker", () => {
     expect((await api(`/api/capability-gaps/${list.gaps[0]!.id}`)).status).toBe(200);
   });
 
+  it("records development-needed weather requests without blocking the answer",async()=>{
+    const response=await sendMessage("weather-capability-gap","내 위치를 기반으로 날씨 알려줘");
+    const body=await response.json<{model:string;message:string}>();
+    expect(body.model).not.toBe("jarvis-code-required");
+    expect(body.message).not.toContain("기능 요청으로 기록");
+    const list=await (await api("/api/capability-gaps?status=unresolved&service=weather")).json<{gaps:Array<{service:string|null;label:string}>}>();
+    expect(list.gaps.length).toBeGreaterThanOrEqual(1);
+    expect(list.gaps[0]).toMatchObject({service:"weather",label:"code-required"});
+  });
+
   it("manages Tool Providers explicitly and persists changes between requests", async () => {
     const all = await sendMessage("tool-provider-management", "현재 외부 서비스 Provider 상태를 전부 보여줘.");
     await expect(all.json()).resolves.toMatchObject({

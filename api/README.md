@@ -282,11 +282,13 @@ or rotate Cloudflare Worker Secrets.
 
 ## Capability Gap logging
 
-Jarvis conservatively records an explicit unsupported external-service mutation as `code-required`
-only when no registered Tool Provider or MCP server can supply that integration. Provider errors,
-disabled configuration, authentication failures, missing input, timeouts, and rate limits remain in
-their existing error flows and are never capability gaps. Logging is best-effort and cannot fail the
-Agent response.
+Jarvis records a `code-required` Capability Gap when the current Tool, Provider, or MCP set cannot
+fulfill the request. Explicit unsupported external-service mutations still stop with a recorded
+feature-request reply. Location-based weather and other missing live capabilities are recorded
+without blocking an existing-tool answer. If the model later admits it has no tool or API for the
+request, that reply is recorded as well. Provider errors, disabled configuration, authentication
+failures, missing input, timeouts, and rate limits remain in their existing error flows and are
+never capability gaps. Logging is best-effort and cannot fail the Agent response.
 
 ```text
 GET   /api/capability-gaps?status=unresolved&service=notion

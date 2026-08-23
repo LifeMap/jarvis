@@ -4,7 +4,7 @@
 
 > 구현 메모 (2026-08-14): 리팩터링 Phase 5에서 기존 Model Configuration, Tool Provider Configuration, MCP Registry를 orchestration하는 `RuntimeConfigurationManager`를 추가했다. 전체 Secret-free snapshot, section 조회, validation-first 복합 변경, Model/Tool reset, MCP Registry를 보존하는 전체 reset과 변경 history를 지원한다. `runtime_configuration_history`에는 target과 이전/신규 selection 및 source만 저장하며 token, API key, credential, authorization 값은 제거한다. 명확한 action verb가 있는 사용자 명령만 mutation으로 처리하며, 복합 변경은 전 항목 validation 성공 후 적용되고 실패하면 기존 설정을 유지한다.
 
-> 구현 메모 (2026-08-14): 리팩터링 Phase 7-1에서 보수적인 Capability Gap 판정과 `capability_gaps` 로그를 추가했다. 등록된 Tool Provider와 MCP 서버가 전혀 없는 명시적 외부 서비스 변경 요청만 `code-required`로 기록한다. 인증, 권한, 입력, timeout, rate-limit, disabled Provider 문제는 기존 오류 흐름을 유지한다. 요청 원문은 Secret redaction 후 저장하며 반복 요청을 보존하고 Admin에서 상태·서비스 필터, reviewed/ignored 상태 변경 및 단순 집계를 지원한다. 코드 생성, GitHub 연동, Runtime 설정 변경은 수행하지 않는다.
+> 구현 메모 (2026-08-23): Capability Gap은 등록된 Tool/Provider/MCP로 처리할 수 없는 요청을 `code-required`로 기록한다. 명시적 외부 서비스 변경 요청은 기존처럼 기능 요청 응답으로 중단하고, 위치 기반 날씨처럼 전용 도구가 없는 조회는 답변을 시도하면서 함께 기록한다. 모델이 도구/API가 없다고 인정한 응답도 기록한다. 인증, 권한, 입력, timeout, rate-limit, disabled Provider 문제는 기존 오류 흐름을 유지한다. 요청 원문은 Secret redaction 후 저장하며 Admin에서 상태·서비스 필터와 집계를 지원한다. 코드 생성, GitHub 연동, Runtime 설정 변경은 수행하지 않는다.
 
 ## 1. 문서 개요
 

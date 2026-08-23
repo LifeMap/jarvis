@@ -47,7 +47,7 @@ import { DurableObjectCredentialStore } from "./security/credential-store";
 import { AuthStatusService } from "./security/auth-status-service";
 import { createAuthManagementTools, parseAuthManagementIntent } from "./security/auth-management-tools";
 import { CapabilityGapRepository, type CapabilityGapStatus } from "./capability-gap/capability-gap-repository";
-import { detectCapabilityGap } from "./capability-gap/capability-gap-detector";
+import { detectCapabilityGap, detectMissingCapabilityResponse, inferRecordedGap } from "./capability-gap/capability-gap-detector";
 
 interface RunRow {
   id: string;
@@ -164,8 +164,8 @@ export class PersonalAssistantAgent extends Agent<Env> {
           toolResults = [{ toolCallId, name: tool.name, success: false, durationMs, summary, error: summary }];
           new ToolExecutionRepository(this).record({ id: crypto.randomUUID(), requestId, toolName: tool.name, toolInput: toolProviderIntent.arguments, success: false, durationMs, resultSummary: summary, error: summary });
         }
-      } else if (capabilityGap) {
-        try{new CapabilityGapRepository(this).create({requestText:message,requestedCapability:capabilityGap.requestedCapability,service:capabilityGap.service,reason:capabilityGap.reason})}catch{/* Capability-gap logging must never fail the user request. */}
+      } else if (capabilityGap?.blocking) {
+        this.recordCapabilityGap(message,capabilityGap);
         responseText="현재 Jarvis에 해당 기능을 실행할 수 있는 연결 기능이 없습니다. 향후 검토할 수 있도록 기능 요청으로 기록했습니다.";
         responseModel="jarvis-code-required";
       } else if (explicitMemory) {
@@ -179,6 +179,7 @@ export class PersonalAssistantAgent extends Agent<Env> {
         responseText = "기억했습니다.";
         responseModel = "jarvis-memory";
       } else {
+        if(capabilityGap)this.recordCapabilityGap(message,capabilityGap);
         const request = new ContextBuilder().build({
           profile,
           longTerm,
@@ -273,6 +274,7 @@ export class PersonalAssistantAgent extends Agent<Env> {
           responseText = llmResponse.text;
           responseModel = llmResponse.model;
         }
+        if(!capabilityGap&&detectMissingCapabilityResponse(responseText))this.recordCapabilityGap(message,inferRecordedGap(message));
       }
       const executionTimeMs = Date.now() - startedAt;
       const completedAt = new Date().toISOString();
@@ -510,6 +512,7 @@ export class PersonalAssistantAgent extends Agent<Env> {
   providerHealth(target?:string){const models=new ModelConfigurationService(new ModelConfigurationRepository(this),createModelRegistry(this.env));const mcp=this.mcpRuntime().registry;const tools=this.toolProviderConfiguration(new GoogleOAuthService(new GoogleOAuthRepository(this),this.env),mcp);return this.reliabilityServices(models,tools,mcp).health.check(target)}
   fallbackConfiguration(){const models=new ModelConfigurationService(new ModelConfigurationRepository(this),createModelRegistry(this.env));const mcp=this.mcpRuntime().registry;const tools=this.toolProviderConfiguration(new GoogleOAuthService(new GoogleOAuthRepository(this),this.env),mcp);return this.reliabilityServices(models,tools,mcp).fallbacks.list()}
   fallbackEvents(limit=50){return new FallbackConfigurationRepository(this).events(limit)}
+  private recordCapabilityGap(message:string,gap:{requestedCapability:string;service:string|null;reason:string}){try{new CapabilityGapRepository(this).create({requestText:message,requestedCapability:gap.requestedCapability,service:gap.service,reason:gap.reason})}catch{/* Capability-gap logging must never fail the user request. */}}
   listCapabilityGaps(filter:{status?:CapabilityGapStatus;service?:string;from?:string;to?:string}={}){return new CapabilityGapRepository(this).list(filter)}
   getCapabilityGap(id:string){return new CapabilityGapRepository(this).get(id)}
   updateCapabilityGapStatus(id:string,status:CapabilityGapStatus){return new CapabilityGapRepository(this).updateStatus(id,status)}
