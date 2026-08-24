@@ -8,6 +8,7 @@ struct ContentView: View {
     // propagate change notifications through a plain `let` property on `model` for you.
     @ObservedObject var callTracker: CallLifecycleTracker
     @ObservedObject var autoAnswer: AutoAnswerController
+    @ObservedObject var callback: MissedCallCallbackController
     @ObservedObject var incomingCallObserver: IncomingCallObserver
     @ObservedObject var callAudioSession: CallAudioSessionController
     @ObservedObject var pcmController: SystemCallAudioPCMController
@@ -19,6 +20,7 @@ struct ContentView: View {
         self.model = model
         self.callTracker = model.callTracker
         self.autoAnswer = model.autoAnswer
+        self.callback = model.callback
         self.incomingCallObserver = model.incomingCallObserver
         self.callAudioSession = model.callAudioSession
         self.pcmController = model.pcmController
@@ -91,7 +93,38 @@ struct ContentView: View {
                                 .font(.system(.body, design: .monospaced))
                         }
                     }
+                    GridRow {
+                        Text("Realtime 말투").foregroundStyle(.secondary)
+                        Picker("", selection: Binding(
+                            get: { model.realtimeSpeechStyle },
+                            set: { model.setRealtimeSpeechStyle($0) }
+                        )) {
+                            ForEach(RealtimeSpeechStyle.allCases) { style in
+                                Text(style.displayName).tag(style)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.segmented)
+                        .frame(maxWidth: 220)
+                    }
                 }
+
+                greetingEditor(
+                    title: "수신 인사",
+                    caption: "다음 착신부터 적용. 상대보다 먼저 그대로 말합니다.",
+                    text: Binding(
+                        get: { model.realtimeIncomingGreeting },
+                        set: { model.setRealtimeIncomingGreeting($0) }
+                    )
+                )
+                greetingEditor(
+                    title: "발신 인사",
+                    caption: "콜백이 연결되면 한 번만 그대로 말합니다. 비우면 수신 기본 인사를 쓰지 않습니다.",
+                    text: Binding(
+                        get: { model.realtimeOutgoingGreeting },
+                        set: { model.setRealtimeOutgoingGreeting($0) }
+                    )
+                )
 
                 HStack {
                     Button("Grant Accessibility…") { model.accessibility.requestPermissionPrompt() }
@@ -214,6 +247,38 @@ struct ContentView: View {
                     .frame(width: 140)
                 }
 
+                HStack {
+                    Text("콜백 주기").foregroundStyle(.secondary)
+                    Picker("", selection: Binding(
+                        get: { callback.intervalMinutes },
+                        set: { callback.intervalMinutes = $0 }
+                    )) {
+                        Text("1분").tag(1)
+                        Text("5분").tag(5)
+                        Text("10분").tag(10)
+                        Text("15분").tag(15)
+                        Text("30분").tag(30)
+                        Text("60분").tag(60)
+                    }
+                    .labelsHidden()
+                    .frame(width: 100)
+                    Text("미응답 후 끊기").foregroundStyle(.secondary)
+                    Picker("", selection: Binding(
+                        get: { callback.noAnswerSeconds },
+                        set: { callback.noAnswerSeconds = $0 }
+                    )) {
+                        Text("15초").tag(15)
+                        Text("30초").tag(30)
+                        Text("45초").tag(45)
+                        Text("60초").tag(60)
+                        Text("90초").tag(90)
+                        Text("120초").tag(120)
+                    }
+                    .labelsHidden()
+                    .frame(width: 100)
+                    Text("큐 \(callback.queueCount)").foregroundStyle(.secondary)
+                }
+
                 if let remaining = autoAnswer.countdownRemaining {
                     Text(String(format: "Auto answer in: %.1f sec", remaining))
                         .font(.callout)
@@ -304,6 +369,22 @@ struct ContentView: View {
             DispatchQueue.main.async {
                 model.start()
             }
+        }
+    }
+
+    private func greetingEditor(title: String, caption: String, text: Binding<String>) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title).foregroundStyle(.secondary)
+            TextEditor(text: text)
+                .font(.system(.body, design: .monospaced))
+                .frame(minHeight: 72, maxHeight: 140)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(Color.secondary.opacity(0.35))
+                )
+            Text(caption)
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 

@@ -12,14 +12,9 @@ enum RealtimeAudioConverter {
     }
 
     static func toHALTX(mono24kPCM16: [Int16]) -> [Float] {
-        guard !mono24kPCM16.isEmpty else { return [] }
-        let mono24k = mono24kPCM16.map { Float($0) / 32768.0 }
-        let mono48k = resampleLinear(mono24k, inRate: RealtimeAudioFormat.sampleRate, outRate: RealtimeAudioFormat.halSampleRate)
-        var stereo = [Float](repeating: 0, count: mono48k.count * 2)
-        for i in mono48k.indices {
-            stereo[i * 2] = mono48k[i]
-            stereo[i * 2 + 1] = mono48k[i]
-        }
+        var converter = RealtimeHALTXConverter()
+        var stereo = converter.convert(mono24kPCM16)
+        stereo.append(contentsOf: converter.flush())
         return stereo
     }
 
@@ -39,5 +34,42 @@ enum RealtimeAudioConverter {
             output[i] = s0 + (s1 - s0) * frac
         }
         return output
+    }
+}
+
+struct RealtimeHALTXConverter {
+    private var pending: Float?
+
+    mutating func reset() {
+        pending = nil
+    }
+
+    mutating func convert(_ mono24kPCM16: [Int16]) -> [Float] {
+        var mono48k: [Float] = []
+        mono48k.reserveCapacity(mono24kPCM16.count * 2)
+        for sample in mono24kPCM16 {
+            let current = Float(sample) / 32768.0
+            if let previous = pending {
+                mono48k.append(previous)
+                mono48k.append((previous + current) * 0.5)
+            }
+            pending = current
+        }
+        return Self.stereo(mono48k)
+    }
+
+    mutating func flush() -> [Float] {
+        guard let previous = pending else { return [] }
+        pending = nil
+        return Self.stereo([previous, previous])
+    }
+
+    private static func stereo(_ mono48k: [Float]) -> [Float] {
+        var stereo = [Float](repeating: 0, count: mono48k.count * 2)
+        for i in mono48k.indices {
+            stereo[i * 2] = mono48k[i]
+            stereo[i * 2 + 1] = mono48k[i]
+        }
+        return stereo
     }
 }

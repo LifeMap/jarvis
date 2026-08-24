@@ -12,7 +12,8 @@ let package = Package(
         .executableTarget(
             name: "JarvisCallBridge",
             dependencies: ["JarvisPCMRealtime"],
-            path: "Sources/JarvisCallBridge"
+            path: "Sources/JarvisCallBridge",
+            linkerSettings: [.linkedFramework("Contacts"), .linkedFramework("AVFoundation")]
         ),
         .testTarget(
             name: "JarvisCallBridgeTests",

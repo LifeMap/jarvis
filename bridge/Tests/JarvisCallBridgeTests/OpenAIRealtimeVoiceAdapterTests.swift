@@ -27,7 +27,29 @@ final class OpenAIRealtimeVoiceAdapterTests: XCTestCase {
         XCTAssertEqual(turn["type"] as? String, "server_vad")
         XCTAssertEqual((turn["create_response"] as? Bool) ?? (turn["create_response"] as? NSNumber)?.boolValue, true)
         XCTAssertEqual((turn["interrupt_response"] as? Bool) ?? (turn["interrupt_response"] as? NSNumber)?.boolValue, true)
+        let transcription = try XCTUnwrap(input["transcription"] as? [String: Any])
+        XCTAssertEqual(transcription["model"] as? String, "whisper-1")
         XCTAssertNil(session["turn_detection"], "do not send both turn_detection locations")
+        XCTAssertEqual(transport.sentTexts.count, 2)
+        let second = try XCTUnwrap(JSONSerialization.jsonObject(with: Data((transport.sentTexts.last ?? "").utf8)) as? [String: Any])
+        XCTAssertEqual(second["type"] as? String, "response.create")
+        await adapter.disconnect()
+    }
+
+    func testConnectSendsInjectedInstructions() async throws {
+        let transport = FakeRealtimeWebSocketTransport()
+        let adapter = OpenAIRealtimeVoiceAdapter(
+            apiKey: "sk-test",
+            model: "m",
+            transport: transport,
+            instructions: "항상 존댓말로만 말하세요."
+        )
+        let connected = await adapter.connect()
+        XCTAssertTrue(connected)
+        let first = transport.sentTexts.first ?? ""
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(first.utf8)) as? [String: Any])
+        let session = try XCTUnwrap(object["session"] as? [String: Any])
+        XCTAssertEqual(session["instructions"] as? String, "항상 존댓말로만 말하세요.")
         await adapter.disconnect()
     }
 
@@ -78,6 +100,46 @@ final class OpenAIRealtimeVoiceAdapterTests: XCTestCase {
         await adapter.disconnect()
     }
 
+    func testTranscriptionEventsCollectCallerAndJarvisTurns() async {
+        let transport = FakeRealtimeWebSocketTransport()
+        let adapter = OpenAIRealtimeVoiceAdapter(apiKey: "sk-test", model: "m", transport: transport)
+        let connected = await adapter.connect()
+        XCTAssertTrue(connected)
+        adapter.ingestServerMessage(#"{"type":"conversation.item.input_audio_transcription.completed","transcript":"택배 왔습니다"}"#)
+        adapter.ingestServerMessage(#"{"type":"response.output_audio_transcript.done","transcript":"네, 전달하겠습니다"}"#)
+        XCTAssertEqual(adapter.transcript, [
+            CallTranscriptTurn(role: "caller", text: "택배 왔습니다"),
+            CallTranscriptTurn(role: "jarvis", text: "네, 전달하겠습니다"),
+        ])
+        await adapter.disconnect()
+    }
+
+    func testFirstJarvisTranscriptReplacesOpeningInstructions() async {
+        let transport = FakeRealtimeWebSocketTransport()
+        let adapter = OpenAIRealtimeVoiceAdapter(
+            apiKey: "sk-test",
+            model: "m",
+            transport: transport,
+            instructions: "첫 인사 본문",
+            followUpInstructions: "이미 인사했으니 반복하지 마세요."
+        )
+        let connected = await adapter.connect()
+        XCTAssertTrue(connected)
+        adapter.ingestServerMessage(#"{"type":"response.output_audio_transcript.done","transcript":"안녕하세요"}"#)
+        for _ in 0..<20 { await Task.yield() }
+        let updates = transport.sentTexts.compactMap { text -> String? in
+            guard let object = try? JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any],
+                  object["type"] as? String == "session.update",
+                  let session = object["session"] as? [String: Any]
+            else { return nil }
+            return session["instructions"] as? String
+        }
+        XCTAssertEqual(updates.first, "첫 인사 본문")
+        XCTAssertEqual(updates.last, "이미 인사했으니 반복하지 마세요.")
+        XCTAssertGreaterThanOrEqual(updates.count, 2)
+        await adapter.disconnect()
+    }
+
     func testConnectFailureReturnsFalse() async {
         let transport = FakeRealtimeWebSocketTransport()
         transport.connectError = URLError(.notConnectedToInternet)
@@ -101,6 +163,27 @@ final class OpenAIRealtimeVoiceAdapterTests: XCTestCase {
         XCTAssertEqual(adapter.pollTX(), [])
         XCTAssertEqual(speechCallbacks, 1)
         XCTAssertFalse(transport.sentTexts.contains(where: { $0.contains("response.cancel") }))
+        await adapter.disconnect()
+    }
+
+    func testSpeechStartedDropsLaterDeltasUntilSpeechStopped() async {
+        let transport = FakeRealtimeWebSocketTransport()
+        let adapter = OpenAIRealtimeVoiceAdapter(apiKey: "sk-test", model: "m", transport: transport)
+        let connected = await adapter.connect()
+        XCTAssertTrue(connected)
+        adapter.ingestServerMessage("""
+        {"type":"response.output_audio.delta","delta":"\(pcm16Base64([9, 8]))"}
+        """)
+        adapter.ingestServerMessage(#"{"type":"input_audio_buffer.speech_started"}"#)
+        adapter.ingestServerMessage("""
+        {"type":"response.output_audio.delta","delta":"\(pcm16Base64([7, 6, 5]))"}
+        """)
+        XCTAssertEqual(adapter.pollTX(), [])
+        adapter.ingestServerMessage(#"{"type":"input_audio_buffer.speech_stopped"}"#)
+        adapter.ingestServerMessage("""
+        {"type":"response.output_audio.delta","delta":"\(pcm16Base64([4, 3]))"}
+        """)
+        XCTAssertEqual(adapter.pollTX(), [4, 3])
         await adapter.disconnect()
     }
 

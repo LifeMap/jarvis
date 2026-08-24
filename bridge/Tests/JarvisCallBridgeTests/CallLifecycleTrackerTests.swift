@@ -102,4 +102,45 @@ final class CallLifecycleTrackerTests: XCTestCase {
         tracker.update(hasAnyCandidate: false, evidence: .none)
         XCTAssertEqual(tracker.state, .unknown, "unknown must not silently resolve itself via update()")
     }
+
+    func testFinishSessionRecordsOutcomeWithoutActive() {
+        let clock = FakeClock()
+        clock.now = Date(timeIntervalSince1970: 10)
+        let tracker = CallLifecycleTracker(answerTransitionGrace: 0.1, logger: BridgeLogger(), now: { clock.now })
+        tracker.update(hasAnyCandidate: true, evidence: .none)
+        clock.advance(5)
+        tracker.update(hasAnyCandidate: false, evidence: .none)
+        clock.advance(0.2)
+        tracker.update(hasAnyCandidate: false, evidence: .none)
+        XCTAssertEqual(tracker.state, .idle)
+        XCTAssertEqual(tracker.lastOutcome?.reachedActive, false)
+        XCTAssertEqual(tracker.lastOutcome?.startedAt.timeIntervalSince1970, 10)
+        XCTAssertEqual(tracker.lastOutcome!.endedAt.timeIntervalSince1970, 15.2, accuracy: 0.001)
+    }
+
+    func testFinishSessionRecordsReachedActive() {
+        let clock = FakeClock()
+        let tracker = CallLifecycleTracker(endDebounceInterval: 0.1, logger: BridgeLogger(), now: { clock.now })
+        tracker.update(hasAnyCandidate: true, evidence: .none)
+        tracker.update(hasAnyCandidate: false, evidence: TestSnapshots.activeEvidence)
+        tracker.update(hasAnyCandidate: false, evidence: .none)
+        clock.advance(0.2)
+        tracker.update(hasAnyCandidate: false, evidence: .none)
+        XCTAssertEqual(tracker.lastOutcome?.reachedActive, true)
+    }
+
+    func testIdleActiveEvidenceBecomesActive() {
+        let tracker = CallLifecycleTracker(logger: BridgeLogger())
+        tracker.update(hasAnyCandidate: false, evidence: TestSnapshots.activeEvidence)
+        XCTAssertEqual(tracker.state, .active)
+        XCTAssertNotNil(tracker.currentSession)
+    }
+
+    func testResetDoesNotPublishMissedOutcome() {
+        let tracker = CallLifecycleTracker(logger: BridgeLogger())
+        tracker.update(hasAnyCandidate: true, evidence: .none)
+        tracker.reset()
+        XCTAssertNil(tracker.lastOutcome)
+        XCTAssertEqual(tracker.state, .idle)
+    }
 }

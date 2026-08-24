@@ -5,6 +5,7 @@ import type { CreateScheduleInput, UpdateScheduleInput } from "./scheduler/types
 import { routeAgentRequest } from "agents";
 import { safeErrorMessage } from "./security/redaction";
 import { DEFAULT_REALTIME_MODEL, mintRealtimeClientSecret, realtimeMintErrorDetail } from "./realtime/client-secret";
+import { normalizeCaller, normalizeDirection, normalizeFixedCallbackSummary, normalizeTranscript } from "./calls/types";
 
 export { PersonalAssistantAgent } from "./personal-assistant-agent";
 
@@ -46,6 +47,10 @@ export default {
     }
 
     const agent = env.PERSONAL_ASSISTANT_AGENT.getByName(AGENT_NAME);
+
+    if (url.pathname === "/api/calls" || url.pathname.startsWith("/api/calls/")) {
+      return handleCalls(request, url, agent);
+    }
 
     if(url.pathname==="/api/runtime-configuration"&&request.method==="GET")return json(await agent.runtimeConfiguration());
     if(url.pathname==="/api/runtime-configuration/history"&&request.method==="GET")return json({history:await agent.runtimeConfigurationHistory(Number(url.searchParams.get("limit")??50))});
@@ -175,6 +180,87 @@ export default {
 } satisfies ExportedHandler<Env>;
 
 type AgentStub = DurableObjectStub<import("./personal-assistant-agent").PersonalAssistantAgent>;
+
+const MAX_CALL_AUDIO_BYTES = 40 * 1024 * 1024;
+
+async function handleCalls(request: Request, url: URL, agent: AgentStub): Promise<Response> {
+  if (url.pathname === "/api/calls") {
+    if (request.method === "GET") return json(await agent.listCalls(url.searchParams.get("updatedAfter")));
+    if (request.method !== "POST") return json({ error: "Method not allowed" }, 405, { allow: "GET, POST" });
+    let body: Record<string, unknown>;
+    try {
+      body = (await request.json()) as Record<string, unknown>;
+    } catch {
+      return json({ error: "Request body must be valid JSON" }, 400);
+    }
+    const caller = normalizeCaller(body.caller);
+    const direction = normalizeDirection(body.direction);
+    const startedAt = typeof body.startedAt === "string" && Number.isFinite(Date.parse(body.startedAt)) ? body.startedAt : "";
+    if (!caller || !startedAt) return json({ error: "caller and startedAt are required" }, 400);
+    if (!direction) return json({ error: "direction must be incoming or outgoing" }, 400);
+    return json(await agent.createCall({ caller, startedAt, direction }));
+  }
+
+  const audioMatch = url.pathname.match(/^\/api\/calls\/([^/]+)\/audio$/);
+  if (audioMatch?.[1]) {
+    const id = decodeURIComponent(audioMatch[1]);
+    if (request.method === "PUT") {
+      const length = Number(request.headers.get("content-length") ?? 0);
+      if (length > MAX_CALL_AUDIO_BYTES) return json({ error: "Audio too large" }, 413);
+      const bytes = await request.arrayBuffer();
+      if (bytes.byteLength > MAX_CALL_AUDIO_BYTES) return json({ error: "Audio too large" }, 413);
+      const result = await agent.putCallAudio(id, bytes);
+      if (!result.ok) {
+        if (result.code === "NOT_FOUND") return json({ error: "Call not found" }, 404);
+        if (result.code === "CONFLICT") return json({ error: "Call already completed" }, 409);
+        return json({ error: "Call audio storage unavailable" }, 503);
+      }
+      return json({ hasAudio: true });
+    }
+    if (request.method !== "GET") return json({ error: "Method not allowed" }, 405, { allow: "GET, PUT" });
+    const audio = await agent.getCallAudio(id);
+    if (!audio) return json({ error: "Call audio not found" }, 404);
+    return new Response(audio.body, {
+      headers: { "content-type": audio.contentType, "cache-control": "no-store" },
+    });
+  }
+
+  const completeMatch = url.pathname.match(/^\/api\/calls\/([^/]+)\/complete$/);
+  if (completeMatch?.[1]) {
+    if (request.method !== "POST") return json({ error: "Method not allowed" }, 405, { allow: "POST" });
+    const id = decodeURIComponent(completeMatch[1]);
+    let body: Record<string, unknown>;
+    try {
+      body = (await request.json()) as Record<string, unknown>;
+    } catch {
+      return json({ error: "Request body must be valid JSON" }, 400);
+    }
+    const endedAt = typeof body.endedAt === "string" && Number.isFinite(Date.parse(body.endedAt)) ? body.endedAt : "";
+    const transcript = normalizeTranscript(body.transcript);
+    if (!endedAt || !transcript) return json({ error: "endedAt and transcript are required" }, 400);
+    const fixedSummary = normalizeFixedCallbackSummary(body.summary);
+    const result = await agent.completeCall(id, {
+      endedAt,
+      transcript,
+      ...(body.uploadFailed === true ? { uploadFailed: true } : {}),
+      ...(fixedSummary ? { summary: fixedSummary } : {}),
+    });
+    if (!result.ok) {
+      if (result.code === "NOT_FOUND") return json({ error: "Call not found" }, 404);
+      return json({ error: "Call already completed" }, 409);
+    }
+    return json(result.call);
+  }
+
+  const detailMatch = url.pathname.match(/^\/api\/calls\/([^/]+)$/);
+  if (detailMatch?.[1]) {
+    if (request.method !== "GET") return json({ error: "Method not allowed" }, 405, { allow: "GET" });
+    const record = await agent.getCall(decodeURIComponent(detailMatch[1]));
+    return record ? json(record) : json({ error: "Call not found" }, 404);
+  }
+
+  return json({ error: "Not found" }, 404);
+}
 
 async function handleAgentMessage(request: Request, agent: AgentStub): Promise<Response> {
 

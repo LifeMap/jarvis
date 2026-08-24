@@ -21,6 +21,9 @@
       "storage": "sqlite"
     }
   },
+  "r2_buckets": [
+    { "binding": "CALLS_BUCKET", "bucket_name": "jarvis" }
+  ],
   "ai": {
     "binding": "AI"
   },

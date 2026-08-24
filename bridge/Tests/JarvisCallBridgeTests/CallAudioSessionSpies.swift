@@ -190,7 +190,14 @@ final class RealtimeVoiceSessionControllingSpy: RealtimeVoiceSessionControlling 
     var failConnect = false
     var orderLog: CallAudioOperationOrderLog?
     private(set) var connectCalls: [String] = []
+    private(set) var prepareCalls: [String] = []
     private(set) var disconnectCalls: [String] = []
+    private(set) var stopRecordingCalls = 0
+
+    func prepare(reason: String) async {
+        prepareCalls.append(reason)
+        orderLog?.record("realtime-prepare")
+    }
 
     func connect(reason: String) async {
         connectCalls.append(reason)
@@ -202,6 +209,13 @@ final class RealtimeVoiceSessionControllingSpy: RealtimeVoiceSessionControlling 
         disconnectCalls.append(reason)
         orderLog?.record("realtime-disconnect")
     }
+
+    func stopRecording() async {
+        stopRecordingCalls += 1
+        orderLog?.record("realtime-stop-recording")
+    }
+
+    func finalizeIdleReport() async {}
 }
 
 @MainActor

@@ -11,6 +11,7 @@ import Foundation
 final class CallLifecycleTracker: ObservableObject {
     @Published private(set) var state: CallLifecycleState = .idle
     @Published private(set) var currentSession: CallSession?
+    @Published private(set) var lastOutcome: CallSessionOutcome?
 
     /// PRD §20: a momentary AX tree refresh must not be mistaken for the call actually ending.
     let endDebounceInterval: TimeInterval
@@ -28,6 +29,7 @@ final class CallLifecycleTracker: ObservableObject {
     let answerTransitionGrace: TimeInterval
     private var pendingAnswerTransitionSince: Date?
 
+    private var sessionReachedActive = false
     private let logger: BridgeLogger
     private let now: () -> Date
 
@@ -45,8 +47,15 @@ final class CallLifecycleTracker: ObservableObject {
     func update(hasAnyCandidate: Bool, evidence: CallStateEvidence, displayCaller: String? = nil) {
         switch state {
         case .idle, .ended:
-            if hasAnyCandidate {
-                let session = CallSession(displayCaller: displayCaller)
+            if isActiveEvidence(evidence) {
+                lastOutcome = nil
+                sessionReachedActive = true
+                currentSession = CallSession(startedAt: now(), displayCaller: displayCaller)
+                transition(to: .active)
+            } else if hasAnyCandidate {
+                lastOutcome = nil
+                sessionReachedActive = false
+                let session = CallSession(startedAt: now(), displayCaller: displayCaller)
                 currentSession = session
                 transition(to: .ringing)
                 logger.log("[CALL] candidate discovered, session=\(session.id)")
@@ -59,6 +68,7 @@ final class CallLifecycleTracker: ObservableObject {
                 let wasTransitioning = pendingAnswerTransitionSince != nil
                 pendingAnswerTransitionSince = nil
                 pendingEndSince = nil
+                sessionReachedActive = true
                 transition(to: .active)
                 if wasTransitioning {
                     logger.log("[CALL] active evidence acquired during answer transition session=\(currentSession?.id ?? "?")")
@@ -134,6 +144,8 @@ final class CallLifecycleTracker: ObservableObject {
     func reset() {
         pendingEndSince = nil
         pendingAnswerTransitionSince = nil
+        sessionReachedActive = false
+        lastOutcome = nil
         currentSession = nil
         transition(to: .idle)
     }
@@ -147,8 +159,14 @@ final class CallLifecycleTracker: ObservableObject {
     }
 
     private func finishSession(to newState: CallLifecycleState) {
+        lastOutcome = CallSessionOutcome(
+            startedAt: currentSession?.startedAt ?? now(),
+            endedAt: now(),
+            reachedActive: sessionReachedActive
+        )
         pendingEndSince = nil
         pendingAnswerTransitionSince = nil
+        sessionReachedActive = false
         currentSession = nil
         transition(to: newState)
     }

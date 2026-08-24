@@ -35,4 +35,35 @@ final class RealtimeAudioConverterTests: XCTestCase {
     func testOddLengthStereoIsRejected() {
         XCTAssertTrue(RealtimeAudioConverter.toProviderRX(interleavedStereo48k: [0.1]).isEmpty)
     }
+
+    func testStatelessChunkedHALTXDoesNotMatchWholeStream() {
+        let samples = (0..<64).map { Int16($0 * 500) }
+        let whole = RealtimeAudioConverter.toHALTX(mono24kPCM16: samples)
+        var concat: [Float] = []
+        var start = 0
+        while start < samples.count {
+            let end = min(start + 7, samples.count)
+            concat += RealtimeAudioConverter.toHALTX(mono24kPCM16: Array(samples[start..<end]))
+            start = end
+        }
+        XCTAssertNotEqual(concat, whole)
+    }
+
+    func testStatefulChunkedHALTXMatchesWholeStream() {
+        let samples = (0..<64).map { Int16($0 * 500) }
+        let whole = RealtimeAudioConverter.toHALTX(mono24kPCM16: samples)
+        var converter = RealtimeHALTXConverter()
+        var concat: [Float] = []
+        var start = 0
+        while start < samples.count {
+            let end = min(start + 7, samples.count)
+            concat += converter.convert(Array(samples[start..<end]))
+            start = end
+        }
+        concat += converter.flush()
+        XCTAssertEqual(concat.count, whole.count)
+        for (index, pair) in zip(concat, whole).enumerated() {
+            XCTAssertEqual(pair.0, pair.1, accuracy: 0.0001, "mismatch at \(index)")
+        }
+    }
 }

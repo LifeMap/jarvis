@@ -14,6 +14,7 @@ final class BridgeViewModel: ObservableObject {
     let callTracker: CallLifecycleTracker
     let autoAnswer: AutoAnswerController
     let incomingCallObserver: IncomingCallObserver
+    let callback: MissedCallCallbackController
     /// Phase 3 CHECKPOINT 1 — audio route takeover/restore for a verified Active call.
     let callAudioSession: CallAudioSessionController
     /// Phase 3 CHECKPOINT 2 — Bridge's own CoreAudio Direct I/O. Exposed here as the *concrete*
@@ -26,7 +27,12 @@ final class BridgeViewModel: ObservableObject {
     /// they never observe it.
     let pcmController: SystemCallAudioPCMController
     let realtimeSessionController: OpenAIRealtimeVoiceSessionController
+    private let callerResolver = StoredCallCallerResolver()
+    private let instructionStore = UserDefaultsRealtimeCallInstructionStore()
     @Published private(set) var realtimeEnabled = false
+    @Published private(set) var realtimeSpeechStyle: RealtimeSpeechStyle = .polite
+    @Published var realtimeIncomingGreeting = ""
+    @Published var realtimeOutgoingGreeting = ""
 
     /// nil when `accessibilityScanner` is a test mock — only the real `SystemAccessibilityClient`
     /// implements the raw-discovery/event-diagnostics capabilities (CHECKPOINT 2 fix).
@@ -59,11 +65,19 @@ final class BridgeViewModel: ObservableObject {
             self.callAudioSession = callAudioSession
             let pcm = SystemCallAudioPCMController(logger: logger) // see doc comment — inert in this (test-injected) path
             self.pcmController = pcm
-            self.realtimeSessionController = OpenAIRealtimeVoiceSessionController(pcm: pcm)
+            self.realtimeSessionController = OpenAIRealtimeVoiceSessionController(
+                pcm: pcm,
+                resolveCaller: { [callerResolver] in callerResolver.resolve() },
+                log: { logger.log($0) }
+            )
         } else {
             let pcm = SystemCallAudioPCMController(logger: logger)
             self.pcmController = pcm
-            let realtime = OpenAIRealtimeVoiceSessionController(pcm: pcm)
+            let realtime = OpenAIRealtimeVoiceSessionController(
+                pcm: pcm,
+                resolveCaller: { [callerResolver] in callerResolver.resolve() },
+                log: { logger.log($0) }
+            )
             self.realtimeSessionController = realtime
             self.callAudioSession = CallAudioSessionController(
                 pcmController: pcm,
@@ -79,14 +93,34 @@ final class BridgeViewModel: ObservableObject {
         self.autoAnswer = autoAnswer
 
         let stateMachineRef = stateMachine
+        let callerResolver = self.callerResolver
+        callerResolver.contactName = ContactsCallNameLookup.displayName
+        let callback = MissedCallCallbackController(
+            store: UserDefaultsMissedCallCallbackStore(),
+            tracker: tracker,
+            scanner: accessibilityScanner,
+            opener: WorkspaceCallURLOpener(),
+            reporter: JarvisAPIClient(),
+            logger: logger,
+            workModeArmed: { stateMachineRef.state == .armed },
+            autoAnswerEnabled: { autoAnswer.isEnabled },
+            delaySeconds: { autoAnswer.delaySeconds },
+            resolveCaller: { callerResolver.resolve() },
+            loadEnv: { RealtimeEnvFile.resolve(appBundleURL: Bundle.main.bundleURL) }
+        )
+        callback.realtimeSession = realtimeSessionController
+        self.callback = callback
         self.incomingCallObserver = IncomingCallObserver(
             scanner: accessibilityScanner,
             tracker: tracker,
             autoAnswer: autoAnswer,
             callAudioSession: self.callAudioSession,
+            callback: callback,
             logger: logger,
             workModeArmedProvider: { stateMachineRef.state == .armed }
         )
+        self.incomingCallObserver.onCallerTexts = { callerResolver.ingest($0) }
+        self.incomingCallObserver.onCallerSessionEnded = { callerResolver.reset() }
 
         // UI synchronization fix: `CallAudioSessionController` owns route *transaction* logic and
         // knows nothing about SwiftUI/`BridgeViewModel` — it only calls this plain closure at the
@@ -108,7 +142,16 @@ final class BridgeViewModel: ObservableObject {
             self?.refreshRouteSnapshot(reason: reason)
             self?.audioDriver.refresh()
         }
-    }
+        realtimeSpeechStyle = instructionStore.speechStyle
+        let incoming = instructionStore.incomingGreeting
+        if incoming.isEmpty {
+            instructionStore.incomingGreeting = RealtimeCallInstructions.defaultOpening
+            realtimeIncomingGreeting = RealtimeCallInstructions.defaultOpening
+        } else {
+            realtimeIncomingGreeting = incoming
+        }
+        realtimeOutgoingGreeting = instructionStore.outgoingGreeting
+        }
 
     func start() {
         logger.log("[BRIDGE] app started")
@@ -128,6 +171,30 @@ final class BridgeViewModel: ObservableObject {
         // meeting on the user's speaker keeps working. Auto Answer already defaults to `true`.
         setWorkMode(true)
         incomingCallObserver.start()
+        callback.start()
+    }
+
+    func setRealtimeSpeechStyle(_ style: RealtimeSpeechStyle) {
+        realtimeSpeechStyle = style
+        instructionStore.speechStyle = style
+    }
+
+    func setRealtimeIncomingGreeting(_ text: String) {
+        let capped = Self.cappedGreeting(text)
+        realtimeIncomingGreeting = capped
+        instructionStore.incomingGreeting = capped
+    }
+
+    func setRealtimeOutgoingGreeting(_ text: String) {
+        let capped = Self.cappedGreeting(text)
+        realtimeOutgoingGreeting = capped
+        instructionStore.outgoingGreeting = capped
+    }
+
+    private static func cappedGreeting(_ text: String) -> String {
+        text.count <= RealtimeCallInstructions.extraLimit
+            ? text
+            : String(text.prefix(RealtimeCallInstructions.extraLimit))
     }
 
     func setRealtimeEnabled(_ enabled: Bool) {

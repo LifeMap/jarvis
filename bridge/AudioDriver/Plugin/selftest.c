@@ -211,7 +211,11 @@ static void CheckPCMDiagnostics(AudioServerPlugInDriverInterface *interface, Aud
         Check("outputNonZeroCallbacks == 1 for non-zero WriteMix", snapshot.outputNonZeroCallbacks == 1);
         Check("outputPeakLinear > 0 for non-zero WriteMix", snapshot.outputPeakLinear > 0.0f);
         Check("loopbackWriteFrames == frameCount", snapshot.loopbackWriteFrames == (uint64_t)frameCount);
-        Check("loopbackReadFrames == 0 (ReadInput taps and does not drain)", snapshot.loopbackReadFrames == 0);
+        if (deviceID == kJarvisCallAudio_Inject_Device) {
+            Check("loopbackReadFrames == frameCount (Inject ReadInput drains)", snapshot.loopbackReadFrames == (uint64_t)frameCount);
+        } else {
+            Check("loopbackReadFrames == 0 (ReadInput taps and does not drain)", snapshot.loopbackReadFrames == 0);
+        }
         Check("inputOperationCount == 1 after one ReadInput", snapshot.inputOperationCount == 1);
         Check("inputFrames == frameCount after one ReadInput", snapshot.inputFrames == (int64_t)frameCount);
         Check("inputNonZeroCallbacks == 1 for non-zero ReadInput", snapshot.inputNonZeroCallbacks == 1);
@@ -236,7 +240,13 @@ static void CheckPCMDiagnostics(AudioServerPlugInDriverInterface *interface, Aud
     memset(readAgain, 0, sizeof(readAgain));
     OSStatus tapAgainStatus = interface->DoIOOperation(driverRef, deviceID, inputStreamID, 0, kAudioServerPlugInIOOperationReadInput, frameCount, &dummyCycleInfo, readAgain, NULL);
     Check("second ReadInput without a new WriteMix succeeds", tapAgainStatus == kAudioHardwareNoError);
-    Check("second ReadInput still returns the latest WriteMix (tap, not exclusive drain)", memcmp(writeBuffer2, readAgain, sizeof(writeBuffer2)) == 0);
+    if (deviceID == kJarvisCallAudio_Inject_Device) {
+        float silence[64 * 2];
+        memset(silence, 0, sizeof(silence));
+        Check("Inject second ReadInput is silence after drain", memcmp(readAgain, silence, sizeof(silence)) == 0);
+    } else {
+        Check("second ReadInput still returns the latest WriteMix (tap, not exclusive drain)", memcmp(writeBuffer2, readAgain, sizeof(writeBuffer2)) == 0);
+    }
 
     // §14/§15/§39 investigation — a read-only diagnostics property must have NO side effects:
     // repeated reads (no further DoIOOperation calls in between) must return byte-identical

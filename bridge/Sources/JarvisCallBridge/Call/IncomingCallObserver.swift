@@ -18,9 +18,12 @@ final class IncomingCallObserver: ObservableObject {
     /// `tracker.update(...)`, so audio-route decisions see the identical lifecycle state
     /// `IncomingCallObserver` itself just computed (no separate timer, no second race window).
     private let callAudioSession: CallAudioSessionController?
+    private let callback: MissedCallCallbackController?
     private let logger: BridgeLogger
     private let pollInterval: TimeInterval
     private let workModeArmedProvider: () -> Bool
+    var onCallerTexts: (([String]) -> Void)?
+    var onCallerSessionEnded: (() -> Void)?
 
     private var timer: Timer?
     /// Reentrancy guard: `tick()` is `async` (route convergence polling inside
@@ -41,6 +44,7 @@ final class IncomingCallObserver: ObservableObject {
         tracker: CallLifecycleTracker,
         autoAnswer: AutoAnswerController,
         callAudioSession: CallAudioSessionController? = nil,
+        callback: MissedCallCallbackController? = nil,
         logger: BridgeLogger,
         pollInterval: TimeInterval = 0.75,
         workModeArmedProvider: @escaping () -> Bool
@@ -49,6 +53,7 @@ final class IncomingCallObserver: ObservableObject {
         self.tracker = tracker
         self.autoAnswer = autoAnswer
         self.callAudioSession = callAudioSession
+        self.callback = callback
         self.logger = logger
         self.pollInterval = pollInterval
         self.workModeArmedProvider = workModeArmedProvider
@@ -100,6 +105,8 @@ final class IncomingCallObserver: ObservableObject {
         // active-call controls) between the two scans, and the tracker sees "no candidate" with
         // stale/empty evidence and incorrectly treats a just-answered call as ended.
         let snapshots = scanner.scanCallRelevantElements()
+        let identity = scanner.scanCallerIdentityTexts()
+        onCallerTexts?(identity.isEmpty ? CallCallerIdentity.texts(from: snapshots) : identity)
         let resolved = AnswerCandidateResolver.resolve(from: snapshots)
         candidates = resolved
 
@@ -117,8 +124,13 @@ final class IncomingCallObserver: ObservableObject {
 
         let wasIdle = tracker.state == .idle || tracker.state == .ended
         tracker.update(hasAnyCandidate: !resolved.isEmpty, evidence: evidence)
+        if wasIdle && tracker.state == .ringing {
+            callback?.noteIncomingRinging()
+        }
         if !wasIdle && (tracker.state == .idle) {
+            await callback?.handleIncomingBecameIdle()
             autoAnswer.resetForNewCall()
+            onCallerSessionEnded?()
         }
 
         autoAnswer.evaluate(candidates: resolved, workModeArmed: workModeArmedProvider())

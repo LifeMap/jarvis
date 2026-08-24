@@ -48,6 +48,9 @@ import { AuthStatusService } from "./security/auth-status-service";
 import { createAuthManagementTools, parseAuthManagementIntent } from "./security/auth-management-tools";
 import { CapabilityGapRepository, type CapabilityGapStatus } from "./capability-gap/capability-gap-repository";
 import { detectCapabilityGap, detectMissingCapabilityResponse, inferRecordedGap } from "./capability-gap/capability-gap-detector";
+import { CallRepository } from "./calls/call-repository";
+import { summarizeCallTranscript } from "./calls/summarize";
+import { callAudioObjectKey, callDetail, callListItem, type CallCaller, type CallDirection, type CallTranscriptTurn } from "./calls/types";
 
 interface RunRow {
   id: string;
@@ -397,6 +400,69 @@ export class PersonalAssistantAgent extends Agent<Env> {
 
   deleteMemory(id: string): boolean {
     return new MemoryRepository(this).delete(id);
+  }
+
+  createCall(input: { caller: CallCaller; startedAt: string; direction: CallDirection }) {
+    return callDetail(new CallRepository(this).create(input));
+  }
+
+  listCalls(updatedAfter?: string | null) {
+    return { calls: new CallRepository(this).list(updatedAfter).map(callListItem) };
+  }
+
+  getCall(id: string) {
+    const record = new CallRepository(this).get(id);
+    return record ? callDetail(record) : null;
+  }
+
+  async putCallAudio(id: string, bytes: ArrayBuffer) {
+    const repository = new CallRepository(this);
+    const current = repository.get(id);
+    if (!current) return { ok: false as const, code: "NOT_FOUND" };
+    if (current.status !== "active") return { ok: false as const, code: "CONFLICT" };
+    const bucket = this.env.CALLS_BUCKET;
+    if (!bucket) return { ok: false as const, code: "R2_UNAVAILABLE" };
+    const key = callAudioObjectKey({
+      startedAt: current.startedAt,
+      direction: current.direction,
+      phoneNumber: current.caller.phoneNumber,
+    });
+    await bucket.put(key, bytes, { httpMetadata: { contentType: "audio/mp4" } });
+    repository.setAudioKey(id, key);
+    return { ok: true as const, hasAudio: true };
+  }
+
+  async getCallAudio(id: string) {
+    const current = new CallRepository(this).get(id);
+    if (!current?.audioKey) return null;
+    const object = await this.env.CALLS_BUCKET?.get(current.audioKey);
+    if (!object) return null;
+    return { body: await object.arrayBuffer(), contentType: object.httpMetadata?.contentType ?? "audio/mp4" };
+  }
+
+  async completeCall(id: string, input: { endedAt: string; transcript: CallTranscriptTurn[]; uploadFailed?: boolean; summary?: string }) {
+    const repository = new CallRepository(this);
+    const current = repository.get(id);
+    if (!current) return { ok: false as const, code: "NOT_FOUND" };
+    if (current.status !== "active") return { ok: false as const, code: "CONFLICT" };
+    const fixedSummary = input.transcript.length === 0 ? (input.summary ?? null) : null;
+    const summary = fixedSummary ?? await summarizeCallTranscript(input.transcript, createModelProvider(this.env));
+    const status = fixedSummary
+      ? "failed"
+      : current.hasAudio
+        ? "completed"
+        : input.uploadFailed
+          ? "upload_failed"
+          : input.transcript.length > 0
+            ? "completed"
+            : "upload_failed";
+    const record = repository.complete(id, {
+      endedAt: input.endedAt,
+      transcript: input.transcript,
+      summary,
+      status,
+    });
+    return record ? { ok: true as const, call: callDetail(record) } : { ok: false as const, code: "NOT_FOUND" };
   }
 
   googleAuthorizationUrl(redirectUri: string): string {

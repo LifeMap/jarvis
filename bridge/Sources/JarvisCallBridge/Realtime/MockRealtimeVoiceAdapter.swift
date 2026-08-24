@@ -6,11 +6,18 @@ final class MockRealtimeVoiceAdapter: RealtimeVoiceAdapting {
     private(set) var disconnectCount = 0
     private(set) var sentRX: [[Int16]] = []
     private var txQueue: [[Int16]] = []
+    private var suppressTX = false
     var onRemoteSpeechStarted: (() -> Void)?
+    var transcript: [CallTranscriptTurn] = []
 
     func fireRemoteSpeechStarted() {
         txQueue = []
+        suppressTX = true
         onRemoteSpeechStarted?()
+    }
+
+    func fireRemoteSpeechStopped() {
+        suppressTX = false
     }
 
     func connect() async -> Bool {
@@ -33,11 +40,12 @@ final class MockRealtimeVoiceAdapter: RealtimeVoiceAdapting {
     }
 
     func enqueueTX(_ pcm16Mono24k: [Int16]) {
+        guard !suppressTX else { return }
         txQueue.append(pcm16Mono24k)
     }
 
     func pollTX() -> [Int16] {
-        guard isConnected, !txQueue.isEmpty else { return [] }
+        guard isConnected, !suppressTX, !txQueue.isEmpty else { return [] }
         return txQueue.removeFirst()
     }
 }

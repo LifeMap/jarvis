@@ -125,6 +125,7 @@ final class CallAudioSessionController: ObservableObject {
             // not still be running underneath them.
             await realtimeSession.disconnect(reason: "ownership-loss")
             await pcmController.stop(reason: "ownership-loss")
+            Task { await realtimeSession.finalizeIdleReport() }
             pcmStarted = false
             stopContinuityOutputMute()
             // §18: don't fight the user — drop our own devices and give up on this session's
@@ -150,6 +151,7 @@ final class CallAudioSessionController: ObservableObject {
             // Capture/Inject + Continuity mute. Idle Work Mode must not seize audio.
             guard let session else { return }
             await attemptRouteTakeoverIfNeeded(session: session)
+            await realtimeSession.prepare(reason: "ringing")
 
         case .active:
             guard let session else { return }
@@ -159,7 +161,10 @@ final class CallAudioSessionController: ObservableObject {
         case .idle, .ended:
             if routeOwnerSessionID != nil { await restore(reason: "call-ended") }
 
-        case .answering, .ending, .unknown:
+        case .ending:
+            await realtimeSession.stopRecording()
+
+        case .answering, .unknown:
             break
         }
     }
@@ -300,7 +305,10 @@ final class CallAudioSessionController: ObservableObject {
     private func startPCMIfNeeded(session: CallSession) async {
         guard !excludedSessionIDs.contains(session.id) else { return }
         guard routeOwnerSessionID == session.id, state == .routed else { return }
-        guard !pcmStarted else { return }
+        guard !pcmStarted else {
+            await realtimeSession.connect(reason: "takeover")
+            return
+        }
         guard let snapshot = originalSnapshot else { return }
         guard await pcmController.start(reason: "takeover", rxTapDeviceID: processMute.rxTapDeviceID) else {
             logger.log("[CALL-AUDIO] pcm start failed — emergency-restoring route session=\(session.id)")
@@ -330,6 +338,7 @@ final class CallAudioSessionController: ObservableObject {
         // was never running (true for every stage except "pcm-start").
         await realtimeSession.disconnect(reason: "rollback")
         await pcmController.stop(reason: "rollback")
+        Task { await realtimeSession.finalizeIdleReport() }
         pcmStarted = false
         stopContinuityOutputMute()
 
@@ -376,6 +385,7 @@ final class CallAudioSessionController: ObservableObject {
         // leave an active IOProc referencing a device that's about to be handed back/deactivated.
         await realtimeSession.disconnect(reason: reason)
         await pcmController.stop(reason: reason)
+        Task { await realtimeSession.finalizeIdleReport() }
         pcmStarted = false
         stopContinuityOutputMute()
 

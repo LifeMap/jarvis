@@ -156,6 +156,10 @@ static Boolean IsTapDevice(const JarvisCallAudioDeviceState *device) {
     return device == &gTapDevice;
 }
 
+static Boolean IsInjectDevice(const JarvisCallAudioDeviceState *device) {
+    return device == &gInjectDevice;
+}
+
 static JarvisLoopbackBuffer *LoopbackSourceFor(JarvisCallAudioDeviceState *device) {
     return IsTapDevice(device) ? &gCaptureDevice.loopback : &device->loopback;
 }
@@ -1032,11 +1036,15 @@ static OSStatus Driver_DoIOOperation(AudioServerPlugInDriverRef inDriver, AudioO
             }
         }
     } else if (inOperationID == kAudioServerPlugInIOOperationReadInput) {
-        /* Tap, do not drain. Capture is default output: the system client's unused duplex
-           ReadInput already consumes one exclusive reader. A drain here would leave Bridge's
-           later ReadInput with silence even when WriteMix just delivered real call audio.
-           The Tap device reads the same Capture ring so its own HAL client gets a real ReadInput. */
-        JarvisLoopbackBufferTapLatest(LoopbackSourceFor(device), (float *)ioMainBuffer, inIOBufferFrameSize);
+        /* Inject is Phone.app's microphone. Drain so a faster reader cannot replay the same
+           WriteMix chunk (speech sounds like bubbling; a 1 kHz tone hides it). Capture/Tap stay
+           on TapLatest: Capture is default output and an unused duplex ReadInput must not steal
+           the ring from the Tap monitor. */
+        if (IsInjectDevice(device)) {
+            JarvisLoopbackBufferRead(&device->loopback, (float *)ioMainBuffer, inIOBufferFrameSize);
+        } else {
+            JarvisLoopbackBufferTapLatest(LoopbackSourceFor(device), (float *)ioMainBuffer, inIOBufferFrameSize);
+        }
         /* WillDoIOOperation() says in-place, so the host should use ioMainBuffer only. If a host
            still passes a distinct secondary (AudioServerPlugIn.h: non-in-place results "must end
            up in this buffer"), copy so the client IOProc cannot be left with an untouched buffer. */

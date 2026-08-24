@@ -30,3 +30,9 @@ struct CallSession: Equatable, Identifiable {
         self.displayCaller = displayCaller
     }
 }
+
+struct CallSessionOutcome: Equatable {
+    var startedAt: Date
+    var endedAt: Date
+    var reachedActive: Bool
+}

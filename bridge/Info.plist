@@ -20,5 +20,7 @@
     <string>14.2</string>
     <key>NSAudioCaptureUsageDescription</key>
     <string>통화 상대의 목소리만 Jarvis가 듣고, 회의·유튜브에 쓰는 스피커는 그대로 두기 위해 통화 재생 소리를 잠시 끕니다.</string>
+    <key>NSContactsUsageDescription</key>
+    <string>저장된 연락처 이름을 수신 전화 보고에 쓰기 위해 연락처를 찾습니다. 번호는 보고에만 쓰고 로그에는 남기지 않습니다.</string>
 </dict>
 </plist>

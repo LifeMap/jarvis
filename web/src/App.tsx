@@ -6,6 +6,8 @@ import { useSpeechRecognition } from "./hooks/useSpeechRecognition";
 import { useTextToSpeech } from "./hooks/useTextToSpeech";
 import { useLocationContext } from "./hooks/useLocationContext";
 import { AgentApiError, getConversation, resolveApproval, sendAgentMessage } from "./services/agent";
+import { getCall, listCalls, type CallDetail } from "./services/calls";
+import { CallReportBanner } from "./components/CallReportBanner";
 import type { ConversationMessage, DebugSnapshot } from "./types/agent";
 import "./styles.css";
 
@@ -20,6 +22,7 @@ export default function App() {
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
   const [debug, setDebug] = useState<DebugSnapshot | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [callReport, setCallReport] = useState<CallDetail | null>(null);
   const [resolvingApproval, setResolvingApproval] = useState(false);
   const speechRecognition = useSpeechRecognition(setInput);
   const textToSpeech = useTextToSpeech();
@@ -28,6 +31,42 @@ export default function App() {
     () => [...messages].reverse().find((message) => message.role === "assistant")?.content,
     [messages],
   );
+
+  useEffect(() => {
+    let lastSeen = "";
+    let permissionAsked = false;
+    const notify = (detail: CallDetail) => {
+      const title = detail.caller.name === "unknown" ? detail.caller.phoneNumber : detail.caller.name;
+      if (typeof Notification === "undefined") return;
+      if (Notification.permission === "granted") {
+        new Notification("수신 전화", { body: `${title} · ${detail.summary ?? "녹음을 확인하세요"}` });
+        return;
+      }
+      if (Notification.permission === "default" && !permissionAsked) {
+        permissionAsked = true;
+        void Notification.requestPermission();
+      }
+    };
+    const tick = async () => {
+      try {
+        const calls = await listCalls();
+        const fresh = calls.find((call) =>
+          (call.status === "completed" || call.status === "upload_failed") && call.updatedAt > lastSeen
+        );
+        if (!fresh) return;
+        lastSeen = fresh.updatedAt;
+        const detail = await getCall(fresh.id);
+        if (!detail) return;
+        setCallReport(detail);
+        notify(detail);
+      } catch {
+        return;
+      }
+    };
+    void tick();
+    const timer = window.setInterval(() => { void tick(); }, 5000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     if (!session.restore) return;
@@ -119,6 +158,8 @@ export default function App() {
           <div className="environment"><span /> Local development</div>
         </div>
       </header>
+
+      {callReport ? <CallReportBanner report={callReport} onDismiss={() => setCallReport(null)} /> : null}
 
       <section className="hero">
         <p className="eyebrow">Personal assistant runtime</p>

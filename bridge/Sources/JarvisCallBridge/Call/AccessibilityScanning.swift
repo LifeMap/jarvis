@@ -77,6 +77,10 @@ protocol AccessibilityScanning {
     /// whatever interactive elements were found. Must never click, focus, or move anything.
     func scanCallRelevantElements() -> [AXElementSnapshot]
 
+    /// Read-only strings from the same call UI walk, including non-button text. Default is empty
+    /// so tests that only stub buttons keep a single `scanCallRelevantElements()` per tick.
+    func scanCallerIdentityTexts() -> [String]
+
     /// Derives `CallStateEvidence` for whichever call-related surfaces currently exist (answer
     /// button, end-call button, active-call controls, duration UI). Read-only.
     func currentCallStateEvidence() -> CallStateEvidence
@@ -84,4 +88,8 @@ protocol AccessibilityScanning {
     /// The only place an AX action is ever performed. Callers must have already validated
     /// confidence/state/dedup before calling this.
     func press(_ snapshot: AXElementSnapshot) -> AccessibilityPressResult
+}
+
+extension AccessibilityScanning {
+    func scanCallerIdentityTexts() -> [String] { [] }
 }

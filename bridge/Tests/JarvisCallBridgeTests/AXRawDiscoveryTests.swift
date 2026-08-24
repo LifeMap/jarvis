@@ -188,6 +188,20 @@ final class AXRawDiscoveryTests: XCTestCase {
         XCTAssertEqual(outcome.elements.first?.title, "<redacted: digit-heavy value, len=13>")
     }
 
+    /// Production caller identity used to read the already-redacted walk records, so a visible
+    /// banner number became `unknown`. Identity strings must stay raw; only dump records redact.
+    func testWalkIdentityTextsKeepAPhoneThatElementRecordsRedact() {
+        let phone = FakeAXNode(role: "AXStaticText", title: "010-1234-5678")
+        let root = FakeAXNode(role: "AXWindow", children: [phone])
+        let outcome = AXRawDiscovery.walk(root, pid: 1, processName: "Fake", bundleIdentifier: nil, maxDepth: 5, maxNodesForProcess: 10)
+
+        XCTAssertEqual(outcome.elements.first { $0.role == "AXStaticText" }?.title, "<redacted: digit-heavy value, len=13>")
+        XCTAssertEqual(
+            CallCallerIdentity.resolve(texts: outcome.identityTexts, contactName: { _ in nil }).phoneNumber,
+            "+821012345678"
+        )
+    }
+
     /// Excluded menu nodes must never be visited/read beyond checking their role — same
     /// read-only guarantee as ordinary nodes, just proven for the exclusion path too.
     func testExcludedMenuNodesAreNeverMutated() {

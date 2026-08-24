@@ -230,5 +230,26 @@ export function ensureApplicationSchema(database: SqlExecutor): void {
       response TEXT, error_message TEXT
     )
   `;
-  database.sql`CREATE INDEX IF NOT EXISTS schedule_executions_schedule_idx ON schedule_executions (schedule_id, started_at)`;
+      database.sql`CREATE INDEX IF NOT EXISTS schedule_executions_schedule_idx ON schedule_executions (schedule_id, started_at)`;
+  database.sql`
+    CREATE TABLE IF NOT EXISTS calls (
+      id TEXT PRIMARY KEY,
+      status TEXT NOT NULL CHECK (status IN ('active', 'completed', 'upload_failed', 'failed')),
+      direction TEXT NOT NULL DEFAULT 'incoming' CHECK (direction IN ('incoming', 'outgoing')),
+      caller_name TEXT NOT NULL,
+      caller_phone TEXT NOT NULL,
+      started_at TEXT NOT NULL,
+      ended_at TEXT,
+      transcript_json TEXT NOT NULL,
+      summary TEXT,
+      audio_key TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+  `;
+  database.sql`CREATE INDEX IF NOT EXISTS calls_updated_idx ON calls (updated_at DESC)`;
+  const callColumns = database.sql<{ name: string }>`PRAGMA table_info(calls)`;
+  if (!callColumns.some((column) => column.name === "direction")) {
+    database.sql`ALTER TABLE calls ADD COLUMN direction TEXT NOT NULL DEFAULT 'incoming'`;
+  }
 }

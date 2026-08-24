@@ -2,29 +2,36 @@ import Foundation
 
 @MainActor
 final class OpenAIRealtimeVoiceAdapter: RealtimeVoiceAdapting {
-    static let defaultInstructions = """
+    nonisolated static let defaultInstructions = """
     당신은 전화로 통화 중인 한국어 비서입니다.
-    상대가 쓰는 언어로 맞춰, 짧게 자연스럽게 대답하세요.
+    첫 인사 이후에는 상대가 쓰는 언어로 맞춰, 짧게 자연스럽게 대답하세요.
     """
 
     private let apiKey: String
     private let model: String
     private let instructions: String
+    private let followUpInstructions: String?
     private let transport: RealtimeWebSocketTransporting
     private var receiveTask: Task<Void, Never>?
     private var txQueue: [[Int16]] = []
+    private var suppressTX = false
+    private var didSendFollowUp = false
+    private(set) var collectedTranscript: [CallTranscriptTurn] = []
     private(set) var isConnected = false
     var onRemoteSpeechStarted: (() -> Void)?
+    var transcript: [CallTranscriptTurn] { collectedTranscript }
 
     init(
         apiKey: String,
         model: String,
         transport: RealtimeWebSocketTransporting,
-        instructions: String = OpenAIRealtimeVoiceAdapter.defaultInstructions
+        instructions: String = OpenAIRealtimeVoiceAdapter.defaultInstructions,
+        followUpInstructions: String? = nil
     ) {
         self.apiKey = apiKey
         self.model = model
         self.instructions = instructions
+        self.followUpInstructions = followUpInstructions
         self.transport = transport
     }
 
@@ -34,6 +41,8 @@ final class OpenAIRealtimeVoiceAdapter: RealtimeVoiceAdapting {
         do {
             try await transport.connect(url: url, headers: ["Authorization": "Bearer \(apiKey)"])
             try await transport.send(text: sessionUpdateJSON())
+            try await transport.send(text: #"{"type":"response.create"}"#)
+            collectedTranscript = []
             isConnected = true
             let transport = self.transport
             receiveTask = Task { [weak self] in
@@ -60,6 +69,8 @@ final class OpenAIRealtimeVoiceAdapter: RealtimeVoiceAdapting {
         transport.close()
         isConnected = false
         txQueue = []
+        suppressTX = false
+        didSendFollowUp = false
     }
 
     func sendRX(_ pcm16Mono24k: [Int16]) {
@@ -82,23 +93,45 @@ final class OpenAIRealtimeVoiceAdapter: RealtimeVoiceAdapting {
         else { return }
         switch type {
         case "response.output_audio.delta", "response.audio.delta", "session.output_audio.delta":
+            guard !suppressTX else { return }
             guard let delta = object["delta"] as? String, let samples = Self.decodePCM16(base64: delta) else { return }
             txQueue.append(samples)
         case "input_audio_buffer.speech_started", "speech_started":
             txQueue = []
+            suppressTX = true
             onRemoteSpeechStarted?()
+        case "input_audio_buffer.speech_stopped", "speech_stopped":
+            suppressTX = false
+        case "conversation.item.input_audio_transcription.completed":
+            if let text = transcriptionText(object) {
+                collectedTranscript.append(CallTranscriptTurn(role: "caller", text: text))
+            }
+        case "response.output_audio_transcript.done", "response.audio_transcript.done":
+            if let text = transcriptionText(object) {
+                collectedTranscript.append(CallTranscriptTurn(role: "jarvis", text: text))
+            }
+            sendFollowUpInstructionsIfNeeded()
         default:
             break
         }
     }
 
-    private func sessionUpdateJSON() -> String {
+    private func sendFollowUpInstructionsIfNeeded() {
+        guard !didSendFollowUp, let followUpInstructions, !followUpInstructions.isEmpty, isConnected else { return }
+        didSendFollowUp = true
+        let json = sessionUpdateJSON(instructions: followUpInstructions)
+        let transport = self.transport
+        Task { try? await transport.send(text: json) }
+    }
+
+    private func sessionUpdateJSON(instructions: String? = nil) -> String {
         let session: [String: Any] = [
             "type": "realtime",
-            "instructions": instructions,
+            "instructions": instructions ?? self.instructions,
             "audio": [
                 "input": [
                     "format": ["type": "audio/pcm", "rate": 24000],
+                    "transcription": ["model": "whisper-1"],
                     "turn_detection": [
                         "type": "server_vad",
                         "create_response": true,
@@ -111,6 +144,16 @@ final class OpenAIRealtimeVoiceAdapter: RealtimeVoiceAdapting {
         let body: [String: Any] = ["type": "session.update", "session": session]
         let data = try? JSONSerialization.data(withJSONObject: body, options: [])
         return String(data: data ?? Data("{}".utf8), encoding: .utf8) ?? "{}"
+    }
+
+    private func transcriptionText(_ object: [String: Any]) -> String? {
+        if let text = object["transcript"] as? String, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return text.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        if let text = object["text"] as? String, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return text.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        return nil
     }
 
     static func base64PCM16(_ samples: [Int16]) -> String {

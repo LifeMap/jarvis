@@ -20,6 +20,11 @@ button, textarea { font: inherit; }
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: .45; }
 
+.call-banner { display: flex; justify-content: space-between; gap: 16px; margin: 16px 0 0; padding: 14px 16px; border: 1px solid rgba(156,248,199,.35); border-radius: 12px; background: rgba(36, 72, 56, .55); }
+.call-banner p { margin: 4px 0 0; color: var(--muted); }
+.call-banner audio { margin-top: 10px; width: min(360px, 100%); }
+.call-banner button { align-self: flex-start; }
+
 .app-shell { width: min(1440px, 100%); min-height: 100vh; margin: 0 auto; padding: 0 38px 56px; }
 .topbar { height: 86px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
 .brand { display: flex; align-items: center; gap: 12px; }

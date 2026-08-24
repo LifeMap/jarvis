@@ -73,6 +73,20 @@ final class CallAudioSessionControllerTests: XCTestCase {
         XCTAssertTrue(spies.pcm.startCalls.isEmpty, "ringing takeover is route-only — PCM stays closed until Active")
     }
 
+    func testRingingPreparesRealtimeWithoutConnectingPump() async {
+        let spies = CallAudioTestFixtures.makeSpies()
+        let realtime = RealtimeVoiceSessionControllingSpy()
+        let controller = CallAudioSessionController(
+            routeController: spies.route, deviceActivator: spies.activator, recoveryStore: spies.store,
+            pcmController: spies.pcm, realtimeSession: realtime, processMute: spies.mute,
+            logger: BridgeLogger(), convergenceMaxAttempts: 5, convergencePollNanoseconds: 1_000_000
+        )
+        await controller.handleLifecycleChange(callState: .ringing, session: CallSession(), workModeArmed: true)
+        XCTAssertEqual(realtime.prepareCalls, ["ringing"])
+        XCTAssertTrue(realtime.connectCalls.isEmpty)
+        XCTAssertTrue(spies.pcm.startCalls.isEmpty)
+    }
+
     func testRepeatedRingingTicksAreIdempotent() async {
         let spies = CallAudioTestFixtures.makeSpies()
         let controller = makeController(spies)
@@ -347,6 +361,25 @@ final class CallAudioSessionControllerTests: XCTestCase {
         await controller.handleLifecycleChange(callState: .ending, session: session, workModeArmed: true)
 
         XCTAssertEqual(controller.state, .routed, "Ending alone (Phase 2's own end debounce) must not yet trigger restore — only confirmed Idle does")
+    }
+
+    func testEndingStopsRecordingWithoutRestore() async {
+        let spies = CallAudioTestFixtures.makeSpies()
+        let realtime = RealtimeVoiceSessionControllingSpy()
+        let controller = CallAudioSessionController(
+            routeController: spies.route, deviceActivator: spies.activator, recoveryStore: spies.store,
+            pcmController: spies.pcm, realtimeSession: realtime, processMute: spies.mute,
+            logger: BridgeLogger(), convergenceMaxAttempts: 5, convergencePollNanoseconds: 1_000_000
+        )
+        let session = CallSession()
+        await controller.handleLifecycleChange(callState: .active, session: session, workModeArmed: true)
+        XCTAssertEqual(controller.state, .routed)
+
+        await controller.handleLifecycleChange(callState: .ending, session: session, workModeArmed: true)
+
+        XCTAssertEqual(realtime.stopRecordingCalls, 1)
+        XCTAssertTrue(realtime.disconnectCalls.isEmpty)
+        XCTAssertEqual(controller.state, .routed)
     }
 
     // MARK: - §31 items 27-32: confirmed Idle restore transaction

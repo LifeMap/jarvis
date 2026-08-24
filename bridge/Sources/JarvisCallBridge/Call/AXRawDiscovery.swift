@@ -106,6 +106,9 @@ struct AXWalkOutcome {
     let elements: [AXRawDiscoveryElement]
     let truncated: Bool
     let excludedMenuNodeCount: Int
+    /// Unredacted title/description/value from the same walk. Diagnostic `elements` stay
+    /// redacted; caller identity must not read those records or a banner number becomes `unknown`.
+    let identityTexts: [String]
 }
 
 enum AXRawDiscovery {
@@ -130,6 +133,7 @@ enum AXRawDiscovery {
         maxNodesForProcess: Int
     ) -> AXWalkOutcome {
         var elements: [AXRawDiscoveryElement] = []
+        var identityTexts: [String] = []
         var visited = 0
         var truncated = false
         var excludedMenuNodeCount = 0
@@ -148,6 +152,9 @@ enum AXRawDiscovery {
                 return
             }
             visited += 1
+            identityTexts.append(contentsOf: CallCallerIdentity.identityTexts(
+                title: node.title, description: node.elementDescription, value: node.value
+            ))
             elements.append(AXRawDiscoveryElement(
                 depth: depth, pid: pid, processName: processName, bundleIdentifier: bundleIdentifier,
                 windowIndex: windowIndex, role: node.role, subrole: node.subrole, axIdentifier: node.axIdentifier,
@@ -163,7 +170,7 @@ enum AXRawDiscovery {
         }
 
         recurse(root, depth: 0, ancestors: [])
-        return AXWalkOutcome(elements: elements, truncated: truncated, excludedMenuNodeCount: excludedMenuNodeCount)
+        return AXWalkOutcome(elements: elements, truncated: truncated, excludedMenuNodeCount: excludedMenuNodeCount, identityTexts: identityTexts)
     }
 }
 

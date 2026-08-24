@@ -2,6 +2,7 @@ import type { PersonalAssistantAgent } from "./personal-assistant-agent";
 
 export interface Env {
   PERSONAL_ASSISTANT_AGENT: DurableObjectNamespace<PersonalAssistantAgent>;
+  CALLS_BUCKET?: R2Bucket;
   AI?: WorkersAiBinding;
   JARVIS_API_TOKEN?: string;
   LLM_PROVIDER: string;

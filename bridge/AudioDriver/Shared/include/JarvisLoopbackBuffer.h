@@ -54,8 +54,9 @@ void JarvisLoopbackBufferWrite(JarvisLoopbackBuffer *buffer, const float *frames
 
 /* Consumer side — exclusive drain. Never blocks, never allocates. On underrun, the missing tail
    is silence and underrunCount increases. Kept for unit tests and any single-reader path; the
-   live driver ReadInput uses TapLatest so a default-output client's unused duplex ReadInput
-   cannot starve a second reader (Bridge). */
+   live Capture/Tap ReadInput uses TapLatest so a default-output client's unused duplex
+   ReadInput cannot starve a second reader. Inject ReadInput uses Read so Phone.app consumes
+   each WriteMix chunk once. */
 void JarvisLoopbackBufferRead(JarvisLoopbackBuffer *buffer, float *outFrames, uint32_t frameCount);
 
 /* Non-destructive monitor. Copies the most recently written `frameCount` frames (silence-pads

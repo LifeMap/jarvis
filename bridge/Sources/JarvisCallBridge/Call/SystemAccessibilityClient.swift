@@ -19,14 +19,20 @@ final class SystemAccessibilityClient: AccessibilityScanning {
     private static let maxNodesPerProcess = 600
 
     private var firstObservedIDs: [String: Date] = [:]
+    private var lastIdentityTexts: [String] = []
     private let eventDiagnosticsSession = AXEventDiagnosticsSession()
 
     func scanCallRelevantElements() -> [AXElementSnapshot] {
+        lastIdentityTexts = []
         var results: [AXElementSnapshot] = []
         for bundleIdentifier in Self.candidateBundleIdentifiers {
             results.append(contentsOf: scanProcess(bundleIdentifier: bundleIdentifier))
         }
         return results
+    }
+
+    func scanCallerIdentityTexts() -> [String] {
+        lastIdentityTexts
     }
 
     /// Delegates entirely to the pure, unit-testable `CallStateEvidenceExtractor` — see that type
@@ -91,8 +97,11 @@ final class SystemAccessibilityClient: AccessibilityScanning {
                 RealAXNode(element: window), pid: pid, processName: processName, bundleIdentifier: bundleIdentifier,
                 windowIndex: index, maxDepth: Self.maxScanDepth, maxNodesForProcess: Self.maxNodesPerProcess
             )
-            for raw in outcome.elements where raw.actions.contains("AXPress") || raw.role == "AXButton" {
-                results.append(snapshot(from: raw, pid: pid, bundleIdentifier: bundleIdentifier))
+            lastIdentityTexts.append(contentsOf: outcome.identityTexts)
+            for raw in outcome.elements {
+                if raw.actions.contains("AXPress") || raw.role == "AXButton" {
+                    results.append(snapshot(from: raw, pid: pid, bundleIdentifier: bundleIdentifier))
+                }
             }
         }
         return results
