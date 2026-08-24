@@ -1,7 +1,7 @@
 # Phase 5 CHECKPOINT 1 — Jarvis 인증 + ephemeral Realtime 키
 
 날짜: 2026-08-24  
-상태: 설계 승인. 구현 전  
+상태: 구현됨. 실기기 게이트 전  
 브랜치: `phase5`  
 근거: `docs/Jarvis_Call_Bridge_Client_PRD.md` Phase 5, §20, §21  
 선행: Phase 4 COMPLETE (2026-08-24)
