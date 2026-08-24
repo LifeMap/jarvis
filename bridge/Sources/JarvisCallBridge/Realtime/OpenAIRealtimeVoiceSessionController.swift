@@ -63,6 +63,9 @@ final class OpenAIRealtimeVoiceSessionController: ObservableObject, RealtimeVoic
             self.adapter = nil
             return
         }
+        adapter.onRemoteSpeechStarted = { [weak self] in
+            self?.handleRemoteSpeechStarted()
+        }
         isConnectedNow = true
         openWAVs()
         uiState = .connected
@@ -111,6 +114,11 @@ final class OpenAIRealtimeVoiceSessionController: ObservableObject, RealtimeVoic
                 try? await Task.sleep(for: .milliseconds(10))
             }
         }
+    }
+
+    private func handleRemoteSpeechStarted() {
+        guard isConnectedNow else { return }
+        pcm.clearTX()
     }
 
     private func applyIdleOrArmed() {

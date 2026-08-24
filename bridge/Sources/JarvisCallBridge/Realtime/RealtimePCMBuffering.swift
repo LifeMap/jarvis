@@ -5,4 +5,5 @@ protocol RealtimePCMBuffering: AnyObject {
     func writeTXFrames(_ interleavedStereo: [Float]) -> Int
     func queuedTXFrames() -> Int
     func clearRX()
+    func clearTX()
 }

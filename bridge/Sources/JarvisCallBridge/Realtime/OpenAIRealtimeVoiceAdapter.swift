@@ -14,6 +14,7 @@ final class OpenAIRealtimeVoiceAdapter: RealtimeVoiceAdapting {
     private var receiveTask: Task<Void, Never>?
     private var txQueue: [[Int16]] = []
     private(set) var isConnected = false
+    var onRemoteSpeechStarted: (() -> Void)?
 
     init(
         apiKey: String,
@@ -83,6 +84,9 @@ final class OpenAIRealtimeVoiceAdapter: RealtimeVoiceAdapting {
         case "response.output_audio.delta", "response.audio.delta", "session.output_audio.delta":
             guard let delta = object["delta"] as? String, let samples = Self.decodePCM16(base64: delta) else { return }
             txQueue.append(samples)
+        case "input_audio_buffer.speech_started", "speech_started":
+            txQueue = []
+            onRemoteSpeechStarted?()
         default:
             break
         }
@@ -93,7 +97,14 @@ final class OpenAIRealtimeVoiceAdapter: RealtimeVoiceAdapting {
             "type": "realtime",
             "instructions": instructions,
             "audio": [
-                "input": ["format": ["type": "audio/pcm", "rate": 24000]],
+                "input": [
+                    "format": ["type": "audio/pcm", "rate": 24000],
+                    "turn_detection": [
+                        "type": "server_vad",
+                        "create_response": true,
+                        "interrupt_response": true,
+                    ],
+                ],
                 "output": ["format": ["type": "audio/pcm", "rate": 24000]],
             ],
         ]

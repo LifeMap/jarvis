@@ -674,6 +674,11 @@ final class SystemCallAudioPCMController: CallAudioPCMControlling, ObservableObj
         guard let runtime else { return }
         JarvisPCMRuntimeClearRX(runtime)
     }
+
+    func clearTX() {
+        guard let runtime else { return }
+        JarvisPCMRuntimeClearTX(runtime)
+    }
 }
 
 extension SystemCallAudioPCMController: RealtimePCMBuffering {}

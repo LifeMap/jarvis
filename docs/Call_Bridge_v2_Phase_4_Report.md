@@ -5,11 +5,14 @@
 
 - **Phase 4 CHECKPOINT 1**: **FINAL PASS** — TX 링 + 변환 + adapter/세션 순서. 앱에 OpenAI 없음. 실기기: Active+PCM에서 1 kHz 1초 연속 청취 (2026-08-22)
 - **Phase 4 CHECKPOINT 2**: **FINAL PASS** — OpenAI Realtime 한 턴 speech-to-speech. 앱 안 WebSocket. RX는 Continuity 프로세스 탭. Jarvis Agent 없음 (2026-08-22)
-- **Phase 4**: **IN PROGRESS** — VAD / barge-in / 여러 턴은 CHECKPOINT 3. 자동 진행하지 않음
+- **Phase 4 CHECKPOINT 3**: **FINAL PASS** — 여러 턴 + 상대 끼어들기. `server_vad` + `interrupt_response`. 주인 개입 없음 (2026-08-24)
+- **Phase 4**: **COMPLETE**
 
 스펙(CP1): `docs/superpowers/specs/2026-08-21-phase4-cp1-realtime-voice-design.md`  
 스펙(CP2): `docs/superpowers/specs/2026-08-22-phase4-cp2-openai-realtime-design.md`  
-계획(CP2): `docs/superpowers/plans/2026-08-22-phase4-cp2-openai-realtime.md`
+스펙(CP3): `docs/superpowers/specs/2026-08-23-phase4-cp3-multiturn-barge-in-design.md`  
+계획(CP2): `docs/superpowers/plans/2026-08-22-phase4-cp2-openai-realtime.md`  
+계획(CP3): `docs/superpowers/plans/2026-08-23-phase4-cp3-multiturn-barge-in.md`
 
 ## 자동화
 
@@ -17,6 +20,8 @@
 
 - 2026-08-22 CP2 구현 직후: **366 passed**
 - 2026-08-22 Continuity 탭 RX 추가 후: **368 passed, 0 failed**
+- 2026-08-23 CP3 자동화: **373 passed, 0 failed**. 실기기 게이트 전.
+- 2026-08-24 CP3 실기기 PASS 후: 자동화 수는 그대로 **373 passed, 0 failed**. Phase 4 COMPLETE.
 
 드라이버는 이 체크포인트에서 수정·재설치하지 않았다. `bridge/.env`는 gitignore. 키 미커밋.
 
@@ -108,12 +113,25 @@ Continuity 원격 음성은 `com.apple.avconferenced`가 스피커로 쓴다. �
 
 ---
 
-## Phase 4 잔여 (CHECKPOINT 3, 미착수)
+## CHECKPOINT 3 — 실기기 FINAL PASS (2026-08-24 17:47)
 
-PRD Phase 4 완료 기준 중 CP2에 넣지 않은 것:
+증거:
 
-- 여러 턴 대화
-- VAD
-- barge-in / local TX clear / response cancel
+- 로그: `~/Documents/jarvis-call-bridge-log-20260824-174740.txt`
+- RX: `~/Documents/jarvis-call-bridge-rx-20260824-174708.wav` — 29.053 s, 24 kHz mono PCM16, peak 30041, nonzero 93.24%
+- TX: `~/Documents/jarvis-call-bridge-tx-20260824-174708.wav` — 33.500 s, peak 16857, nonzero 99.35%
 
-스펙 없음. 에이전트는 CHECKPOINT 2 PASS 뒤에 다음 체크포인트를 자동으로 시작하지 않는다.
+로그 요지:
+
+- `17:47:06.668` Active + PCM `rxSource=continuity-tap` + AUHAL start
+- Active 구간에서 `activity=active`가 여러 번 반복 (한 턴이 아님)
+- `txUnderrunCount=0`
+- 사용자 청취: 상대 폰에서 AI 답 들림, 상대가 말을 끊으면 AI 정지, 답이 끝난 뒤 다음 턴 이어짐
+
+같은 로그의 직전 통화(`17:38:58`, 세션 `0A57157A`)는 answer-transition grace 2.5초 만료로 Idle이 되어 PCM/Realtime/WAV가 없었다. CP3 실패로 보지 않는다. 이번 PASS 통화는 수동 응답 후 grace 안에서 Active가 떴다.
+
+Auto Answer는 이 통화에서 `element no longer present`로 한 번 실패했고 재시도하지 않았다. 사용자는 수동으로 받았다. CP3 범위(여러 턴 + 상대 끼어들기)가 아니므로 이 체크포인트 실패로 보지 않는다.
+
+**Phase 4 CHECKPOINT 3 = FINAL PASS.** 이 체크포인트는 다시 열지 않는다.
+
+**Phase 4 = COMPLETE.** 주인 Human Takeover는 Phase 6. Phase 5(Jarvis Agent)는 여기서 시작하지 않는다.
