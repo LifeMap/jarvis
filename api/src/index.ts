@@ -4,6 +4,7 @@ import type { ApprovalStatus } from "./approval/approval-repository";
 import type { CreateScheduleInput, UpdateScheduleInput } from "./scheduler/types";
 import { routeAgentRequest } from "agents";
 import { safeErrorMessage } from "./security/redaction";
+import { DEFAULT_REALTIME_MODEL, mintRealtimeClientSecret, realtimeMintErrorDetail } from "./realtime/client-secret";
 
 export { PersonalAssistantAgent } from "./personal-assistant-agent";
 
@@ -37,6 +38,11 @@ export default {
 
     if (!isAuthorized(request, env)) {
       return json({ error: "Unauthorized" }, 401, { "www-authenticate": "Bearer" });
+    }
+
+    if (url.pathname === "/api/realtime/client-secret") {
+      if (request.method !== "POST") return json({ error: "Method not allowed" }, 405, { allow: "POST" });
+      return handleRealtimeClientSecret(request, env);
     }
 
     const agent = env.PERSONAL_ASSISTANT_AGENT.getByName(AGENT_NAME);
@@ -213,6 +219,22 @@ async function handleUpdateMemory(request: Request, agent: AgentStub, id: string
   if (input.source !== undefined && !isMemorySource(input.source)) return json({ error: "Invalid memory source" }, 400);
   const updated = await agent.updateMemory(id, input);
   return updated ? json(updated) : json({ error: "Memory not found" }, 404);
+}
+
+async function handleRealtimeClientSecret(request: Request, env: Env): Promise<Response> {
+  const body = await readJson(request);
+  const requested = body && typeof body === "object" ? (body as { model?: unknown }).model : undefined;
+  const model = typeof requested === "string" && requested.trim() ? requested.trim() : DEFAULT_REALTIME_MODEL;
+  try {
+    const minted = await mintRealtimeClientSecret({
+      openaiAPIKey: env.OPENAI_API_KEY ?? "",
+      baseURL: env.OPENAI_BASE_URL || "https://api.openai.com/v1",
+      model,
+    });
+    return json(minted);
+  } catch (error) {
+    return json({ error: "Realtime credential unavailable", detail: realtimeMintErrorDetail(error) }, 503);
+  }
 }
 
 async function readJson(request: Request): Promise<unknown> {
