@@ -6,6 +6,7 @@
 - **Phase 5 CHECKPOINT 1**: **IN PROGRESS** — Jarvis 인증 + ephemeral Realtime 키
 - **Phase 5**: **IN PROGRESS**
 
-스펙(CP1): `docs/superpowers/specs/2026-08-24-phase5-cp1-jarvis-ephemeral-realtime-design.md`
+스펙(CP1): `docs/superpowers/specs/2026-08-24-phase5-cp1-jarvis-ephemeral-realtime-design.md`  
+계획(CP1): `docs/superpowers/plans/2026-08-24-phase5-cp1-jarvis-ephemeral-realtime.md`
 
 Memory / Tool / Approval / Scheduler / Keychain은 이 체크포인트에 없다.
