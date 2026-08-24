@@ -3,6 +3,8 @@ import Foundation
 struct RealtimeEnvValues: Equatable {
     var apiKey: String?
     var model: String?
+    var jarvisAPIToken: String?
+    var jarvisAPIOrigin: String?
 }
 
 enum RealtimeEnvFile {
@@ -30,6 +32,10 @@ enum RealtimeEnvFile {
                 values.apiKey = value.isEmpty ? nil : value
             case "OPENAI_REALTIME_MODEL":
                 values.model = value.isEmpty ? nil : value
+            case "JARVIS_API_TOKEN":
+                values.jarvisAPIToken = value.isEmpty ? nil : value
+            case "JARVIS_API_ORIGIN":
+                values.jarvisAPIOrigin = value.isEmpty ? nil : value
             default:
                 break
             }
@@ -40,7 +46,9 @@ enum RealtimeEnvFile {
     static func loadFromProcess(environment: [String: String] = ProcessInfo.processInfo.environment) -> RealtimeEnvValues {
         RealtimeEnvValues(
             apiKey: emptyToNil(environment["OPENAI_API_KEY"]),
-            model: emptyToNil(environment["OPENAI_REALTIME_MODEL"])
+            model: emptyToNil(environment["OPENAI_REALTIME_MODEL"]),
+            jarvisAPIToken: emptyToNil(environment["JARVIS_API_TOKEN"]),
+            jarvisAPIOrigin: emptyToNil(environment["JARVIS_API_ORIGIN"])
         )
     }
 
@@ -52,7 +60,9 @@ enum RealtimeEnvFile {
         let file = load(from: envFileURL(appBundleURL: appBundleURL))
         return RealtimeEnvValues(
             apiKey: process.apiKey ?? file.apiKey,
-            model: process.model ?? file.model ?? defaultModel
+            model: process.model ?? file.model ?? defaultModel,
+            jarvisAPIToken: process.jarvisAPIToken ?? file.jarvisAPIToken,
+            jarvisAPIOrigin: process.jarvisAPIOrigin ?? file.jarvisAPIOrigin
         )
     }
 

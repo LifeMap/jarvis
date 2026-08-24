@@ -11,6 +11,7 @@ final class OpenAIRealtimeVoiceSessionController: ObservableObject, RealtimeVoic
 
     private let pcm: RealtimePCMBuffering
     private let loadEnv: () -> RealtimeEnvValues
+    private let mintCredentials: JarvisRealtimeCredentialMinting
     private let makeAdapter: (RealtimeEnvValues) -> RealtimeVoiceAdapting
     private let documentsDirectory: URL
     private let now: () -> Date
@@ -25,6 +26,7 @@ final class OpenAIRealtimeVoiceSessionController: ObservableObject, RealtimeVoic
         loadEnv: @escaping () -> RealtimeEnvValues = {
             RealtimeEnvFile.resolve(appBundleURL: Bundle.main.bundleURL)
         },
+        mintCredentials: JarvisRealtimeCredentialMinting = JarvisAPIClient(),
         makeAdapter: @escaping (RealtimeEnvValues) -> RealtimeVoiceAdapting = { env in
             OpenAIRealtimeVoiceAdapter(
                 apiKey: env.apiKey ?? "",
@@ -37,6 +39,7 @@ final class OpenAIRealtimeVoiceSessionController: ObservableObject, RealtimeVoic
     ) {
         self.pcm = pcm
         self.loadEnv = loadEnv
+        self.mintCredentials = mintCredentials
         self.makeAdapter = makeAdapter
         self.documentsDirectory = documentsDirectory
         self.now = now
@@ -50,12 +53,25 @@ final class OpenAIRealtimeVoiceSessionController: ObservableObject, RealtimeVoic
         }
         if isConnectedNow { return }
         let env = loadEnv()
-        guard let key = env.apiKey, !key.isEmpty else {
-            uiState = .failed("missing API key")
+        guard let token = env.jarvisAPIToken, !token.isEmpty,
+              let origin = env.jarvisAPIOrigin, !origin.isEmpty
+        else {
+            uiState = .failed("jarvis auth")
             return
         }
         uiState = .connecting
-        let adapter = makeAdapter(RealtimeEnvValues(apiKey: key, model: env.model ?? RealtimeEnvFile.defaultModel))
+        let model = env.model ?? RealtimeEnvFile.defaultModel
+        let secret: JarvisRealtimeClientSecret
+        do {
+            secret = try await mintCredentials.mintRealtimeClientSecret(origin: origin, token: token, model: model)
+        } catch let error as JarvisAPIClientError where error == .jarvisAuth {
+            uiState = .failed("jarvis auth")
+            return
+        } catch {
+            uiState = .failed("network")
+            return
+        }
+        let adapter = makeAdapter(RealtimeEnvValues(apiKey: secret.value, model: secret.model))
         self.adapter = adapter
         let ok = await adapter.connect()
         guard ok else {

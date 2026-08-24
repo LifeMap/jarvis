@@ -16,12 +16,16 @@ final class RealtimeEnvFileTests: XCTestCase {
 
         OPENAI_API_KEY=sk-test
         OPENAI_REALTIME_MODEL=gpt-realtime-2.1-mini
+        JARVIS_API_TOKEN=jarvis-token
+        JARVIS_API_ORIGIN=https://jarvis-api.twms.ai
         """.write(to: url, atomically: true, encoding: .utf8)
         defer { try? FileManager.default.removeItem(at: url) }
 
         let loaded = RealtimeEnvFile.load(from: url)
         XCTAssertEqual(loaded.apiKey, "sk-test")
         XCTAssertEqual(loaded.model, "gpt-realtime-2.1-mini")
+        XCTAssertEqual(loaded.jarvisAPIToken, "jarvis-token")
+        XCTAssertEqual(loaded.jarvisAPIOrigin, "https://jarvis-api.twms.ai")
     }
 
     func testStripsQuotesAndRejectsEmptyKey() throws {

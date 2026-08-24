@@ -23,15 +23,75 @@ final class OpenAIRealtimeVoiceSessionControllerTests: XCTestCase {
         XCTAssertEqual(session.uiState, .connected)
     }
 
-    func testMissingKeyFailsWithoutAdapterConnect() async {
+    func testMissingJarvisAuthFailsWithoutAdapterConnect() async {
         let pcm = InMemoryRealtimePCMBuffer()
         pcm.isRunning = true
         let mock = MockRealtimeVoiceAdapter()
-        let session = makeSession(pcm: pcm, adapter: mock, enabled: true, apiKey: nil)
+        let session = makeSession(pcm: pcm, adapter: mock, enabled: true, token: nil, origin: nil)
         await session.connect(reason: "takeover")
         XCTAssertEqual(mock.connectCount, 0)
-        XCTAssertEqual(session.uiState, .failed("missing API key"))
+        XCTAssertEqual(session.uiState, .failed("jarvis auth"))
         XCTAssertTrue(pcm.isRunning)
+    }
+
+    func testMintAuthFailureDoesNotConnectAdapter() async {
+        let pcm = InMemoryRealtimePCMBuffer()
+        pcm.isRunning = true
+        let mock = MockRealtimeVoiceAdapter()
+        let mint = FakeJarvisCredentialMint()
+        mint.error = .jarvisAuth
+        let session = makeSession(pcm: pcm, adapter: mock, mint: mint, enabled: true)
+        await session.connect(reason: "takeover")
+        XCTAssertEqual(mint.callCount, 1)
+        XCTAssertEqual(mock.connectCount, 0)
+        XCTAssertEqual(session.uiState, .failed("jarvis auth"))
+        XCTAssertTrue(pcm.isRunning)
+    }
+
+    func testMintFailureDoesNotStopPCM() async {
+        let pcm = InMemoryRealtimePCMBuffer()
+        pcm.isRunning = true
+        let mock = MockRealtimeVoiceAdapter()
+        let mint = FakeJarvisCredentialMint()
+        mint.error = .network
+        let session = makeSession(pcm: pcm, adapter: mock, mint: mint, enabled: true)
+        await session.connect(reason: "takeover")
+        XCTAssertEqual(mock.connectCount, 0)
+        XCTAssertEqual(session.uiState, .failed("network"))
+        XCTAssertTrue(pcm.isRunning)
+    }
+
+    func testConnectMintsSecretBeforeAdapterConnect() async {
+        let pcm = InMemoryRealtimePCMBuffer()
+        pcm.isRunning = true
+        let mock = MockRealtimeVoiceAdapter()
+        let mint = FakeJarvisCredentialMint()
+        mint.secret = JarvisRealtimeClientSecret(value: "ek_session", expiresAt: 1, model: "gpt-realtime-2.1-mini")
+        var mintedKey: String?
+        let session = OpenAIRealtimeVoiceSessionController(
+            pcm: pcm,
+            loadEnv: {
+                RealtimeEnvValues(
+                    model: "gpt-realtime-2.1-mini",
+                    jarvisAPIToken: "jarvis-token",
+                    jarvisAPIOrigin: "https://jarvis-api.twms.ai"
+                )
+            },
+            mintCredentials: mint,
+            makeAdapter: { env in
+                mintedKey = env.apiKey
+                return mock
+            },
+            documentsDirectory: FileManager.default.temporaryDirectory
+        )
+        session.isEnabled = true
+        await session.connect(reason: "takeover")
+        XCTAssertEqual(mint.callCount, 1)
+        XCTAssertEqual(mint.lastOrigin, "https://jarvis-api.twms.ai")
+        XCTAssertEqual(mint.lastToken, "jarvis-token")
+        XCTAssertEqual(mintedKey, "ek_session")
+        XCTAssertEqual(mock.connectCount, 1)
+        XCTAssertEqual(session.uiState, .connected)
     }
 
     func testAdapterFailureDoesNotStopPCM() async {
@@ -104,17 +164,43 @@ final class OpenAIRealtimeVoiceSessionControllerTests: XCTestCase {
     private func makeSession(
         pcm: InMemoryRealtimePCMBuffer,
         adapter: MockRealtimeVoiceAdapter,
+        mint: FakeJarvisCredentialMint = FakeJarvisCredentialMint(),
         enabled: Bool,
-        apiKey: String? = "sk-test"
+        token: String? = "jarvis-token",
+        origin: String? = "https://jarvis-api.twms.ai"
     ) -> OpenAIRealtimeVoiceSessionController {
         let session = OpenAIRealtimeVoiceSessionController(
             pcm: pcm,
-            loadEnv: { RealtimeEnvValues(apiKey: apiKey, model: "gpt-realtime-2.1-mini") },
+            loadEnv: {
+                RealtimeEnvValues(
+                    model: "gpt-realtime-2.1-mini",
+                    jarvisAPIToken: token,
+                    jarvisAPIOrigin: origin
+                )
+            },
+            mintCredentials: mint,
             makeAdapter: { _ in adapter },
             documentsDirectory: FileManager.default.temporaryDirectory
         )
         session.isEnabled = enabled
         return session
+    }
+}
+
+@MainActor
+final class FakeJarvisCredentialMint: JarvisRealtimeCredentialMinting {
+    var secret = JarvisRealtimeClientSecret(value: "ek_test", expiresAt: 1, model: "gpt-realtime-2.1-mini")
+    var error: JarvisAPIClientError?
+    private(set) var callCount = 0
+    private(set) var lastOrigin: String?
+    private(set) var lastToken: String?
+
+    func mintRealtimeClientSecret(origin: String, token: String, model: String) async throws -> JarvisRealtimeClientSecret {
+        callCount += 1
+        lastOrigin = origin
+        lastToken = token
+        if let error { throw error }
+        return secret
     }
 }
 
