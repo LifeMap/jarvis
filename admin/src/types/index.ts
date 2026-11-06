@@ -1,6 +1,7 @@
 export interface CallCaller{name:string;phoneNumber:string}
 export interface CallListItem{id:string;status:string;direction?:string;caller:CallCaller;startedAt:string;endedAt:string|null;summary:string|null;hasAudio:boolean;updatedAt:string}
-export interface CallDetail extends CallListItem{transcript:Array<{role:"caller"|"jarvis";text:string}>;audioPath:string|null}
+export interface CallHold{start:string;end:string;status:string}
+export interface CallDetail extends CallListItem{transcript:Array<{role:"caller"|"jarvis";text:string}>;audioPath:string|null;holds?:CallHold[]}
 export interface Memory{ id:string;type:"profile"|"long_term";key?:string;value?:string;content?:string;category?:string;source:string;createdAt:string;updatedAt:string }
 export interface Approval{approvalId:string;conversationId:string;toolName:string;toolArguments:Record<string,unknown>;status:string;requestedAt:string;expiresAt:string|null;resultSummary:string|null;error:string|null}
 export interface Schedule{id:string;title:string;instruction:string;scheduleType:"one_time"|"recurring";scheduleRule:Record<string,unknown>;timezone:string;enabled:boolean;status:string;lastRunAt:string|null;nextRunAt:string|null;lastResult:string|null}

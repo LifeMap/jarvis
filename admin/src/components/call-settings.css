@@ -1,0 +1,7 @@
+.android-call-controls { min-width: 0; }
+.android-call-controls textarea { display:block; width:100%; min-height:84px; margin-top:8px; padding:12px; resize:vertical; box-sizing:border-box; border:1px solid #303b35; border-radius:8px; background:#0e1511; color:#edf4ef; font:inherit; line-height:1.6; }
+.android-call-controls input[type=checkbox] { width:auto; margin:0 8px 0 0; }
+.android-call-controls fieldset { min-width:0; margin:16px 0; padding:20px; border:1px solid #303b35; border-radius:12px; }
+.android-call-controls fieldset p { line-height:1.7; }
+.android-call-controls input[type=number] { width:90px; margin-left:12px; }
+.android-call-controls fieldset:disabled { opacity:.6; }
