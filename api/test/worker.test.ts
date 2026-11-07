@@ -311,13 +311,28 @@ describe("Jarvis Phase 1 Worker", () => {
 
   it("uses the named calendar creation request as authorization and audits the result", async () => {
     const body = await (await sendMessage("direct-calendar", "jarvis 캘린더를 생성해줘")).json<{
-      approvalRequired: boolean; toolResults: {name: string}[];
+      approvalRequired: boolean; model: string; message: string; toolResults: {name: string; summary: string}[];
     }>();
     expect(body.approvalRequired).toBe(false);
     expect(body.toolResults).toHaveLength(1);
     expect(body.toolResults[0]?.name).toBe("calendar.ensure_calendar");
+    expect(body.model).toBe('jarvis-calendar');
+    expect(body.message).toBe(body.toolResults[0]?.summary);
     const { approvals } = await (await api('/api/approvals')).json<{approvals: {conversationId: string; status: string; executionId: string | null}[]}>();
     expect(approvals.find(item => item.conversationId === 'direct-calendar')).toMatchObject({status: 'FAILED', executionId: expect.any(String)});
+  });
+
+  it("routes direct creation after an earlier approval prompt even when the model selector would choose no tool", async () => {
+    const session = "calendar-repeat";
+    await sendMessage(session, "캘린더를 생성하는 게 좋을까");
+    // The test model selects no tool for this English command, so routing must not rely on it.
+    const response = await (await sendMessage(session, "create a calendar named Jarvis")).json<{
+      model: string; approvalRequired: boolean; toolCalls: {name:string; input:unknown}[]; toolResults: {summary:string}[]; message:string;
+    }>();
+    expect(response.approvalRequired).toBe(false);
+    expect(response.model).toBe("jarvis-calendar");
+    expect(response.toolCalls[0]).toMatchObject({name:"calendar.ensure_calendar", input:{name:"Jarvis"}});
+    expect(response.message).toBe(response.toolResults[0]?.summary);
   });
 
   it("expires a pending approval and never executes it", async () => {

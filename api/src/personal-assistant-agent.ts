@@ -1,4 +1,4 @@
-import { explicitlyRequestsCalendar } from "./tools/calendar/calendar-authorization";
+import { explicitlyRequestsCalendar, requestedCalendarName } from "./tools/calendar/calendar-authorization";
 import { CalendarCreationRepository } from './tools/calendar/calendar-catalog';
 import { Agent, type AgentContext } from "agents";
 import { ApprovalRepository, type Approval, type ApprovalStatus } from "./approval/approval-repository";
@@ -212,7 +212,10 @@ export class PersonalAssistantAgent extends Agent<Env> {
         const fallbackActive={...activeToolProviders};
         for(const selection of toolFallbackSelections){const service=selection.target.slice(6) as "gmail"|"calendar"|"search";fallbackServices.add(service);fallbackActive[service]=selection.providerId;}
         const registry = new ToolRegistry(createToolProviders(this.env, oauth, activeToolProviders,mcpRuntime,new CalendarCreationRepository(this)), scheduler, [], fallbackServices.size?{providers:createToolProviders(this.env,oauth,fallbackActive,mcpRuntime,new CalendarCreationRepository(this)),services:fallbackServices,configuration:reliability.fallbacks,health:reliability.health}:undefined);
-        const candidate = await provider.selectTool(request, registry.definitions());
+        const calendarName = requestedCalendarName(message);
+        const candidate = calendarName && registry.get("calendar.ensure_calendar")
+          ? { id: crypto.randomUUID(), name: "calendar.ensure_calendar", arguments: { name: calendarName } }
+          : await provider.selectTool(request, registry.definitions());
         const selected = candidate && (candidate.name === "calendar.ensure_calendar" || isExplicitMutationIntent(message, candidate.name)) ? candidate
           : candidate && registry.get(candidate.name)?.policy === "APPROVAL_REQUIRED" ? null : candidate;
         if (selected) {
@@ -269,6 +272,10 @@ export class PersonalAssistantAgent extends Agent<Env> {
               ...(error ? { error } : {}),
             });
             if (directApproval) new ApprovalRepository(this).finish(directApproval.approvalId, success, executionId, summary, error);
+            if (selected.name === "calendar.ensure_calendar") {
+              responseText = summary;
+              responseModel = "jarvis-calendar";
+            } else {
             const llmResponse = await provider.generateWithToolResult(request, selected, {
               success,
               data: toolPayload,
@@ -278,6 +285,7 @@ export class PersonalAssistantAgent extends Agent<Env> {
             });
             responseText = llmResponse.text;
             responseModel = llmResponse.model;
+            }
             }
           }
         }
