@@ -1,3 +1,5 @@
+import type { CalendarCreationRepository } from './calendar/calendar-catalog';
+import { calendarCapabilities as getCalendarCapabilities } from './calendar/calendar-catalog';
 import type { Env } from "../env";
 import { GoogleCalendarClient } from "./calendar/calendar-client";
 import { GoogleGmailClient } from "./gmail/gmail-client";
@@ -18,14 +20,14 @@ const DEFAULT_PROVIDERS: ActiveToolProviders = {
 
 export function createToolProviders(
   env: Env, googleAuth: AccessTokenProvider, active: ActiveToolProviders = DEFAULT_PROVIDERS,
-  mcp?: { client: GenericMcpClient; registry: McpRegistryService },
+  mcp?: { client: GenericMcpClient; registry: McpRegistryService }, creationGuard?:CalendarCreationRepository,
 ): ToolProviderSet {
   const accessToken = () => googleAuth.getAccessToken();
   const scopes=googleAuth.status?.().scopes;
   const gmailCapabilities=!scopes?["read","send","reply"]:[...(scopes.includes("https://www.googleapis.com/auth/gmail.readonly")?["read"]:[]),...(scopes.includes("https://www.googleapis.com/auth/gmail.send")?["send","reply"]:[])];
-  const calendarCapabilities=!scopes||scopes.includes("https://www.googleapis.com/auth/calendar.events")?["read","create","update","delete"]:scopes.includes("https://www.googleapis.com/auth/calendar.readonly")?["read"]:[];
+  const calendarCapabilities=getCalendarCapabilities(scopes);
   const gmail = new GoogleGmailClient(accessToken);
-  const calendar = new GoogleCalendarClient(accessToken);
+  const calendar = new GoogleCalendarClient(accessToken,undefined,creationGuard);
   const mcpGmail=mcp?.registry.serverForProvider(active.gmail);
   const mcpCalendar=mcp?.registry.serverForProvider(active.calendar);
   const mcpSearch=mcp?.registry.serverForProvider(active.search);

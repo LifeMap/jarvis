@@ -24,6 +24,7 @@ export class TestLlmProvider implements LlmProvider {
       : /(메일|email).*(보내|발송|send)|(보내|발송|send).*(메일|email)/i.test(text) ? "gmail.send"
       : /(일정|캘린더|calendar).*(삭제|delete)/i.test(text) ? "calendar.delete"
       : /(일정|캘린더|calendar).*(수정|변경|update)/i.test(text) ? "calendar.update"
+      : /(?:캘린더|calendar).*(만들|생성|추가|준비|create|ensure)/i.test(text) ? "calendar.ensure_calendar"
       : /(일정|캘린더|calendar).*(만들|생성|추가|create)/i.test(text) ? "calendar.create"
       : /메일|gmail|email/i.test(text) ? "gmail.search_messages"
       : /일정|캘린더|calendar|schedule/i.test(text) ? "google_calendar.search_events"
@@ -38,6 +39,7 @@ export class TestLlmProvider implements LlmProvider {
         : { title:"Jarvis scheduled task",instruction:/메일.*보내/i.test(text)?"메일 보내줘":"테스트 작업 실행해줘",scheduleType:"one_time",scheduleRule:{runAt:new Date(now.getTime()+300_000).toISOString()} })
         : name === "gmail.send" ? { to: "recipient@example.com", subject: "Jarvis test", body: "Test message" }
         : name === "gmail.reply" ? { to: "recipient@example.com", subject: "Re: Jarvis test", body: "Test reply", threadId: "thread-1" }
+        : name === "calendar.ensure_calendar" ? { name: "Jarvis" }
         : name === "calendar.create" ? { title: "Jarvis test", start: "2026-08-13T10:00:00+09:00", end: "2026-08-13T11:00:00+09:00" }
         : name === "calendar.update" ? { eventId: "event-1", title: "Jarvis updated", start: "2026-08-13T10:00:00+09:00", end: "2026-08-13T11:00:00+09:00" }
         : name === "calendar.delete" ? { eventId: "event-1" }

@@ -11,6 +11,7 @@ const toolDescriptions: Record<string, string> = {
   "gmail.send": "새 이메일을 발송합니다. 사용자의 명시적 승인이 필요합니다.",
   "gmail.reply": "기존 Gmail 대화에 답장합니다. 사용자의 명시적 승인이 필요합니다.",
   "google_calendar.search_events": "지정한 기간의 Google Calendar 일정을 조회합니다. 읽기 전용입니다.",
+  "calendar.ensure_calendar": "같은 이름의 Google 캘린더가 있는지 확인하고, 없을 때만 생성합니다. 승인이 필요합니다.",
   "calendar.create": "Google Calendar 일정을 생성합니다. 사용자의 명시적 승인이 필요합니다.",
   "calendar.update": "Google Calendar 일정을 수정합니다. 사용자의 명시적 승인이 필요합니다.",
   "calendar.delete": "Google Calendar 일정을 삭제합니다. 사용자의 명시적 승인이 필요합니다.",

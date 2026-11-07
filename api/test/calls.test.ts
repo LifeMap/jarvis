@@ -38,12 +38,10 @@ async function createCall(
 describe("summarizeCallTranscript", () => {
   it("returns null without calling the model when transcript is empty", async () => {
     let called = false;
-    const provider = {
-      ...new TestLlmProvider("should-not-run"),
-      generate: async () => {
+    const provider = new TestLlmProvider("should-not-run");
+    provider.generate = async () => {
         called = true;
         return { text: "nope", model: "test" };
-      },
     };
     await expect(summarizeCallTranscript([], provider)).resolves.toBeNull();
     expect(called).toBe(false);

@@ -1,3 +1,4 @@
+import { calendarCapabilities as getCalendarCapabilities } from './calendar/calendar-catalog';
 import type { Env } from "../env";
 
 export type DynamicToolService = "gmail" | "calendar" | "search";
@@ -50,7 +51,7 @@ export function createToolProviderRegistry(env: Env, availability: ToolProviderA
   const googleEnabled = googleConfigured && availability.googleConnected;
   const scopes=availability.googleScopes;
   const gmailCapabilities=!scopes?["read","send","reply"]:[...(scopes.includes("https://www.googleapis.com/auth/gmail.readonly")?["read"]:[]),...(scopes.includes("https://www.googleapis.com/auth/gmail.send")?["send","reply"]:[])];
-  const calendarCapabilities=!scopes||scopes.includes("https://www.googleapis.com/auth/calendar.events")?["read","create","update","delete"]:scopes.includes("https://www.googleapis.com/auth/calendar.readonly")?["read"]:[];
+  const calendarCapabilities=getCalendarCapabilities(scopes);
   const googleReason = !googleConfigured
     ? "GOOGLE_CLIENT_ID 또는 GOOGLE_CLIENT_SECRET이 설정되지 않았습니다."
     : !availability.googleConnected ? "Google 계정이 연결되지 않았습니다." : undefined;

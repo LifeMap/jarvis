@@ -1,3 +1,4 @@
+import { CalendarCreationRepository } from './tools/calendar/calendar-catalog';
 import { Agent, type AgentContext } from "agents";
 import { ApprovalRepository, type Approval, type ApprovalStatus } from "./approval/approval-repository";
 import type {
@@ -209,7 +210,7 @@ export class PersonalAssistantAgent extends Agent<Env> {
         const fallbackServices=new Set<"gmail"|"calendar"|"search">();
         const fallbackActive={...activeToolProviders};
         for(const selection of toolFallbackSelections){const service=selection.target.slice(6) as "gmail"|"calendar"|"search";fallbackServices.add(service);fallbackActive[service]=selection.providerId;}
-        const registry = new ToolRegistry(createToolProviders(this.env, oauth, activeToolProviders,mcpRuntime), scheduler, [], fallbackServices.size?{providers:createToolProviders(this.env,oauth,fallbackActive,mcpRuntime),services:fallbackServices,configuration:reliability.fallbacks,health:reliability.health}:undefined);
+        const registry = new ToolRegistry(createToolProviders(this.env, oauth, activeToolProviders,mcpRuntime,new CalendarCreationRepository(this)), scheduler, [], fallbackServices.size?{providers:createToolProviders(this.env,oauth,fallbackActive,mcpRuntime,new CalendarCreationRepository(this)),services:fallbackServices,configuration:reliability.fallbacks,health:reliability.health}:undefined);
         const candidate = await provider.selectTool(request, registry.definitions());
         const selected = candidate && isExplicitMutationIntent(message, candidate.name) ? candidate
           : candidate && registry.get(candidate.name)?.policy === "APPROVAL_REQUIRED" ? null : candidate;
@@ -361,7 +362,7 @@ export class PersonalAssistantAgent extends Agent<Env> {
   adminToolStatus(){
     const oauthService=new GoogleOAuthService(new GoogleOAuthRepository(this),this.env);const oauth=oauthService.status();
     const latest=new ToolExecutionRepository(this).list(100);
-    const mcpRuntime=this.mcpRuntime();const registry=new ToolRegistry(createToolProviders(this.env,oauthService,new ToolProviderResolver(this.toolProviderConfiguration(oauthService,mcpRuntime.registry)).resolveAll(),mcpRuntime),new SchedulerService(new ScheduleRepository(this),this,this.env.SYSTEM_TIMEZONE??"UTC"));
+    const mcpRuntime=this.mcpRuntime();const registry=new ToolRegistry(createToolProviders(this.env,oauthService,new ToolProviderResolver(this.toolProviderConfiguration(oauthService,mcpRuntime.registry)).resolveAll(),mcpRuntime,new CalendarCreationRepository(this)),new SchedulerService(new ScheduleRepository(this),this,this.env.SYSTEM_TIMEZONE??"UTC"));
     return registry.tools.map(tool=>({name:tool.name,description:tool.description,enabled:true,policy:tool.policy,requiresApproval:tool.requiresApproval,
       connection:tool.name.startsWith("gmail.")||tool.name.startsWith("calendar.")||tool.name.startsWith("google_calendar.")?(oauth.connected?"connected":"disconnected"):registry.provider(tool.name)?.implementation!=="unavailable"?"available":"unavailable",
       provider:registry.provider(tool.name),
@@ -539,7 +540,7 @@ export class PersonalAssistantAgent extends Agent<Env> {
       return { ok: false, code: "EXPIRED", message: "Approval이 만료되었습니다.", approval: repository.get(id)! };
     }
     const oauth = new GoogleOAuthService(new GoogleOAuthRepository(this), this.env);
-    const mcpRuntime=this.mcpRuntime();const registry = new ToolRegistry(createToolProviders(this.env, oauth, new ToolProviderResolver(this.toolProviderConfiguration(oauth,mcpRuntime.registry)).resolveAll(),mcpRuntime));
+    const mcpRuntime=this.mcpRuntime();const registry = new ToolRegistry(createToolProviders(this.env, oauth, new ToolProviderResolver(this.toolProviderConfiguration(oauth,mcpRuntime.registry)).resolveAll(),mcpRuntime,new CalendarCreationRepository(this)));
     const tool = registry.get(existing.toolName);
     if (!tool) return { ok: false, code: "TOOL_NOT_FOUND", message: "요청된 Tool을 찾을 수 없습니다.", approval: existing };
     if (tool.policy !== "APPROVAL_REQUIRED") return { ok: false, code: "POLICY_MISMATCH", message: "Tool 승인 정책이 일치하지 않습니다.", approval: existing };
@@ -637,6 +638,7 @@ function parseExplicitMemory(message: string): string | null {
 function isExplicitMutationIntent(message: string, toolName: string): boolean {
   if (toolName === "gmail.send") return /(메일|gmail|email)/i.test(message) && /(보내|발송|전송|send)/i.test(message);
   if (toolName === "gmail.reply") return /(답장|회신|reply)/i.test(message);
+  if (toolName === "calendar.ensure_calendar") return /(캘린더|calendar)/i.test(message) && /(만들|생성|추가|준비|없으면|없을.*생성|create|add|ensure)/i.test(message);
   if (toolName === "calendar.create") return /(일정|캘린더|calendar|회의|미팅)/i.test(message) && /(만들|생성|추가|등록|create|add)/i.test(message);
   if (toolName === "calendar.update") return /(일정|캘린더|calendar|회의|미팅)/i.test(message) && /(수정|변경|옮겨|update|change)/i.test(message);
   if (toolName === "calendar.delete") return /(일정|캘린더|calendar|회의|미팅)/i.test(message) && /(삭제|취소|지워|delete|cancel)/i.test(message);

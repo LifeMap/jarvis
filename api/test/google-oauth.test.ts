@@ -24,6 +24,8 @@ describe("GoogleOAuthService", () => {
     expect(url.searchParams.get("scope")).toContain("gmail.readonly");
     expect(url.searchParams.get("scope")).toContain("gmail.send");
     expect(url.searchParams.get("scope")).toContain("calendar.events");
+    expect(url.searchParams.get("scope")).toContain("calendar.calendarlist.readonly");
+    expect(url.searchParams.get("scope")).toContain("calendar.app.created");
   });
 
   it("refreshes and persists an expired access token", async () => {

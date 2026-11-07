@@ -1,3 +1,4 @@
+import { CalendarEnsureTool } from './calendar/calendar-catalog';
 import { CalendarSearchTool } from "./calendar/calendar-tool";
 import { CalendarCreateTool, CalendarDeleteTool, CalendarUpdateTool } from "./calendar/calendar-write-tools";
 import { GmailSearchTool } from "./gmail/gmail-tool";
@@ -26,7 +27,8 @@ export class ToolRegistry {
   readonly #fallbackProvidersByTool = new Map<string, ToolProviderIdentity>();
   constructor(providers: ToolProviderSet, scheduler?: SchedulerService, additional: Array<{tool:ToolDefinition;identity:ToolProviderIdentity}> = [], private readonly fallback?: ToolFallbackRuntime) {
     const gmailTools = [new GmailSearchTool(providers.gmail.client), new GmailSendTool(providers.gmail.client), new GmailReplyTool(providers.gmail.client)];
-    const calendarTools = [new CalendarSearchTool(providers.calendar.client), new CalendarCreateTool(providers.calendar.client), new CalendarUpdateTool(providers.calendar.client), new CalendarDeleteTool(providers.calendar.client)];
+    const calendarTools:ToolDefinition[] = [new CalendarSearchTool(providers.calendar.client), new CalendarCreateTool(providers.calendar.client), new CalendarUpdateTool(providers.calendar.client), new CalendarDeleteTool(providers.calendar.client)];
+    if(providers.calendar.client.ensureCalendar)calendarTools.push(new CalendarEnsureTool({ensureCalendar:providers.calendar.client.ensureCalendar.bind(providers.calendar.client)}));
     const searchTools = [new WebSearchTool(providers.search.provider)];
     const schedulerTools = scheduler ? [new SchedulerCreateTool(scheduler)] : [];
     this.tools = [...gmailTools, ...calendarTools, ...searchTools, ...schedulerTools,...additional.map(item=>item.tool)];
@@ -87,4 +89,4 @@ export class ToolRegistry {
 }
 
 function toolTarget(identity: ToolProviderIdentity) { return `tools.${identity.service}.${identity.implementation}`; }
-function requiredCapability(name:string){if(name==="gmail.search_messages")return"read";if(name==="gmail.send")return"send";if(name==="gmail.reply")return"reply";if(name==="google_calendar.search_events")return"read";if(name==="calendar.create")return"create";if(name==="calendar.update")return"update";if(name==="calendar.delete")return"delete";return undefined;}
+function requiredCapability(name:string){if(name==="calendar.ensure_calendar")return"ensure_calendar";if(name==="gmail.search_messages")return"read";if(name==="gmail.send")return"send";if(name==="gmail.reply")return"reply";if(name==="google_calendar.search_events")return"read";if(name==="calendar.create")return"create";if(name==="calendar.update")return"update";if(name==="calendar.delete")return"delete";return undefined;}

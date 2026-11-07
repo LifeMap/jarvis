@@ -17,7 +17,7 @@ afterEach(() => {
 
 describe("mintRealtimeClientSecret", () => {
   it("returns value expiresAt model from OpenAI", async () => {
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+    const fetchMock = vi.fn(async (_url: string, _init: RequestInit) => new Response(JSON.stringify({
       value: "ek_test",
       expires_at: 1_700_000_000,
       session: { model: "gpt-realtime-2.1-mini" },

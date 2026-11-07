@@ -298,6 +298,7 @@ describe("Jarvis Phase 1 Worker", () => {
   it.each([
     ["답장해줘", "gmail.reply"],
     ["일정 만들어줘", "calendar.create"],
+    ["Jarvis 캘린더 만들어줘", "calendar.ensure_calendar"],
     ["일정 수정해줘", "calendar.update"],
     ["일정 삭제해줘", "calendar.delete"],
   ])("creates approval for %s without executing it", async (message, toolName) => {
