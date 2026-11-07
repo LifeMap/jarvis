@@ -22,7 +22,8 @@ export function CallSettings({deviceId}:{deviceId:string}) {
       <p><label>첫 인사 <textarea required maxLength={500} value={settings.greeting} onChange={e=>setSettings({...settings,greeting:e.target.value})}/></label></p>
       <p><label>말투와 답변 길이 <textarea required maxLength={1000} value={settings.style} onChange={e=>setSettings({...settings,style:e.target.value})}/></label></p>
       <p><label><input type="checkbox" checked={settings.calendarEnabled} onChange={e=>setSettings({...settings,calendarEnabled:e.target.checked})}/> 수신 통화에서 일정 조회와 가예약 사용</label></p>
-      <p>Google 캘린더 연결이 필요합니다. 가예약은 쓰기 가능한 Jarvis 캘린더에 저장되며 확정 일정이 아닙니다.</p>
+      <p>일정 조회와 가예약은 Jarvis의 기존 Google 계정 연결을 사용합니다.</p>
+      <p>가예약은 해당 계정에서 쓰기 권한이 있는 ‘Jarvis’ 캘린더에 저장됩니다. 가예약은 확정 일정이 아닙니다.</p>
       <p>필요한 정보 수집 → 전달 내용 확인 → 상대방의 종료 대기. 자동 콜백은 사용하지 않습니다.</p>
       <button type="submit">{saving?'저장 중…':'통화 설정 저장'}</button>
     </fieldset></form>{message&&<p role="status">{message}</p>}
