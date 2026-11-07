@@ -298,7 +298,7 @@ describe("Jarvis Phase 1 Worker", () => {
   it.each([
     ["답장해줘", "gmail.reply"],
     ["일정 만들어줘", "calendar.create"],
-    ["Jarvis 캘린더 만들어줘", "calendar.ensure_calendar"],
+    ["캘린더를 생성하는 게 좋을까", "calendar.ensure_calendar"],
     ["일정 수정해줘", "calendar.update"],
     ["일정 삭제해줘", "calendar.delete"],
   ])("creates approval for %s without executing it", async (message, toolName) => {
@@ -307,6 +307,17 @@ describe("Jarvis Phase 1 Worker", () => {
     }>();
     expect(body.approval).toMatchObject({ toolName, status: "PENDING" });
     expect(body.toolResults).toEqual([]);
+  });
+
+  it("uses the named calendar creation request as authorization and audits the result", async () => {
+    const body = await (await sendMessage("direct-calendar", "jarvis 캘린더를 생성해줘")).json<{
+      approvalRequired: boolean; toolResults: {name: string}[];
+    }>();
+    expect(body.approvalRequired).toBe(false);
+    expect(body.toolResults).toHaveLength(1);
+    expect(body.toolResults[0]?.name).toBe("calendar.ensure_calendar");
+    const { approvals } = await (await api('/api/approvals')).json<{approvals: {conversationId: string; status: string; executionId: string | null}[]}>();
+    expect(approvals.find(item => item.conversationId === 'direct-calendar')).toMatchObject({status: 'FAILED', executionId: expect.any(String)});
   });
 
   it("expires a pending approval and never executes it", async () => {

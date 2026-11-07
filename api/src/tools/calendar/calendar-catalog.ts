@@ -11,7 +11,7 @@ export class CalendarCreationRepository {
 }
 export class CalendarEnsureTool implements ToolDefinition<EnsureCalendarResult> {
   name='calendar.ensure_calendar';
-  description='요청한 이름의 Google 캘린더를 숨김 항목까지 조회합니다. 같은 이름이 있으면 기존 캘린더와 쓰기 가능 여부를 반환하고, 없을 때만 새 캘린더를 생성합니다. 일정이 아닌 캘린더 자체를 만드는 기능이며 사용자의 명시적 승인이 필요합니다. 읽기 전용 캘린더가 있어도 중복 생성하지 않습니다.';
+  description='요청한 이름의 Google 캘린더를 숨김 항목까지 조회합니다. 같은 이름이 있으면 기존 캘린더와 쓰기 가능 여부를 반환하고, 없을 때만 새 캘린더를 생성합니다. 일정이 아닌 캘린더 자체를 만드는 기능이며 사용자가 이름을 지정해 직접 생성을 요청하면 실행하고, 스스로 제안한 생성은 별도 승인이 필요합니다. 읽기 전용 캘린더가 있어도 중복 생성하지 않습니다.';
   policy='APPROVAL_REQUIRED' as const;requiresApproval=true;
   inputSchema={type:'object',properties:{name:{type:'string',description:'조회하거나 생성할 캘린더 이름',minLength:1,maxLength:200}},required:['name'],additionalProperties:false};
   constructor(private client:CalendarCatalogClient){}

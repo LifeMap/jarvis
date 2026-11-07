@@ -1,3 +1,4 @@
+import { explicitlyRequestsCalendar } from "./tools/calendar/calendar-authorization";
 import { CalendarCreationRepository } from './tools/calendar/calendar-catalog';
 import { Agent, type AgentContext } from "agents";
 import { ApprovalRepository, type Approval, type ApprovalStatus } from "./approval/approval-repository";
@@ -212,11 +213,12 @@ export class PersonalAssistantAgent extends Agent<Env> {
         for(const selection of toolFallbackSelections){const service=selection.target.slice(6) as "gmail"|"calendar"|"search";fallbackServices.add(service);fallbackActive[service]=selection.providerId;}
         const registry = new ToolRegistry(createToolProviders(this.env, oauth, activeToolProviders,mcpRuntime,new CalendarCreationRepository(this)), scheduler, [], fallbackServices.size?{providers:createToolProviders(this.env,oauth,fallbackActive,mcpRuntime,new CalendarCreationRepository(this)),services:fallbackServices,configuration:reliability.fallbacks,health:reliability.health}:undefined);
         const candidate = await provider.selectTool(request, registry.definitions());
-        const selected = candidate && isExplicitMutationIntent(message, candidate.name) ? candidate
+        const selected = candidate && (candidate.name === "calendar.ensure_calendar" || isExplicitMutationIntent(message, candidate.name)) ? candidate
           : candidate && registry.get(candidate.name)?.policy === "APPROVAL_REQUIRED" ? null : candidate;
         if (selected) {
           const tool = registry.get(selected.name);
           if (tool) {
+            let directApproval: Approval | undefined;
             if (tool.policy === "APPROVAL_REQUIRED") {
               approval = new ApprovalRepository(this).create({
                 approvalId: crypto.randomUUID(), conversationId: sessionId, requestId,
@@ -224,9 +226,13 @@ export class PersonalAssistantAgent extends Agent<Env> {
                 policy: "APPROVAL_REQUIRED", expiresAt: new Date(Date.now() + 24 * 60 * 60_000).toISOString(),
               });
             }
+            if (approval && selected.name === "calendar.ensure_calendar" && explicitlyRequestsCalendar(message, selected.arguments.name)) {
+              directApproval = new ApprovalRepository(this).claim(approval.approvalId, new Date().toISOString()) ?? undefined;
+              if (directApproval) approval = undefined;
+            }
             const debugCall: ToolCallDebug = {
               id: selected.id, name: selected.name, input: selected.arguments,
-              requiresApproval: tool.requiresApproval, ...(approval ? { approvalId: approval.approvalId } : {}),
+              requiresApproval: Boolean(approval), ...(approval ? { approvalId: approval.approvalId } : {}),
             };
             toolCalls = [debugCall];
             if (approval) {
@@ -239,7 +245,7 @@ export class PersonalAssistantAgent extends Agent<Env> {
             let error: string | undefined;
             let summary: string;
             try {
-              const execution = await registry.execute(selected.name, selected.arguments, { timezone });
+              const execution = await registry.execute(selected.name, selected.arguments, { timezone }, directApproval ? { approvalId: directApproval.approvalId, toolName: selected.name } : undefined);
               toolPayload = execution.result;
               if (selected.name === "scheduler.create") createdSchedule = toolPayload as import("./scheduler/types").JarvisSchedule;
               success = true;
@@ -256,11 +262,13 @@ export class PersonalAssistantAgent extends Agent<Env> {
               ...(error ? { error } : {}),
             };
             toolResults = [debugResult];
+            const executionId = crypto.randomUUID();
             new ToolExecutionRepository(this).record({
-              id: crypto.randomUUID(), requestId, toolName: selected.name,
+              id: executionId, requestId, toolName: selected.name,
               toolInput: selected.arguments, success, durationMs, resultSummary: summary,
               ...(error ? { error } : {}),
             });
+            if (directApproval) new ApprovalRepository(this).finish(directApproval.approvalId, success, executionId, summary, error);
             const llmResponse = await provider.generateWithToolResult(request, selected, {
               success,
               data: toolPayload,

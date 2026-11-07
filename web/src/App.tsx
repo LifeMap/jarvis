@@ -218,8 +218,5 @@ export default function App() {
 }
 
 function formatAssistantMessage(response:import("./types/agent").AgentMessageResponse){
-  const location=response.context?.location;
-  if(!location)return response.message;
-  const accuracy=location.accuracyMeters!==undefined?` · 정확도 약 ${Math.round(location.accuracyMeters)}m`:"";
-  return `${response.message}\n\n📍 현재 위치: ${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}${accuracy}\n수집 시각: ${new Date(location.capturedAt).toLocaleString()}`;
+  return response.message;
 }

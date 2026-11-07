@@ -105,7 +105,7 @@ function ToolExecutions({ calls, results }: {
         return (
           <div className="tool-debug-card" key={call.id}>
             <strong>{call.name}</strong>
-            <span className={result?.success ? "tool-success" : "tool-failure"}>{result?.success ? "success" : "failure"}</span>
+            <span className={!result ? "" : result.success ? "tool-success" : "tool-failure"}>{!result ? "pending" : result.success ? "success" : "failure"}</span>
             <code>{result ? `${result.durationMs} ms` : "pending"}</code>
             <pre>{JSON.stringify(call.input, null, 2)}</pre>
             {result && <p>{result.summary}</p>}

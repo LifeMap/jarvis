@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import type { ConversationMessage } from "../types/agent";
 
 interface ConversationProps {
@@ -6,6 +7,11 @@ interface ConversationProps {
 }
 
 export function Conversation({ messages, isLoading }: ConversationProps) {
+  const listRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const list = listRef.current;
+    if (list) list.scrollTop = list.scrollHeight;
+  }, [messages, isLoading]);
   return (
     <section className="panel conversation-panel" aria-labelledby="conversation-title">
       <div className="panel-heading">
@@ -16,7 +22,7 @@ export function Conversation({ messages, isLoading }: ConversationProps) {
         <span className="message-count">{messages.length} messages</span>
       </div>
 
-      <div className="message-list" aria-live="polite">
+      <div ref={listRef} className="message-list" aria-live="polite">
         {messages.length === 0 ? (
           <div className="empty-state">
             <span className="empty-orb" aria-hidden="true" />
