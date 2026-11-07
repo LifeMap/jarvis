@@ -255,7 +255,8 @@ export class PersonalAssistantAgent extends Agent<Env> {
               summary = tool.summarize(toolPayload);
               if (execution.fallbackUsed) summary += ` (Fallback 사용: ${execution.primaryProvider} → ${execution.fallbackProvider}, ${execution.failureType})`;
             } catch (toolError) {
-              error = toolError instanceof ToolError ? toolError.userMessage : "Tool 실행 중 오류가 발생했습니다.";
+              error = toolError instanceof ToolError ? toolError.userMessage
+                : toolError instanceof ToolPolicyError ? toolError.message : "Tool 실행 중 오류가 발생했습니다.";
               toolPayload = { error };
               summary = error;
             }

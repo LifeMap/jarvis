@@ -58,7 +58,12 @@ export class ToolRegistry {
     if (tool.policy === "AUTO" && authorization) throw new ToolPolicyError("POLICY_MISMATCH", "Read-only Tool에는 승인 권한을 사용할 수 없습니다.");
     const primary = this.provider(name);
     const capability=requiredCapability(name);
-    if(primary?.capabilities&&capability&&!primary.capabilities.includes(capability))throw new ToolPolicyError("POLICY_MISMATCH",`현재 ${primary.implementation} 인증에는 ${capability} 권한이 없습니다. 계정을 필요한 scope로 다시 연결해 주세요.`);
+    if(primary?.capabilities&&capability&&!primary.capabilities.includes(capability)) {
+      const message = name === "calendar.ensure_calendar" && primary.implementation === "google-calendar-api"
+        ? "Google 계정에 캘린더 목록 조회·생성 권한이 없어 실행하지 못했습니다. 기존 일정 권한만으로는 캘린더를 만들 수 없습니다. Google 계정을 다시 연결해 추가 권한을 허용한 뒤 요청해 주세요. 캘린더는 생성되지 않았습니다."
+        : `현재 ${primary.implementation} 인증에는 ${capability} 권한이 없습니다. 계정을 필요한 scope로 다시 연결해 주세요.`;
+      throw new ToolPolicyError("POLICY_MISMATCH", message);
+    }
     const started = Date.now();
     try {
       const result = await tool.execute(input, context);

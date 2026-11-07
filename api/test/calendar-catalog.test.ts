@@ -53,6 +53,6 @@ describe('calendar.ensure_calendar',()=>{
   const providers=createToolProviders({} as Env,{getAccessToken:async()=> 'token',status:()=>({scopes:[prefix+'calendar.events']})});
   const registry=new ToolRegistry(providers);
   await expect(registry.execute('calendar.ensure_calendar',{name:'Jarvis'},{timezone:'Asia/Seoul'})).rejects.toMatchObject({code:'APPROVAL_REQUIRED'});
-  await expect(registry.execute('calendar.ensure_calendar',{name:'Jarvis'},{timezone:'Asia/Seoul'},{approvalId:'a',toolName:'calendar.ensure_calendar'})).rejects.toMatchObject({code:'POLICY_MISMATCH'});
+  await expect(registry.execute('calendar.ensure_calendar',{name:'Jarvis'},{timezone:'Asia/Seoul'},{approvalId:'a',toolName:'calendar.ensure_calendar'})).rejects.toMatchObject({code:'POLICY_MISMATCH',message:expect.stringContaining('캘린더 목록 조회·생성 권한')});
  });
 });

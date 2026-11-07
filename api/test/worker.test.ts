@@ -317,6 +317,8 @@ describe("Jarvis Phase 1 Worker", () => {
     expect(body.toolResults).toHaveLength(1);
     expect(body.toolResults[0]?.name).toBe("calendar.ensure_calendar");
     expect(body.model).toBe('jarvis-calendar');
+    expect(body.message).toContain('캘린더 목록 조회·생성 권한');
+    expect(body.message).not.toBe('Tool 실행 중 오류가 발생했습니다.');
     expect(body.message).toBe(body.toolResults[0]?.summary);
     const { approvals } = await (await api('/api/approvals')).json<{approvals: {conversationId: string; status: string; executionId: string | null}[]}>();
     expect(approvals.find(item => item.conversationId === 'direct-calendar')).toMatchObject({status: 'FAILED', executionId: expect.any(String)});
