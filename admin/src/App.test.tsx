@@ -15,8 +15,10 @@ describe("Jarvis 관리자",()=>{
     fireEvent.click(screen.getByRole("button",{name:"통화"}));
     expect(await screen.findByText("01011112222")).toBeInTheDocument();
     expect(screen.getByText("택배 도착 안내")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button",{name:"상세"}));
-    expect(await screen.findAllByText((_,element)=>element?.tagName==="P"&&element.textContent==="caller: 택배 왔습니다")).not.toHaveLength(0);
+    fireEvent.click(screen.getByRole("button",{name:/01011112222/}));
+    expect(await screen.findByText("택배 왔습니다")).toBeInTheDocument();
+    expect(screen.getByRole("heading",{name:"통화 요약"})).toBeInTheDocument();
+    expect(screen.getByLabelText("선택한 통화 녹음")).toHaveAttribute("src","/api/calls/call-1/audio");
   });
   it("Agent 실행 기록과 상세를 표시한다",async()=>{const run={id:"r1",request:"안녕",response:"반갑습니다",model:"test",status:"completed",error:null,executionTimeMs:4,createdAt:"2026-08-12",triggerType:"manual"};vi.spyOn(globalThis,"fetch").mockImplementation(input=>String(input).endsWith("/history/r1")?json(run):String(input).endsWith("/history")?json({runs:[run],scheduleExecutions:[]}):json(dashboard));render(<App/>);fireEvent.click(screen.getByRole("button",{name:"실행 기록"}));expect(await screen.findByText("안녕")).toBeInTheDocument();fireEvent.click(screen.getByRole("button",{name:"상세"}));expect(await screen.findByText("반갑습니다")).toBeInTheDocument()});
   it("답변 스타일 설정을 저장한다",async()=>{const current={language:"ko",timezone:"Asia/Seoul",responseTone:"friendly",speechStyle:"polite",responseDetail:"balanced",customInstructions:"",llmProvider:"openai",llmModel:"gpt-5-mini",systemTimezone:"UTC",secretsManagedBy:"Cloudflare Secrets"};const fetchMock=vi.spyOn(globalThis,"fetch").mockImplementation((input,init)=>String(input).endsWith("/settings")?json(init?.method==="PATCH"?{...current,...JSON.parse(String(init.body))}:current):json(dashboard));render(<App/>);fireEvent.click(screen.getByRole("button",{name:"설정"}));expect(await screen.findByText("전체적인 톤")).toBeInTheDocument();fireEvent.change(screen.getByLabelText("사용자 지정 답변 지침"),{target:{value:"결론부터 말해줘."}});fireEvent.click(screen.getByRole("button",{name:"저장"}));await waitFor(()=>expect(fetchMock).toHaveBeenCalledWith("/api/settings",expect.objectContaining({method:"PATCH",body:expect.stringContaining("결론부터 말해줘.")})));expect(await screen.findByText("저장했습니다.")).toBeInTheDocument()});
