@@ -2,6 +2,7 @@ import './call-settings.css';
 import { useEffect, useState, type FormEvent } from 'react';
 import { api } from '../services/api-client';
 interface Device { deviceId:string;link:string;phone:string;busy:boolean;outbound:boolean;autoAnswer:boolean;updatedAt:string }
+const jobStatus:Record<string,string>={pending:'발신 대기',claimed:'발신 처리 중',completed:'통화 완료',failed:'실패 또는 만료',uncertain:'결과 확인 필요'};
 export function AndroidCallControls() {
   const [devices,setDevices]=useState<Device[]>([]);
   const [requestId,setRequestId]=useState(()=>crypto.randomUUID());
@@ -21,8 +22,9 @@ export function AndroidCallControls() {
   },[]);
   async function submit(event:FormEvent) {
     event.preventDefault();if(sending||!confirmed)return;
+    if(!/^\+?[0-9]{3,20}$/.test(number.replace(/[\s()-]/g,''))||!purpose.trim()){setMessage('전화번호와 전달할 용건을 확인해 주세요.');return;}
     setSending(true);setMessage('');
-    try{const result=await api<{id:string}>('/android-calls/jobs',{method:'POST',body:JSON.stringify({requestId,deviceId,phoneNumber:number,purpose,confirmed:true})});setMessage(`발신 요청이 등록되었습니다. 작업: ${result.id}`);setConfirmed(false);setRequestId(crypto.randomUUID());}
+    try{const result=await api<{id:string;status?:string}>('/android-calls/jobs',{method:'POST',body:JSON.stringify({requestId,deviceId,phoneNumber:number.replace(/[\s()-]/g,''),purpose:purpose.trim(),confirmed:true})});setMessage(`발신 요청이 등록되었습니다. 작업: ${result.id}`);setJobs(current=>[{id:result.id,device_id:deviceId,phone:number,status:result.status??'pending'},...current.filter(job=>job.id!==result.id)]);setConfirmed(false);setRequestId(crypto.randomUUID());}
     catch{setMessage('발신 요청의 접수 여부를 확인하지 못했습니다. 중복 발신을 피하려면 작업 목록을 확인한 뒤 다시 요청하세요.');}
     finally{setSending(false);}
   }
@@ -35,14 +37,14 @@ export function AndroidCallControls() {
     })}
     <form onSubmit={submit}>
       <p><label>장치 ID <input value={deviceId} onChange={e=>{setDeviceId(e.target.value);setConfirmed(false);setRequestId(crypto.randomUUID());}} pattern="[A-Za-z0-9_-]{1,64}" required disabled={sending}/></label></p>
-      <p><label>전화번호 <input type="tel" value={number} onChange={e=>{setNumber(e.target.value);setConfirmed(false);setRequestId(crypto.randomUUID());}} pattern="\+?[0-9]{3,20}" required disabled={sending}/></label></p>
-      <p><label>통화 목적과 허용 범위 <textarea value={purpose} onChange={e=>{setPurpose(e.target.value);setConfirmed(false);setRequestId(crypto.randomUUID());}} maxLength={4000} required disabled={sending}/></label></p>
+      <p><label>전화번호 <input type="tel" value={number} onChange={e=>{setNumber(e.target.value);setConfirmed(false);setRequestId(crypto.randomUUID());}} placeholder="010-1234-5678" required disabled={sending}/></label></p>
+      <p><label>통화 목적과 허용 범위 <textarea value={purpose} onChange={e=>{setPurpose(e.target.value);setConfirmed(false);setRequestId(crypto.randomUUID());}} placeholder="예: 홍길동님에게 내일 오후 2시 방문이 가능한지 확인하고 답변을 전달해 주세요. 시간 확정은 하지 마세요." maxLength={4000} required disabled={sending}/></label></p>
       <p><label><input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)} disabled={sending}/> 위 번호로 AI가 실제 전화를 거는 것에 동의합니다.</label></p>
       <button type="submit" disabled={!confirmed||sending}>{sending?'요청 중…':'발신 요청'}</button>
       <p>요청은 5분 후 만료됩니다. 맥미니에서 발신이 활성화되어 있어야 실행됩니다.</p>
       {message&&<p role="status">{message}</p>}
     </form>
     <h3>최근 발신 요청</h3>
-    {jobs.length===0?<p>발신 요청이 없습니다.</p>:<ul>{jobs.slice(0,10).map(job=><li key={job.id}>{job.phone} · {job.status} · {job.id}</li>)}</ul>}
+    {jobs.length===0?<p>발신 요청이 없습니다.</p>:<ul>{jobs.slice(0,10).map(job=><li key={job.id}>{job.phone} · {jobStatus[job.status]??job.status} · {job.id}</li>)}</ul>}
   </section>;
 }

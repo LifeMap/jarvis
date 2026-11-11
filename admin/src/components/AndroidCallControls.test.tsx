@@ -30,3 +30,23 @@ it('changing the destination invalidates prior confirmation',async()=>{
  expect(screen.getByRole('button',{name:'발신 요청'})).toBeDisabled();
  await waitFor(()=>expect(screen.getByText('발신 요청이 없습니다.')).toBeInTheDocument());
 });
+it('normalizes a formatted phone number and immediately displays the queued request',async()=>{
+ render(<AndroidCallControls/>);
+ await screen.findByText('발신 요청이 없습니다.');
+ fireEvent.change(screen.getByLabelText('전화번호'),{target:{value:'010-1234-5678'}});
+ fireEvent.change(screen.getByLabelText('통화 목적과 허용 범위'),{target:{value:' 방문 시간 확인 '}});
+ fireEvent.click(screen.getByRole('checkbox',{name:/위 번호/}));
+ fireEvent.click(screen.getByRole('button',{name:'발신 요청'}));
+ await waitFor(()=>expect(requests).toHaveLength(1));
+ expect(requests[0]?.body).toMatchObject({phoneNumber:'01012345678',purpose:'방문 시간 확인'});
+ expect(await screen.findByText(/010-1234-5678 · 발신 대기/)).toBeInTheDocument();
+});
+it('does not submit a whitespace-only purpose',async()=>{
+ render(<AndroidCallControls/>);
+ fireEvent.change(screen.getByLabelText('전화번호'),{target:{value:'01012345678'}});
+ fireEvent.change(screen.getByLabelText('통화 목적과 허용 범위'),{target:{value:'   '}});
+ fireEvent.click(screen.getByRole('checkbox',{name:/위 번호/}));
+ fireEvent.click(screen.getByRole('button',{name:'발신 요청'}));
+ expect(await screen.findByText('전화번호와 전달할 용건을 확인해 주세요.')).toBeInTheDocument();
+ expect(requests).toHaveLength(0);
+});
