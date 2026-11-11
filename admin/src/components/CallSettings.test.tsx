@@ -26,3 +26,13 @@ it('does not permit overwriting settings after a load failure',async()=>{
  await screen.findByText(/불러오지 못했습니다/);
  expect(screen.getByRole('button',{name:'통화 설정 저장'})).toBeDisabled();
 });
+it('saves outbound override without changing other settings',async()=>{
+ let saved:any;
+ vi.stubGlobal('fetch',vi.fn(async(_url:unknown,init?:RequestInit)=>{if(init?.method==='PUT')saved=JSON.parse(String(init.body));return Response.json({settings:defaultCallSettings});}));
+ render(<CallSettings deviceId="mac-mini"/>);
+ await waitFor(()=>expect(screen.getByRole('button',{name:'통화 설정 저장'})).toBeEnabled());
+ fireEvent.change(screen.getByLabelText('발신 허용'),{target:{value:'enabled'}});
+ fireEvent.click(screen.getByRole('button',{name:'통화 설정 저장'}));
+ await screen.findByText(/저장했습니다/);
+ expect(saved).toEqual({...defaultCallSettings,outboundEnabled:true});
+});
