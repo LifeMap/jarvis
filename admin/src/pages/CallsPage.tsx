@@ -7,7 +7,6 @@ export function CallsPage(){
   if(load.error)return <ErrorBanner message={load.error}/>;
   const rows=load.data!.calls;
   return <div className="history-grid">
-    <AndroidCallControls/>
     <section className="card">
       <h2>통화 내역</h2>
       {rows.length===0?<Empty/>:<table><thead><tr><th>시간</th><th>이름</th><th>번호</th><th>상태</th><th>요약</th><th>오디오</th><th/></tr></thead>
@@ -24,5 +23,6 @@ export function CallsPage(){
         <dt>녹음</dt><dd>{selected.audioPath?<audio controls src={selected.audioPath}/>:"없음"}</dd>
       </dl>
     </aside>}
+    <AndroidCallControls/>
   </div>;
 }

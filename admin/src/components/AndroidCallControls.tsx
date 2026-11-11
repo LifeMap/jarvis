@@ -1,5 +1,4 @@
 import './call-settings.css';
-import { CallSettings } from './CallSettings';
 import { useEffect, useState, type FormEvent } from 'react';
 import { api } from '../services/api-client';
 interface Device { deviceId:string;link:string;phone:string;busy:boolean;outbound:boolean;autoAnswer:boolean;updatedAt:string }
@@ -43,7 +42,6 @@ export function AndroidCallControls() {
       <p>요청은 5분 후 만료됩니다. 맥미니에서 발신이 활성화되어 있어야 실행됩니다.</p>
       {message&&<p role="status">{message}</p>}
     </form>
-    <CallSettings deviceId={deviceId}/>
     <h3>최근 발신 요청</h3>
     {jobs.length===0?<p>발신 요청이 없습니다.</p>:<ul>{jobs.slice(0,10).map(job=><li key={job.id}>{job.phone} · {job.status} · {job.id}</li>)}</ul>}
   </section>;
