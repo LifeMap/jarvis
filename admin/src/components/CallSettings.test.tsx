@@ -15,7 +15,7 @@ it('loads defaults and persists changed delay, greeting and calendar switch',asy
  expect(screen.getByLabelText('자동 수신 대기 시간 (초)')).toHaveValue(3);
  fireEvent.change(screen.getByLabelText('자동 수신 대기 시간 (초)'),{target:{value:'5'}});
  fireEvent.change(screen.getByLabelText('첫 인사'),{target:{value:'안녕하세요. AI 비서입니다.'}});
- fireEvent.click(screen.getByRole('checkbox'));
+ fireEvent.change(screen.getByLabelText('수신 통화의 캘린더 사용'),{target:{value:'disabled'}});
  fireEvent.click(button);
  await screen.findByText(/저장했습니다/);
  expect(saved).toMatchObject({answerDelaySeconds:5,greeting:'안녕하세요. AI 비서입니다.',calendarEnabled:false});
